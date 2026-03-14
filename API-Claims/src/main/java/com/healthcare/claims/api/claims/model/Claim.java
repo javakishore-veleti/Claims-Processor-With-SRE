@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,7 +27,12 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "claims")
+@Table(name = "claims", indexes = {
+    @Index(name = "idx_claims_tenant_id", columnList = "tenantId"),
+    @Index(name = "idx_claims_customer_id", columnList = "customerId"),
+    @Index(name = "idx_claims_stage", columnList = "stage"),
+    @Index(name = "idx_claims_tenant_stage", columnList = "tenantId, stage")
+})
 @Getter
 @Setter
 @NoArgsConstructor

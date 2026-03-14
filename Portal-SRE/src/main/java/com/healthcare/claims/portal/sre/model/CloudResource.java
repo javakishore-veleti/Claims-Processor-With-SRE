@@ -9,7 +9,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cloud_resources")
+@Table(name = "cloud_resources", indexes = {
+    @Index(name = "idx_cloud_resources_provider", columnList = "cloudProvider"),
+    @Index(name = "idx_cloud_resources_tenant", columnList = "tenantId"),
+    @Index(name = "idx_cloud_resources_type", columnList = "resourceType")
+})
 @Getter
 @Setter
 @NoArgsConstructor

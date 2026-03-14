@@ -1,6 +1,8 @@
 # Local development profile - H2 in-memory database, debug logging
 # Activate with: --spring.profiles.active=local
 spring:
+  flyway:
+    enabled: false
   h2:
     console:
       enabled: true

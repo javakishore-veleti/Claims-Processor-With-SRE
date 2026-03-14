@@ -53,6 +53,7 @@
         <opentelemetry-instrumentation.version>2.12.0</opentelemetry-instrumentation.version>
         <logstash-logback.version>8.0</logstash-logback.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
+        <flyway.version>10.22.0</flyway.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
@@ -178,6 +179,18 @@
                 <groupId>net.logstash.logback</groupId>
                 <artifactId>logstash-logback-encoder</artifactId>
                 <version>${logstash-logback.version}</version>
+            </dependency>
+
+            <!-- Flyway Database Migrations -->
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-core</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

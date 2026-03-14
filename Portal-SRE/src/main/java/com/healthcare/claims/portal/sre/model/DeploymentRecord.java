@@ -7,7 +7,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "deployment_records")
+@Table(name = "deployment_records", indexes = {
+    @Index(name = "idx_deployment_service", columnList = "serviceName"),
+    @Index(name = "idx_deployment_env", columnList = "environment"),
+    @Index(name = "idx_deployment_deployed_at", columnList = "deployedAt")
+})
 @Getter
 @Setter
 @NoArgsConstructor

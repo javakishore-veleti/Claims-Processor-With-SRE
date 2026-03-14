@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +19,14 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "members")
+@Table(name = "members", indexes = {
+    @Index(name = "idx_members_tenant_id", columnList = "tenantId"),
+    @Index(name = "idx_members_member_id", columnList = "memberId"),
+    @Index(name = "idx_members_last_name", columnList = "lastName"),
+    @Index(name = "idx_members_tenant_last_name", columnList = "tenantId, lastName"),
+    @Index(name = "idx_members_email", columnList = "email"),
+    @Index(name = "idx_members_policy_number", columnList = "policyNumber")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
