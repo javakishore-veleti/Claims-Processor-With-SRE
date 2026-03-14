@@ -121,3 +121,30 @@ Integrate Kibana with actual data — log shipping via Filebeat, Elasticsearch i
 
 ## Instruction 29: Keep Everything Updated
 Ensure feature toggles for indexing/searching, Kafka publishing, Redis, log shipping to Prometheus/Grafana/Kibana. Keep index.html updated with all tech stack. Keep architecture sections in .md files updated.
+
+## Instruction 30: HikariCP, Bulkhead, Circuit Breaker, Inter-Service Auth, Auth Error Metrics
+Are we using HikariCP connection pool and also Bulkhead design pattern and also Circuit Breaker for inter-service communication? Based on feature toggles (default false) are we using JWT token or basic authentication or AWS Cognito — all configured through feature toggles for inter-service communication authentication. Also are we logging in dashboards or alerts metrics if certain % of authentication errors received by the target API in observability tools?
+
+## Instruction 31: Common-Libraries with Common-Utils (Encryption, DTOs)
+Create Common-Libraries parent module with Common-Utils child. Utility class for encrypt/decrypt tenant id, customer id, claim ids using respective encryption keys. Ensure Common-Utils is used by every other Maven module. Enhance APIs to accept encrypted IDs and use DTO classes (BaseReqDTO, domain-specific ReqDTO, RespDTO with ApiResponse wrapper) consistently from controller through service layer.
+
+## Instruction 32: README.md and CLAUDE.md Architecture Description
+In README.md or CLAUDE.md while describing the architecture, describe in sequence of Business Architecture, Data Architecture, Application Architecture, Technology Architecture (BDAT). Don't write about folder structure or Java code — make it descriptive with diagrams. Create separate files: README_Developer_First_Time.md, README_Developer_Daily_Activities.md, README_Developer_Deployment_Technical.md in Docs/MD_Files/.
+
+## Instruction 33: Portal Modules Are Orchestrators
+All API- modules are core business services that do CRUD and lookups. Portal- modules act as orchestrators across the core capabilities services in API- modules. Portal-Claims-Advisor orchestrates API-Claims, API-Members, API-Tenants, API-Entitlements.
+
+## Instruction 34: Feign Client + Shared Common Domain Modules
+Use FeignClient library for inter-microservice communication. Create Common-Claims, Common-Members, Common-Tenants, Common-Entitlements, Common-Apps as Maven modules under Common-Libraries. Define ReqDTO and RespDTO classes shared across the codebase. Don't share JPA Entity classes. Can have model classes as proxy to real JPA entities. Add these common-domain dependencies in Portal- and API- modules.
+
+## Instruction 35: Swagger in All Services, /actuator/info Links, Portal-SRE
+Swagger in all services. Add /actuator/info and /actuator/health links in index.html. Create Portal-SRE for SRE-related views — tenant analytics, cloud resource health, deployment tracking, incident management, per-tenant SLO compliance. Don't duplicate what Grafana/Prometheus/Jaeger/Kibana already do. Focus on business-level SRE: tenant usage, cost tracking, service health aggregation, MTTR.
+
+## Instruction 36: CQRS for Spring Boot and Angular
+Enabled CQRS for Spring Boot (separate command/query controllers in API-Tenants and API-Entitlements).
+
+## Instruction 37: Multi-Tenant Entitlements Model
+API-Entitlements for employees/contractors/partners. Integrate with Active Directory in future (feature toggled). Manages Roles, Privileges, Groups, GroupRoles, GroupRolePrivileges, User, UserGroups, UserRolePrivileges. All objects have tenant_id. API-Tenants for tenant CRUD. Portal-Tenants and Portal-Entitlements with Angular UI. Create 100 initial seed tenants with fictional names.
+
+## Instruction 38: Commit and Push All Code
+Commit and push all code to git.

@@ -2,8 +2,6 @@
 
 **HealthCare Plans AI Platform** — A multi-tenant healthcare claims processing platform with AI-powered automation and Site Reliability Engineering practices.
 
-> Part of the [ReGAIN Reference Implementation](https://github.com/javakishore-veleti/Claims-Processor-With-SRE) | Apache 2.0 License
-
 ---
 
 ## Vision

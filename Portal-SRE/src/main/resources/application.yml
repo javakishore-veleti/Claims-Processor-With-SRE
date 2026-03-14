@@ -1,0 +1,67 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: portal-sre
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:claimsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+  h2:
+    console:
+      enabled: ${H2_CONSOLE_ENABLED:true}
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+claims:
+  service-client:
+    auth:
+      enabled: false
+      provider: none
+    services:
+      api-claims:
+        url: ${API_CLAIMS_URL:http://localhost:8081}
+      api-members:
+        url: ${API_MEMBERS_URL:http://localhost:8082}
+      portal-claims-advisor:
+        url: ${PORTAL_CLAIMS_ADVISOR_URL:http://localhost:8083}
+      portal-claims-member:
+        url: ${PORTAL_CLAIMS_MEMBER_URL:http://localhost:8084}
+      portal-batch-assignment:
+        url: ${PORTAL_BATCH_ASSIGNMENT_URL:http://localhost:8085}
+      api-tenants:
+        url: ${API_TENANTS_URL:http://localhost:8086}
+      api-entitlements:
+        url: ${API_ENTITLEMENTS_URL:http://localhost:8087}
+      portal-tenants:
+        url: ${PORTAL_TENANTS_URL:http://localhost:8088}
+      portal-entitlements:
+        url: ${PORTAL_ENTITLEMENTS_URL:http://localhost:8089}
