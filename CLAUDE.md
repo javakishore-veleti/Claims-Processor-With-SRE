@@ -8,9 +8,11 @@ Claims-Processor-With-SRE is a microservice within the HealthCare-Plans-AI-Platf
 On March 13th 2026 in AWS News website, AWS mentioned "Amazon CloudWatch Application Signals adds new SLO capabilities"
 https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/
 
-This project is designed to showcase the above new capabilities of AWS CloudWatch Application Signals for monitoring and managing Service Level Objectives (SLOs) in a healthcare claims processing microservice. The project will demonstrate how to define and monitor SLOs using AWS CloudWatch, and how to use these insights to improve the reliability and performance of the claims processing service.
+This project is designed to showcase the above new capabilities of AWS CloudWatch Application Signals for monitoring and managing Service Level Objectives (SLOs) in a healthcare claims processing microservice. 
+The project will demonstrate how to define and monitor SLOs using AWS CloudWatch, and how to use these insights to improve the reliability and performance of the claims processing service.
 
-- This project is designed to intake healthcare claims data, process it using AI models to identify patterns and anomalies, and provide insights for improving claim processing efficiency and accuracy. The service will also incorporate Site Reliability Engineering (SRE) principles to ensure high availability and performance.
+- This project is designed to intake healthcare claims data, process it using AI models to identify patterns and anomalies, and provide insights for improving claim processing efficiency and accuracy. 
+- The service will also incorporate Site Reliability Engineering (SRE) principles to ensure high availability and performance.
 - This project is designed to be deployed in
   - AWS
   - Azure
@@ -37,75 +39,127 @@ This project is designed to showcase the above new capabilities of AWS CloudWatc
 
 #### Architecture Diagram:
 
+##### Business / Functional View
 ```mermaid
 flowchart TB
-    subgraph Clients["Client Layer"]
+    subgraph BusinessActors["Business Actors"]
+        Member["Member / Patient"]
+        Provider["Healthcare Provider"]
+        ClaimsAdmin["Claims Administrator"]
+        SREOps["SRE / Operations Team"]
+    end
+
+    subgraph BusinessFunctions["Business Functions"]
+        direction TB
+        subgraph ClaimLifecycle["Claim Lifecycle Management"]
+            Submit["Submit Claim<br/>(Screenshot / PDF Upload)"]
+            Validate["Validate &<br/>Extract Data"]
+            Adjudicate["AI-Assisted<br/>Adjudication"]
+            Settle["Settlement &<br/>Payment"]
+        end
+        subgraph Insights["Analytics & Insights"]
+            Patterns["Pattern Detection<br/>& Anomaly Identification"]
+            Efficiency["Processing Efficiency<br/>& Accuracy Metrics"]
+            Reporting["Claims Reporting<br/>& Dashboards"]
+        end
+        subgraph Reliability["Reliability & Operations"]
+            SLOs["SLO / SLI<br/>Monitoring"]
+            Incidents["Incident Management<br/>& Post-Mortems"]
+            Capacity["Capacity Planning<br/>& Auto-Scaling"]
+        end
+    end
+
+    Member -->|"Submits claim"| Submit
+    Provider -->|"Submits claim"| Submit
+    Submit --> Validate --> Adjudicate --> Settle
+    ClaimsAdmin -->|"Reviews & manages"| ClaimLifecycle
+    Adjudicate --> Patterns
+    Patterns --> Efficiency --> Reporting
+    SREOps -->|"Monitors & responds"| Reliability
+    ClaimLifecycle -.->|"Emits metrics"| SLOs
+```
+
+##### Technical / AWS Architecture View
+```mermaid
+flowchart TB
+    subgraph Presentation["Presentation Layer"]
         CP["Customer Portal<br/>(Angular)"]
         AP["Admin Portal<br/>(Angular)"]
     end
 
-    subgraph Gateway["API Gateway Layer"]
+    subgraph AWSAPI["AWS API & Security Layer"]
         APIGW["AWS API Gateway"]
+        IAM["AWS IAM<br/>(Roles & Policies)"]
     end
 
-    subgraph App["Application Layer (Spring Boot)"]
-        direction LR
-        ClaimsAPI["Claims API<br/>(REST Endpoints)"]
-        ClaimsProcessor["Claims Processor<br/>(Business Logic)"]
-        AIService["AI Service<br/>(Model Integration)"]
+    subgraph Application["Application Layer"]
+        subgraph SpringBoot["Spring Boot Microservice"]
+            ClaimsAPI["Claims REST API"]
+            ClaimsProcessor["Claims Processing<br/>Engine"]
+            AIService["AI Integration<br/>Service"]
+        end
+        Kafka["Apache Kafka<br/>(Event Bus)"]
     end
 
-    subgraph Messaging["Event-Driven Messaging"]
-        Kafka["Apache Kafka"]
+    subgraph AILayer["AI / ML Layer"]
+        Lambda["AWS Lambda<br/>(Serverless AI Processing)"]
+        Ollama["Ollama - Mistral 7B<br/>(Local Dev Inference)"]
     end
 
-    subgraph AI["AI / ML Layer"]
-        Lambda["AWS Lambda<br/>(Serverless Processing)"]
-        Ollama["Ollama<br/>(Mistral 7B - Local)"]
+    subgraph AWSData["AWS Data & Storage Layer"]
+        S3["AWS S3<br/>(Claim Documents)"]
+        RDS["AWS RDS PostgreSQL<br/>(Claims Data)"]
+        Redis["Redis<br/>(Session & Cache)"]
     end
 
-    subgraph Storage["Data & Storage Layer"]
-        RDS["AWS RDS<br/>(PostgreSQL)"]
-        S3["AWS S3<br/>(Claim Docs / PDFs)"]
-        Redis["Redis<br/>(Cache)"]
+    subgraph AWSObservability["AWS Observability & SRE Layer"]
+        subgraph CloudWatch["AWS CloudWatch"]
+            CWLogs["CloudWatch Logs"]
+            CWMetrics["CloudWatch Metrics<br/>& Dashboards"]
+            CWSLOs["CloudWatch Application<br/>Signals & SLOs"]
+        end
+        XRay["AWS X-Ray<br/>(Distributed Tracing)"]
+        subgraph OpenSource["Open Source Observability"]
+            Prom["Prometheus"] --> Graf["Grafana"]
+            Jaeger["Jaeger / Zipkin"]
+        end
+        PD["PagerDuty<br/>(Alerting & Incidents)"]
     end
 
-    subgraph Observability["SRE / Observability Layer"]
-        direction LR
-        CW["AWS CloudWatch<br/>(Logs, Metrics, SLOs)"]
-        XRay["AWS X-Ray<br/>(APM / Tracing)"]
-        Prom["Prometheus"]
-        Graf["Grafana<br/>(Dashboards)"]
-        Jaeger["Jaeger / Zipkin<br/>(Distributed Tracing)"]
-        PD["PagerDuty<br/>(Alerting)"]
-    end
-
-    subgraph Deployment["Deployment & CI/CD"]
-        direction LR
+    subgraph AWSDeployment["AWS Deployment & CI/CD"]
+        VPC["AWS VPC"]
+        subgraph Compute["Compute Options"]
+            EB["AWS Elastic Beanstalk"]
+            Fargate["AWS Fargate"]
+        end
         GHA["GitHub Actions<br/>(CI/CD Pipeline)"]
-        EB["AWS Elastic Beanstalk"]
-        Fargate["AWS Fargate"]
-        K8s["Kubernetes<br/>(On-Prem / Local)"]
+        Backup["AWS Backup &<br/>Disaster Recovery"]
+    end
+
+    subgraph LocalDev["Local Development"]
+        Docker["Docker Desktop"]
+        LocalStack["LocalStack<br/>(AWS Simulation)"]
+        K8s["Kubernetes<br/>(On-Prem)"]
     end
 
     CP & AP --> APIGW
-    APIGW --> ClaimsAPI
+    APIGW --> IAM --> ClaimsAPI
     ClaimsAPI --> ClaimsProcessor
     ClaimsProcessor --> AIService
-    ClaimsProcessor --> Kafka
-    Kafka --> ClaimsProcessor
+    ClaimsProcessor <--> Kafka
     AIService --> Lambda
-    AIService --> Ollama
-    ClaimsProcessor --> RDS
+    AIService -.->|"Local only"| Ollama
     ClaimsProcessor --> S3
+    ClaimsProcessor --> RDS
     ClaimsProcessor --> Redis
-    App --> CW
-    App --> XRay
-    App --> Prom
-    Prom --> Graf
-    CW --> PD
-    App --> Jaeger
-    GHA --> EB & Fargate & K8s
+    SpringBoot --> CWLogs & CWMetrics & CWSLOs
+    SpringBoot --> XRay
+    SpringBoot --> Prom
+    SpringBoot --> Jaeger
+    CWSLOs --> PD
+    GHA --> Compute
+    VPC --> Compute
+    GHA -.->|"Local"| Docker & LocalStack & K8s
 ```
 
 ### Main objectives include:
