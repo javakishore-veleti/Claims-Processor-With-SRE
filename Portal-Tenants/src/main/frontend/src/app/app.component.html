@@ -6,7 +6,7 @@
       <div class="subtitle">Tenant Management</div>
     </div>
     <nav class="sidebar-nav">
-      <a class="nav-item" [class.active]="activeNav === 'dashboard'" (click)="setActiveNav('dashboard')">
+      <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
         <span class="icon">&#9633;</span> Dashboard
       </a>
       <a class="nav-item" [class.active]="activeNav === 'tenants'" (click)="setActiveNav('tenants')">
@@ -40,115 +40,7 @@
 
     <!-- Content Area -->
     <div class="content-area">
-      <!-- Stats Grid -->
-      <div class="stats-grid">
-        <div class="stat-card accent-primary">
-          <div class="stat-label">Total Tenants</div>
-          <div class="stat-value">48</div>
-          <div class="stat-change positive">+3 this month</div>
-        </div>
-        <div class="stat-card accent-success">
-          <div class="stat-label">Active Tenants</div>
-          <div class="stat-value">42</div>
-          <div class="stat-change positive">87.5% of total</div>
-        </div>
-        <div class="stat-card accent-warning">
-          <div class="stat-label">Trial Tenants</div>
-          <div class="stat-value">4</div>
-          <div class="stat-change">2 expiring soon</div>
-        </div>
-        <div class="stat-card accent-danger">
-          <div class="stat-label">Suspended</div>
-          <div class="stat-value">2</div>
-          <div class="stat-change negative">Payment overdue</div>
-        </div>
-      </div>
-
-      <!-- Tenants Table -->
-      <div class="section-card">
-        <div class="section-header">
-          <h3>All Tenants</h3>
-          <button class="btn btn-primary btn-sm">+ Create Tenant</button>
-        </div>
-        <div class="section-body">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Tenant ID</th>
-                <th>Name</th>
-                <th>Domain</th>
-                <th>Plan</th>
-                <th>Status</th>
-                <th>Users</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="font-mono">TNT-001</td>
-                <td>Acme Healthcare</td>
-                <td>acme.health.io</td>
-                <td><span class="badge badge-info">Enterprise</span></td>
-                <td><span class="badge badge-success">Active</span></td>
-                <td>245</td>
-                <td>Jan 15, 2025</td>
-                <td><button class="btn btn-secondary btn-xs">Manage</button></td>
-              </tr>
-              <tr>
-                <td class="font-mono">TNT-002</td>
-                <td>Blue Cross Regional</td>
-                <td>bluecross.health.io</td>
-                <td><span class="badge badge-info">Enterprise</span></td>
-                <td><span class="badge badge-success">Active</span></td>
-                <td>189</td>
-                <td>Feb 1, 2025</td>
-                <td><button class="btn btn-secondary btn-xs">Manage</button></td>
-              </tr>
-              <tr>
-                <td class="font-mono">TNT-003</td>
-                <td>Sunrise Medical</td>
-                <td>sunrise.health.io</td>
-                <td><span class="badge badge-primary">Professional</span></td>
-                <td><span class="badge badge-success">Active</span></td>
-                <td>67</td>
-                <td>Mar 10, 2025</td>
-                <td><button class="btn btn-secondary btn-xs">Manage</button></td>
-              </tr>
-              <tr>
-                <td class="font-mono">TNT-004</td>
-                <td>Valley Health Network</td>
-                <td>valley.health.io</td>
-                <td><span class="badge badge-warning">Trial</span></td>
-                <td><span class="badge badge-warning">Trial</span></td>
-                <td>12</td>
-                <td>Feb 28, 2026</td>
-                <td><button class="btn btn-secondary btn-xs">Manage</button></td>
-              </tr>
-              <tr>
-                <td class="font-mono">TNT-005</td>
-                <td>MedFirst Clinic</td>
-                <td>medfirst.health.io</td>
-                <td><span class="badge badge-gray">Starter</span></td>
-                <td><span class="badge badge-danger">Suspended</span></td>
-                <td>8</td>
-                <td>Dec 5, 2025</td>
-                <td><button class="btn btn-secondary btn-xs">Manage</button></td>
-              </tr>
-              <tr>
-                <td class="font-mono">TNT-006</td>
-                <td>Pacific Health Group</td>
-                <td>pacific.health.io</td>
-                <td><span class="badge badge-primary">Professional</span></td>
-                <td><span class="badge badge-success">Active</span></td>
-                <td>94</td>
-                <td>Jul 20, 2025</td>
-                <td><button class="btn btn-secondary btn-xs">Manage</button></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <router-outlet></router-outlet>
     </div>
   </div>
 </div>

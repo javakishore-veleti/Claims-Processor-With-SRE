@@ -1,0 +1,93 @@
+<!-- Stats Grid -->
+<div class="stats-grid">
+  <div class="stat-card accent-primary">
+    <div class="stat-label">Total Imports Today</div>
+    <div class="stat-value">{{ stats.totalImportsToday }}</div>
+    <div class="stat-change positive">Today's imports</div>
+  </div>
+  <div class="stat-card accent-success">
+    <div class="stat-label">Members Created</div>
+    <div class="stat-value">{{ stats.membersCreated | number }}</div>
+    <div class="stat-change positive">All time</div>
+  </div>
+  <div class="stat-card accent-warning">
+    <div class="stat-label">Jobs Running</div>
+    <div class="stat-value">{{ stats.jobsRunning }}</div>
+    <div class="stat-change">In progress</div>
+  </div>
+  <div class="stat-card accent-danger">
+    <div class="stat-label">Failed Jobs</div>
+    <div class="stat-value">{{ stats.failedJobs }}</div>
+    <div class="stat-change negative">Requires attention</div>
+  </div>
+</div>
+
+<!-- Upload Area -->
+<div class="section-card">
+  <div class="section-header">
+    <h3>Import Members</h3>
+    <button class="btn btn-secondary btn-sm">Download Template</button>
+  </div>
+  <div class="section-body" style="padding: 24px;">
+    <div class="upload-area" (click)="fileInput.click()">
+      <input #fileInput type="file" style="display: none;" accept=".xlsx,.xls,.csv" (change)="onFileSelected($event)">
+      <div class="upload-icon">&#128194;</div>
+      <div class="upload-text">Drag & drop Excel files here, or click to browse</div>
+      <div class="upload-hint">Supports .xlsx, .xls, .csv - Max 50MB per file</div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="loading" class="section-card">
+  <div class="section-body" style="padding: 24px; text-align: center;">
+    Loading batch jobs...
+  </div>
+</div>
+
+<!-- Active Jobs Table -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>Active Jobs</h3>
+    <button class="btn btn-primary btn-sm">+ New Job</button>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Records</th>
+          <th>Progress</th>
+          <th>Started</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let job of jobs">
+          <td class="font-mono">{{ job.jobId }}</td>
+          <td>{{ job.type }}</td>
+          <td><span class="badge badge-{{ job.statusClass }}">{{ job.status }}</span></td>
+          <td>{{ job.records | number }}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="progress-bar" style="width: 120px;">
+                <div [class]="getProgressBarClass(job.status)" [style.width.%]="job.progress"></div>
+              </div>
+              <span class="text-sm">{{ job.progress }}%</span>
+            </div>
+          </td>
+          <td>{{ job.startedAt }}</td>
+          <td>
+            <button *ngIf="job.status !== 'Failed'" class="btn btn-secondary btn-xs">View</button>
+            <button *ngIf="job.status === 'Failed'" class="btn btn-danger btn-xs">Retry</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div *ngIf="jobs.length === 0" style="padding: 24px; text-align: center; color: #94a3b8;">
+      No batch jobs found.
+    </div>
+  </div>
+</div>

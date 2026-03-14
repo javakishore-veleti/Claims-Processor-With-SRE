@@ -1,0 +1,65 @@
+<!-- Stats Grid -->
+<div class="stats-grid">
+  <div class="stat-card accent-primary">
+    <div class="stat-label">Active Claims</div>
+    <div class="stat-value">{{ activeClaims }}</div>
+    <div class="stat-change positive">{{ activeClaims }} in progress</div>
+  </div>
+  <div class="stat-card accent-success">
+    <div class="stat-label">Latest Claim Status</div>
+    <div class="stat-value" style="font-size: 20px;">{{ latestStatus || 'N/A' }}</div>
+    <div class="stat-change positive">{{ latestClaimNumber }}</div>
+  </div>
+  <div class="stat-card accent-warning">
+    <div class="stat-label">Total Claims</div>
+    <div class="stat-value">{{ claims.length }}</div>
+    <div class="stat-change">All time</div>
+  </div>
+  <div class="stat-card accent-danger">
+    <div class="stat-label">Pending Actions</div>
+    <div class="stat-value">{{ pendingActions }}</div>
+    <div class="stat-change negative">Documents needed</div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="loading" class="section-card">
+  <div class="section-body" style="padding: 24px; text-align: center;">
+    Loading claims...
+  </div>
+</div>
+
+<!-- Recent Claims Table -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>My Claims</h3>
+    <button class="btn btn-primary btn-sm">+ New Claim</button>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Claim #</th>
+          <th>Stage</th>
+          <th>Amount</th>
+          <th>Filed Date</th>
+          <th>Last Updated</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let claim of claims">
+          <td class="font-mono">{{ claim.claimNumber }}</td>
+          <td><span [class]="getBadgeClass(claim.stage)">{{ claim.stage }}</span></td>
+          <td>{{ claim.amount | currency }}</td>
+          <td>{{ claim.filedDate }}</td>
+          <td>{{ claim.lastUpdated }}</td>
+          <td><button class="btn btn-secondary btn-xs">View Details</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div *ngIf="claims.length === 0" style="padding: 24px; text-align: center; color: #94a3b8;">
+      No claims found.
+    </div>
+  </div>
+</div>

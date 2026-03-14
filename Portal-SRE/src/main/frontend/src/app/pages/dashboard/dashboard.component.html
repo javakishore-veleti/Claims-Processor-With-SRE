@@ -1,0 +1,120 @@
+<!-- Stats Grid -->
+<div class="stats-grid">
+  <div class="stat-card accent-success">
+    <div class="stat-label">Services UP</div>
+    <div class="stat-value">{{ stats.servicesUp }} / {{ stats.totalServices }}</div>
+    <div class="stat-change positive">{{ stats.totalServices > 0 ? ((stats.servicesUp / stats.totalServices) * 100).toFixed(0) : 0 }}% healthy</div>
+  </div>
+  <div class="stat-card accent-danger">
+    <div class="stat-label">Active Incidents</div>
+    <div class="stat-value">{{ stats.activeIncidents }}</div>
+    <div class="stat-change negative" *ngIf="stats.activeIncidents > 0">Requires attention</div>
+    <div class="stat-change positive" *ngIf="stats.activeIncidents === 0">All clear</div>
+  </div>
+  <div class="stat-card accent-primary">
+    <div class="stat-label">Deployments Today</div>
+    <div class="stat-value">{{ stats.deploymentsToday }}</div>
+    <div class="stat-change positive">Today's deployments</div>
+  </div>
+  <div class="stat-card accent-warning">
+    <div class="stat-label">Error Budget Remaining</div>
+    <div class="stat-value">{{ stats.errorBudgetRemaining }}%</div>
+    <div class="stat-change" [class.negative]="stats.errorBudgetRemaining < 50">Budget status</div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="loading" class="section-card">
+  <div class="section-body" style="padding: 24px; text-align: center;">
+    Loading SRE dashboard...
+  </div>
+</div>
+
+<!-- Service Health Grid -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>Service Health</h3>
+    <span class="text-sm text-muted">Last checked: 2 min ago</span>
+  </div>
+  <div class="service-grid">
+    <div *ngFor="let service of services"
+         class="service-card"
+         [style.border-color]="!isServiceUp(service) ? 'var(--danger)' : ''">
+      <div class="service-name">{{ service.name }}</div>
+      <div class="service-status" [class.up]="isServiceUp(service)" [class.down]="!isServiceUp(service)">
+        <span class="status-dot" [class.up]="isServiceUp(service)" [class.down]="!isServiceUp(service)"></span>
+        {{ getServiceStatusText(service) }}
+      </div>
+      <div class="response-time">Avg: {{ service.avgResponseTime }} | P99: {{ service.p99ResponseTime }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Active Incidents Table -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>Active Incidents</h3>
+    <button class="btn btn-danger btn-sm">+ Declare Incident</button>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Severity</th>
+          <th>Status</th>
+          <th>Affected Services</th>
+          <th>Duration</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let incident of incidents">
+          <td class="font-mono">{{ incident.id }}</td>
+          <td>{{ incident.title }}</td>
+          <td><span class="badge badge-{{ incident.severityClass }}">{{ incident.severity }}</span></td>
+          <td><span class="badge badge-{{ incident.statusClass }}">{{ incident.status }}</span></td>
+          <td>{{ incident.affectedServices }}</td>
+          <td>{{ incident.duration }}</td>
+          <td><button class="btn btn-secondary btn-xs">View</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div *ngIf="incidents.length === 0" style="padding: 24px; text-align: center; color: #94a3b8;">
+      No active incidents. All clear!
+    </div>
+  </div>
+</div>
+
+<!-- Recent Deployments Table -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>Recent Deployments</h3>
+    <button class="btn btn-primary btn-sm">Deploy</button>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Version</th>
+          <th>Environment</th>
+          <th>Status</th>
+          <th>Deployed By</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let deploy of deployments">
+          <td>{{ deploy.service }}</td>
+          <td class="font-mono">{{ deploy.version }}</td>
+          <td><span class="badge badge-{{ deploy.envClass }}">{{ deploy.environment }}</span></td>
+          <td><span class="badge badge-{{ deploy.statusClass }}">{{ deploy.status }}</span></td>
+          <td>{{ deploy.deployedBy }}</td>
+          <td>{{ deploy.time }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

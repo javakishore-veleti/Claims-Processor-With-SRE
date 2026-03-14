@@ -1,0 +1,138 @@
+<div class="data-table-container" style="max-width: 800px;">
+  <div class="data-table-header">
+    <h3>Intake New Claim</h3>
+  </div>
+
+  <!-- Success message -->
+  <div *ngIf="submitSuccess" style="padding: 1.5rem; text-align: center;">
+    <div style="font-size: 1.5rem; color: var(--success); margin-bottom: 0.5rem;">Claim Submitted Successfully</div>
+    <p style="color: var(--gray-500);">Redirecting to dashboard...</p>
+  </div>
+
+  <!-- Form -->
+  <form *ngIf="!submitSuccess" (ngSubmit)="submit()" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+
+    <!-- Member Search -->
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">Member *</label>
+      <div style="position: relative;">
+        <input
+          class="search-input"
+          type="text"
+          [(ngModel)]="memberSearch"
+          name="memberSearch"
+          (input)="onMemberSearch()"
+          (focus)="onMemberSearch()"
+          placeholder="Search by member name..."
+          style="width: 100%;"
+          required
+        />
+        <span *ngIf="selectedMember" (click)="clearMember()" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--gray-400);">&#x2715;</span>
+        <div *ngIf="showMemberDropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: var(--white); border: 1px solid var(--gray-200); border-radius: 0.5rem; box-shadow: var(--shadow-md); z-index: 10; max-height: 200px; overflow-y: auto;">
+          <div
+            *ngFor="let m of memberResults"
+            (click)="selectMember(m)"
+            style="padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid var(--gray-100); font-size: 0.85rem;"
+          >
+            <strong>{{ m.firstName }} {{ m.lastName }}</strong>
+            <span style="color: var(--gray-400); margin-left: 0.5rem;">{{ m.memberId || m.id }}</span>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="selectedMember" style="margin-top: 0.25rem; font-size: 0.8rem; color: var(--success);">
+        Selected: {{ selectedMember.firstName }} {{ selectedMember.lastName }} ({{ selectedMember.memberId || selectedMember.id }})
+      </div>
+    </div>
+
+    <!-- Provider -->
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">Provider Name</label>
+      <input
+        class="search-input"
+        type="text"
+        [(ngModel)]="providerName"
+        name="providerName"
+        placeholder="Enter provider name..."
+        style="width: 100%;"
+      />
+    </div>
+
+    <!-- Stage -->
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">Initial Stage</label>
+      <select
+        [(ngModel)]="claimStage"
+        name="claimStage"
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--gray-200); border-radius: 0.5rem; font-size: 0.85rem; background: var(--white);"
+      >
+        <option *ngFor="let stage of stages" [value]="stage">{{ stage }}</option>
+      </select>
+    </div>
+
+    <!-- Amount -->
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">Claim Amount ($)</label>
+      <input
+        class="search-input"
+        type="number"
+        [(ngModel)]="amount"
+        name="amount"
+        placeholder="0.00"
+        step="0.01"
+        min="0"
+        style="width: 100%;"
+      />
+    </div>
+
+    <!-- File Upload -->
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">Claim Documents</label>
+      <div
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        [style.border-color]="dragOver ? 'var(--primary)' : 'var(--gray-200)'"
+        [style.background]="dragOver ? 'var(--primary-light, #f0f7ff)' : 'var(--gray-50)'"
+        style="border: 2px dashed; border-radius: 0.75rem; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s;"
+        (click)="fileInput.click()"
+      >
+        <input #fileInput type="file" multiple (change)="onFileSelect($event)" style="display: none;" />
+        <div style="font-size: 0.9rem; color: var(--gray-500);">
+          Drag & drop files here or <span style="color: var(--primary); font-weight: 500;">browse</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--gray-400); margin-top: 0.25rem;">PDF, TIFF, JPG, PNG supported</div>
+      </div>
+      <div *ngIf="selectedFiles.length > 0" style="margin-top: 0.75rem;">
+        <div *ngFor="let file of selectedFiles; let i = index" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--gray-50); border-radius: 0.5rem; margin-bottom: 0.25rem; font-size: 0.8rem;">
+          <span>{{ file.name }} <span style="color: var(--gray-400);">({{ (file.size / 1024).toFixed(1) }} KB)</span></span>
+          <span (click)="removeFile(i)" style="cursor: pointer; color: var(--danger);">&#x2715;</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">Notes</label>
+      <textarea
+        [(ngModel)]="notes"
+        name="notes"
+        rows="3"
+        placeholder="Additional notes..."
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--gray-200); border-radius: 0.5rem; font-size: 0.85rem; resize: vertical; font-family: inherit;"
+      ></textarea>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="submitError" style="padding: 0.75rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 0.5rem; color: var(--danger); font-size: 0.85rem;">
+      {{ submitError }}
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; padding-top: 0.5rem;">
+      <button type="button" class="btn btn-outline" routerLink="/">Cancel</button>
+      <button type="submit" class="btn btn-primary" [disabled]="submitting || !memberSearch">
+        {{ submitting ? 'Submitting...' : 'Submit Claim' }}
+      </button>
+    </div>
+  </form>
+</div>

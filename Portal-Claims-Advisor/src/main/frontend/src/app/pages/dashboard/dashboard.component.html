@@ -1,0 +1,59 @@
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Claims Today</div>
+    <div class="stat-value">{{ stats.totalClaims }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Pending Review</div>
+    <div class="stat-value">{{ stats.pendingReview }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">AI Extractions</div>
+    <div class="stat-value">{{ stats.aiSuccessRate }}%</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Avg Processing Time</div>
+    <div class="stat-value">{{ stats.avgProcessingTime }}</div>
+  </div>
+</div>
+
+<div class="data-table-container">
+  <div class="data-table-header">
+    <h3>Recent Claims</h3>
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="btn btn-primary btn-sm" routerLink="/intake">+ New Claim</button>
+      <button class="btn btn-outline btn-sm">Export</button>
+    </div>
+  </div>
+  <div *ngIf="loading" style="padding: 2rem; text-align: center; color: var(--gray-500);">Loading claims...</div>
+  <div *ngIf="error" style="padding: 1rem; color: var(--danger);">{{ error }}</div>
+  <table class="data-table" *ngIf="!loading">
+    <thead>
+      <tr>
+        <th>Claim #</th>
+        <th>Member</th>
+        <th>Provider</th>
+        <th>Stage</th>
+        <th>Amount</th>
+        <th>Confidence</th>
+        <th>Submitted</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let claim of recentClaims">
+        <td><strong>{{ claim.claimNumber }}</strong></td>
+        <td>{{ claim.memberName || claim.customerId }}</td>
+        <td>{{ claim.provider || 'N/A' }}</td>
+        <td><span class="badge" [ngClass]="getStageClass(claim.stage)">{{ claim.stage }}</span></td>
+        <td>{{ claim.amount ? ('$' + claim.amount.toFixed(2)) : 'N/A' }}</td>
+        <td><span class="badge" [ngClass]="claim.confidence > 90 ? 'badge-success' : claim.confidence > 70 ? 'badge-warning' : 'badge-danger'">{{ claim.confidence }}%</span></td>
+        <td>{{ claim.submittedDate }}</td>
+        <td><button class="btn btn-outline btn-sm">Review</button></td>
+      </tr>
+      <tr *ngIf="recentClaims.length === 0">
+        <td colspan="8" style="text-align: center; color: var(--gray-500); padding: 2rem;">No claims found</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

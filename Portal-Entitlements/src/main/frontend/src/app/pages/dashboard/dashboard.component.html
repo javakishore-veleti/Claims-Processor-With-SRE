@@ -1,0 +1,100 @@
+<!-- Stats Grid -->
+<div class="stats-grid">
+  <div class="stat-card accent-primary">
+    <div class="stat-label">Total Users</div>
+    <div class="stat-value">{{ totalUsers | number }}</div>
+    <div class="stat-change positive">All users</div>
+  </div>
+  <div class="stat-card accent-success">
+    <div class="stat-label">Active Users</div>
+    <div class="stat-value">{{ activeUsers | number }}</div>
+    <div class="stat-change positive">{{ totalUsers > 0 ? ((activeUsers / totalUsers) * 100).toFixed(1) : 0 }}% active</div>
+  </div>
+  <div class="stat-card accent-info">
+    <div class="stat-label">Groups</div>
+    <div class="stat-value">{{ totalGroups }}</div>
+    <div class="stat-change">Unique groups</div>
+  </div>
+  <div class="stat-card accent-warning">
+    <div class="stat-label">Roles</div>
+    <div class="stat-value">{{ totalRoles }}</div>
+    <div class="stat-change">System + custom</div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="loading" class="section-card">
+  <div class="section-body" style="padding: 24px; text-align: center;">
+    Loading entitlements data...
+  </div>
+</div>
+
+<!-- Users Table -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>Users</h3>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-secondary btn-sm">Export</button>
+      <button class="btn btn-primary btn-sm">+ Add User</button>
+    </div>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Groups</th>
+          <th>Last Login</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of users">
+          <td class="font-mono">{{ user.username }}</td>
+          <td>{{ user.name }}</td>
+          <td>{{ user.email }}</td>
+          <td><span class="badge badge-{{ user.statusClass }}">{{ user.status }}</span></td>
+          <td>{{ user.groups }}</td>
+          <td>{{ user.lastLogin }}</td>
+          <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div *ngIf="users.length === 0" style="padding: 24px; text-align: center; color: #94a3b8;">
+      No users found.
+    </div>
+  </div>
+</div>
+
+<!-- Roles Overview -->
+<div *ngIf="!loading" class="section-card">
+  <div class="section-header">
+    <h3>Roles Overview</h3>
+    <button class="btn btn-primary btn-sm">+ Create Role</button>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Type</th>
+          <th>Users Assigned</th>
+          <th>Privileges</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let role of roles">
+          <td>{{ role.name }}</td>
+          <td><span class="badge badge-{{ role.typeClass }}">{{ role.type }}</span></td>
+          <td>{{ role.usersAssigned }}</td>
+          <td>{{ role.privileges }}</td>
+          <td><button class="btn btn-secondary btn-xs">View</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
