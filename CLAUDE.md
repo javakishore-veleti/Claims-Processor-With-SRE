@@ -79,87 +79,385 @@ flowchart TB
     ClaimLifecycle -.->|"Emits metrics"| SLOs
 ```
 
-##### Technical / AWS Architecture View
+##### 1. Core Application Architecture
 ```mermaid
-flowchart TB
-    subgraph Presentation["Presentation Layer"]
+flowchart LR
+    subgraph Portals["User Portals"]
         CP["Customer Portal<br/>(Angular)"]
         AP["Admin Portal<br/>(Angular)"]
     end
 
-    subgraph AWSAPI["AWS API & Security Layer"]
+    subgraph Core["Claims Processing Core"]
+        API["Claims REST API"]
+        Engine["Processing Engine"]
+        DataAccess["Data Access Layer"]
+    end
+
+    subgraph Data["Data Stores"]
+        DB["PostgreSQL<br/>(Claims Data)"]
+        Cache["Redis<br/>(Cache)"]
+        DocStore["Document Store<br/>(Claim PDFs / Images)"]
+    end
+
+    CP & AP --> API
+    API --> Engine
+    Engine --> DataAccess
+    DataAccess --> DB & Cache & DocStore
+```
+
+##### 2. Event-Driven Architecture
+```mermaid
+flowchart LR
+    subgraph Producers["Event Producers"]
+        ClaimSubmit["Claim Submitted"]
+        ClaimUpdate["Claim Updated"]
+        DocUpload["Document Uploaded"]
+    end
+
+    subgraph EventBus["Apache Kafka (Event Bus)"]
+        direction TB
+        ClaimsTopic["claims-topic"]
+        DocsTopic["documents-topic"]
+        NotifTopic["notifications-topic"]
+        AuditTopic["audit-topic"]
+    end
+
+    subgraph Consumers["Event Consumers"]
+        Validator["Validation<br/>Consumer"]
+        AIProcessor["AI Processing<br/>Consumer"]
+        Notifier["Notification<br/>Consumer"]
+        Auditor["Audit Trail<br/>Consumer"]
+    end
+
+    ClaimSubmit --> ClaimsTopic
+    ClaimUpdate --> ClaimsTopic
+    DocUpload --> DocsTopic
+    ClaimsTopic --> Validator
+    ClaimsTopic --> AIProcessor
+    DocsTopic --> AIProcessor
+    NotifTopic --> Notifier
+    AuditTopic --> Auditor
+    Validator --> NotifTopic
+    AIProcessor --> NotifTopic & AuditTopic
+```
+
+##### 3. Serverless Architecture
+```mermaid
+flowchart TB
+    subgraph Triggers["Triggers"]
         APIGW["AWS API Gateway"]
-        IAM["AWS IAM<br/>(Roles & Policies)"]
+        S3Event["S3 Event<br/>(Document Upload)"]
+        Schedule["CloudWatch<br/>Scheduled Rule"]
     end
 
-    subgraph Application["Application Layer"]
-        subgraph SpringBoot["Spring Boot Microservice"]
-            ClaimsAPI["Claims REST API"]
-            ClaimsProcessor["Claims Processing<br/>Engine"]
-            AIService["AI Integration<br/>Service"]
+    subgraph Lambdas["AWS Lambda Functions"]
+        DocExtract["Document Extraction<br/>(OCR / Text Parse)"]
+        AIInference["AI Inference<br/>(Pattern Detection)"]
+        ClaimEnrich["Claim Enrichment<br/>(Data Augmentation)"]
+        ReportGen["Report Generation<br/>(Scheduled)"]
+    end
+
+    subgraph Downstream["Downstream Services"]
+        RDS["RDS PostgreSQL"]
+        S3Out["S3 (Results)"]
+        SNS["SNS Notifications"]
+    end
+
+    APIGW --> DocExtract & AIInference
+    S3Event --> DocExtract
+    Schedule --> ReportGen
+    DocExtract --> ClaimEnrich
+    ClaimEnrich --> AIInference
+    AIInference --> RDS & S3Out
+    ReportGen --> S3Out & SNS
+```
+
+##### 4. AI Integration Architecture
+```mermaid
+flowchart TB
+    subgraph Input["Claim Input"]
+        PDF["PDF / Screenshot"]
+        Structured["Structured Data<br/>(Form Fields)"]
+    end
+
+    subgraph AIOrchestration["AI Orchestration Layer (Spring Boot)"]
+        Router["AI Request Router"]
+        PreProcess["Pre-Processing<br/>(Data Normalization)"]
+        PostProcess["Post-Processing<br/>(Confidence Scoring)"]
+    end
+
+    subgraph CloudAI["Cloud AI (AWS)"]
+        Lambda["AWS Lambda<br/>(Serverless Inference)"]
+    end
+
+    subgraph LocalAI["Local AI (Development)"]
+        Ollama["Ollama<br/>(Mistral 7B Instruct)"]
+    end
+
+    subgraph AICapabilities["AI Capabilities"]
+        OCR["Document OCR &<br/>Data Extraction"]
+        Anomaly["Anomaly &<br/>Fraud Detection"]
+        Pattern["Pattern Recognition<br/>& Classification"]
+        Suggest["Adjudication<br/>Recommendations"]
+    end
+
+    PDF & Structured --> PreProcess
+    PreProcess --> Router
+    Router -->|"Production"| Lambda
+    Router -.->|"Local Dev"| Ollama
+    Lambda & Ollama --> PostProcess
+    PostProcess --> OCR & Anomaly & Pattern & Suggest
+```
+
+##### 5. AWS Cloud Deployment Architecture
+```mermaid
+flowchart TB
+    subgraph Internet["Internet"]
+        Users["Users / Browsers"]
+    end
+
+    subgraph AWS["AWS Cloud"]
+        subgraph Edge["Edge Layer"]
+            APIGW["API Gateway"]
+            IAM["IAM<br/>(Auth & Policies)"]
         end
-        Kafka["Apache Kafka<br/>(Event Bus)"]
+
+        subgraph VPC["VPC (Private Network)"]
+            subgraph Public["Public Subnet"]
+                ALB["Application<br/>Load Balancer"]
+            end
+
+            subgraph Private["Private Subnet"]
+                subgraph ComputeA["Compute Option A"]
+                    EB["Elastic Beanstalk<br/>(Spring Boot)"]
+                end
+                subgraph ComputeB["Compute Option B"]
+                    Fargate["Fargate<br/>(Containerized)"]
+                end
+            end
+
+            subgraph DataSubnet["Data Subnet"]
+                RDS["RDS PostgreSQL"]
+                ElastiCache["ElastiCache<br/>(Redis)"]
+            end
+        end
+
+        S3["S3<br/>(Documents & Static Assets)"]
+        Lambda["Lambda<br/>(Serverless Functions)"]
+        MSK["Amazon MSK<br/>(Managed Kafka)"]
     end
 
-    subgraph AILayer["AI / ML Layer"]
-        Lambda["AWS Lambda<br/>(Serverless AI Processing)"]
-        Ollama["Ollama - Mistral 7B<br/>(Local Dev Inference)"]
+    Users --> APIGW
+    APIGW --> IAM --> ALB
+    ALB --> EB & Fargate
+    EB & Fargate --> RDS & ElastiCache & S3 & Lambda & MSK
+```
+
+##### 6. SRE & Observability Architecture
+```mermaid
+flowchart TB
+    subgraph AppLayer["Application Instrumentation"]
+        Micrometer["Micrometer<br/>(Metrics SDK)"]
+        SleuthZipkin["Spring Cloud Sleuth<br/>(Trace Propagation)"]
+        LogFramework["SLF4J / Logback<br/>(Structured Logging)"]
     end
 
-    subgraph AWSData["AWS Data & Storage Layer"]
-        S3["AWS S3<br/>(Claim Documents)"]
-        RDS["AWS RDS PostgreSQL<br/>(Claims Data)"]
-        Redis["Redis<br/>(Session & Cache)"]
-    end
-
-    subgraph AWSObservability["AWS Observability & SRE Layer"]
+    subgraph AWSObserve["AWS Native Observability"]
         subgraph CloudWatch["AWS CloudWatch"]
             CWLogs["CloudWatch Logs"]
-            CWMetrics["CloudWatch Metrics<br/>& Dashboards"]
-            CWSLOs["CloudWatch Application<br/>Signals & SLOs"]
+            CWMetrics["Metrics &<br/>Dashboards"]
+            AppSignals["Application Signals<br/>& SLOs"]
+            CWAlarms["CloudWatch<br/>Alarms"]
         end
         XRay["AWS X-Ray<br/>(Distributed Tracing)"]
-        subgraph OpenSource["Open Source Observability"]
-            Prom["Prometheus"] --> Graf["Grafana"]
-            Jaeger["Jaeger / Zipkin"]
+    end
+
+    subgraph OpenSource["Open Source Observability"]
+        Prom["Prometheus<br/>(Metrics Collection)"]
+        Grafana["Grafana<br/>(Visualization)"]
+        Jaeger["Jaeger / Zipkin<br/>(Trace Analysis)"]
+    end
+
+    subgraph Respond["Incident Response"]
+        PD["PagerDuty"]
+        Runbooks["Runbooks &<br/>Auto-Remediation"]
+        PostMortem["Post-Mortem<br/>Analysis"]
+    end
+
+    subgraph SLOs["SLO Management"]
+        Availability["Availability SLO<br/>(99.9% uptime)"]
+        Latency["Latency SLO<br/>(p99 < 500ms)"]
+        ErrorBudget["Error Budget<br/>Tracking"]
+    end
+
+    Micrometer --> CWMetrics & Prom
+    LogFramework --> CWLogs
+    SleuthZipkin --> XRay & Jaeger
+    Prom --> Grafana
+    AppSignals --> SLOs
+    CWAlarms --> PD
+    PD --> Runbooks --> PostMortem
+    SLOs --> ErrorBudget
+```
+
+##### 7. DevOps CI/CD Architecture
+```mermaid
+flowchart LR
+    subgraph Source["Source Control"]
+        GitHub["GitHub<br/>Repository"]
+    end
+
+    subgraph CI["Continuous Integration (GitHub Actions)"]
+        Build["Build<br/>(Maven)"]
+        UnitTest["Unit Tests<br/>(JUnit 5)"]
+        IntegTest["Integration Tests<br/>(Testcontainers)"]
+        CodeQuality["Code Quality<br/>(SonarQube / Checkstyle)"]
+        SecurityScan["Security Scan<br/>(OWASP / Snyk)"]
+        DockerBuild["Docker Image<br/>Build & Push"]
+    end
+
+    subgraph CD["Continuous Deployment"]
+        subgraph Staging["Staging"]
+            StageDeploy["Deploy to<br/>Staging"]
+            SmokeTest["Smoke &<br/>E2E Tests"]
         end
-        PD["PagerDuty<br/>(Alerting & Incidents)"]
-    end
-
-    subgraph AWSDeployment["AWS Deployment & CI/CD"]
-        VPC["AWS VPC"]
-        subgraph Compute["Compute Options"]
-            EB["AWS Elastic Beanstalk"]
-            Fargate["AWS Fargate"]
+        subgraph Prod["Production"]
+            BlueGreen["Blue/Green<br/>Deployment"]
+            Canary["Canary<br/>Release"]
         end
-        GHA["GitHub Actions<br/>(CI/CD Pipeline)"]
-        Backup["AWS Backup &<br/>Disaster Recovery"]
     end
 
-    subgraph LocalDev["Local Development"]
-        Docker["Docker Desktop"]
-        LocalStack["LocalStack<br/>(AWS Simulation)"]
-        K8s["Kubernetes<br/>(On-Prem)"]
+    subgraph Infra["Infrastructure as Code"]
+        CFN["CloudFormation /<br/>Terraform"]
+        IACValidate["Validate &<br/>Plan"]
     end
 
-    CP & AP --> APIGW
-    APIGW --> IAM --> ClaimsAPI
-    ClaimsAPI --> ClaimsProcessor
-    ClaimsProcessor --> AIService
-    ClaimsProcessor <--> Kafka
-    AIService --> Lambda
-    AIService -.->|"Local only"| Ollama
-    ClaimsProcessor --> S3
-    ClaimsProcessor --> RDS
-    ClaimsProcessor --> Redis
-    SpringBoot --> CWLogs & CWMetrics & CWSLOs
-    SpringBoot --> XRay
-    SpringBoot --> Prom
-    SpringBoot --> Jaeger
-    CWSLOs --> PD
-    GHA --> Compute
-    VPC --> Compute
-    GHA -.->|"Local"| Docker & LocalStack & K8s
+    GitHub -->|"Push / PR"| Build
+    Build --> UnitTest --> IntegTest --> CodeQuality --> SecurityScan --> DockerBuild
+    DockerBuild --> StageDeploy --> SmokeTest
+    SmokeTest -->|"Approved"| BlueGreen & Canary
+    GitHub --> CFN --> IACValidate --> StageDeploy
+```
+
+##### 8. Performance & Scalability Architecture
+```mermaid
+flowchart TB
+    subgraph LoadMgmt["Load Management"]
+        ALB["Application<br/>Load Balancer"]
+        RateLimit["API Gateway<br/>Rate Limiting"]
+        CircuitBreaker["Circuit Breaker<br/>(Resilience4j)"]
+    end
+
+    subgraph Scaling["Auto-Scaling"]
+        HPA["K8s HPA /<br/>Fargate Auto-Scale"]
+        ASG["EC2 Auto Scaling<br/>Group"]
+        KafkaPartitions["Kafka Partition<br/>Scaling"]
+    end
+
+    subgraph Caching["Caching Strategy"]
+        Redis["Redis<br/>(Session & Data Cache)"]
+        SpringCache["Spring Cache<br/>(Application Level)"]
+    end
+
+    subgraph Async["Async Processing"]
+        Kafka["Kafka<br/>(Async Event Processing)"]
+        Lambda["Lambda<br/>(Burst Processing)"]
+        ThreadPool["Spring Async<br/>(Thread Pools)"]
+    end
+
+    subgraph Testing["Performance Testing"]
+        LoadTest["Load Testing<br/>(k6 / Gatling)"]
+        ChaosEng["Chaos Engineering<br/>(Gremlin)"]
+        CapPlan["Capacity<br/>Planning"]
+    end
+
+    ALB --> HPA & ASG
+    RateLimit --> ALB
+    CircuitBreaker --> Redis & Kafka
+    HPA -->|"Scale on CPU/Memory"| ASG
+    KafkaPartitions -->|"Scale consumers"| Kafka
+    LoadTest --> CapPlan
+    ChaosEng --> CapPlan
+```
+
+##### 9. Spring Boot & Spring Framework Stack
+```mermaid
+flowchart TB
+    subgraph SpringBoot["Spring Boot Application"]
+        subgraph Web["Web Layer"]
+            MVC["Spring MVC<br/>(REST Controllers)"]
+            Validation["Spring Validation<br/>(Bean Validation)"]
+            Security["Spring Security<br/>(JWT / OAuth2)"]
+        end
+
+        subgraph Service["Service Layer"]
+            TX["Spring TX<br/>(Transaction Mgmt)"]
+            Async["@Async<br/>(Async Processing)"]
+            Retry["Spring Retry<br/>(Retry & Recovery)"]
+            CacheAbs["@Cacheable<br/>(Cache Abstraction)"]
+        end
+
+        subgraph DataLayer["Data Layer"]
+            JPA["Spring Data JPA<br/>(PostgreSQL)"]
+            RedisData["Spring Data Redis<br/>(Cache Store)"]
+        end
+
+        subgraph Messaging["Messaging"]
+            KafkaSpring["Spring Kafka<br/>(Producer / Consumer)"]
+        end
+
+        subgraph Observability["Observability"]
+            Actuator["Spring Actuator<br/>(Health / Metrics)"]
+            Micrometer["Micrometer<br/>(Metrics Export)"]
+            Sleuth["Spring Cloud Sleuth<br/>(Distributed Tracing)"]
+        end
+
+        subgraph Config["Configuration"]
+            Profiles["Spring Profiles<br/>(dev / staging / prod)"]
+            CloudConfig["Spring Cloud Config<br/>(Externalized Config)"]
+        end
+    end
+
+    MVC --> Security --> TX
+    TX --> JPA & RedisData
+    MVC --> Validation
+    Service --> KafkaSpring
+    Actuator --> Micrometer
+    Profiles --> CloudConfig
+```
+
+##### 10. Local Development Architecture
+```mermaid
+flowchart TB
+    subgraph IDE["Developer Workstation"]
+        Code["Spring Boot App<br/>(IDE / Maven)"]
+        DevProfile["spring.profiles.active=dev"]
+    end
+
+    subgraph DockerCompose["Docker Compose Stack"]
+        Postgres["PostgreSQL<br/>:5432"]
+        Redis["Redis<br/>:6379"]
+        Kafka["Kafka + Zookeeper<br/>:9092"]
+        Prometheus["Prometheus<br/>:9090"]
+        Grafana["Grafana<br/>:3000"]
+        Jaeger["Jaeger<br/>:16686"]
+        Zipkin["Zipkin<br/>:9411"]
+    end
+
+    subgraph LocalAI["Local AI"]
+        Ollama["Ollama<br/>(Mistral 7B Instruct)<br/>:11434"]
+    end
+
+    subgraph LocalAWS["AWS Simulation"]
+        LocalStack["LocalStack<br/>(S3, Lambda, SQS, etc.)<br/>:4566"]
+    end
+
+    Code --> DevProfile
+    Code --> Postgres & Redis & Kafka
+    Code --> Ollama
+    Code --> LocalStack
+    Code --> Prometheus --> Grafana
+    Code --> Jaeger & Zipkin
 ```
 
 ### Main objectives include:
