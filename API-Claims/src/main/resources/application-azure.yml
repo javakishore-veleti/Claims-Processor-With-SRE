@@ -1,0 +1,43 @@
+# Azure-specific configuration
+# Values injected from Azure Key Vault / K8s ConfigMap
+# Compose with environment profile: --spring.profiles.active=dev,azure
+spring:
+  datasource:
+    url: ${AZURE_SQL_URL}
+    username: ${AZURE_SQL_USERNAME}
+    password: ${AZURE_SQL_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${AZURE_REDIS_HOST}
+      port: ${AZURE_REDIS_PORT:6380}
+      password: ${AZURE_REDIS_PASSWORD}
+      ssl:
+        enabled: true
+
+# Azure service providers
+claims:
+  features:
+    search:
+      enabled: true
+      provider: azure-cognitive
+    event-stream:
+      enabled: true
+      provider: eventhub
+
+# Azure-specific properties
+azure:
+  keyvault:
+    enabled: true
+    uri: ${AZURE_KEYVAULT_URI}
+  storage:
+    account-name: ${AZURE_STORAGE_ACCOUNT}
+    container: ${AZURE_STORAGE_CONTAINER}
+  eventhub:
+    connection-string: ${AZURE_EVENTHUB_CONNECTION_STRING}
+    namespace: ${AZURE_EVENTHUB_NAMESPACE}
+  cognitive-search:
+    endpoint: ${AZURE_SEARCH_ENDPOINT}
+    api-key: ${AZURE_SEARCH_API_KEY}
+  ai:
+    enabled: true

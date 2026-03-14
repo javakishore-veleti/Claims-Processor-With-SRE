@@ -1,0 +1,115 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# ---------------------------------------------------------------------------
+# Rule files (recording rules evaluated first, then alerting rules)
+# ---------------------------------------------------------------------------
+rule_files:
+  - "/etc/prometheus/recording-rules.yml"
+  - "/etc/prometheus/alert-rules.yml"
+
+# ---------------------------------------------------------------------------
+# Alertmanager configuration
+# ---------------------------------------------------------------------------
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["Claims-Processor-alertmanager:9093"]
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Spring Boot Actuator endpoints
+  # host.docker.internal refers to the host machine where Spring Boot runs
+  - job_name: "portal-claims-advisor"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8081"]
+        labels:
+          service: "Portal-Claims-Advisor"
+
+  - job_name: "portal-claims-member"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8082"]
+        labels:
+          service: "Portal-Claims-Member"
+
+  - job_name: "api-claims"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8083"]
+        labels:
+          service: "API-Claims"
+
+  - job_name: "api-members"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8084"]
+        labels:
+          service: "API-Members"
+
+  - job_name: "portal-batch-assignment"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8085"]
+        labels:
+          service: "Portal-Batch-Assignment"
+
+  - job_name: "api-tenants"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8086"]
+        labels:
+          service: "API-Tenants"
+
+  - job_name: "api-entitlements"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8087"]
+        labels:
+          service: "API-Entitlements"
+
+  - job_name: "portal-tenants"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8088"]
+        labels:
+          service: "Portal-Tenants"
+
+  - job_name: "portal-entitlements"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8089"]
+        labels:
+          service: "Portal-Entitlements"
+
+  - job_name: "portal-sre"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8090"]
+        labels:
+          service: "Portal-SRE"
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure Exporters
+  # ---------------------------------------------------------------------------
+
+  # Kafka Exporter (https://github.com/danielqsj/kafka_exporter)
+  - job_name: "kafka-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9308"]
+
+  # Redis Exporter (https://github.com/oliver006/redis_exporter)
+  - job_name: "redis-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9121"]
+
+  # PostgreSQL Exporter (https://github.com/prometheus-community/postgres_exporter)
+  - job_name: "postgres-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9187"]

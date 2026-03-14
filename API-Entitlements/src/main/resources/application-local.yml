@@ -1,0 +1,18 @@
+# Local development profile - H2 in-memory (default), debug logging
+# Activate with: --spring.profiles.active=local
+spring:
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+
+logging:
+  level:
+    com.healthcare.claims.api.entitlements: DEBUG
+    org.springframework.web: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

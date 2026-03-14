@@ -1,0 +1,28 @@
+
+services:
+  redis:
+    image: redis:7
+    container_name: Claims-Processor-redis
+    restart: unless-stopped
+    command: redis-server --requirepass claims_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "claims_redis", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - claims-processor-net
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

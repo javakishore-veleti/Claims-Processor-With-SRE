@@ -1,0 +1,15 @@
+
+services:
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: Claims-Processor-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    networks:
+      - claims-processor-net
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

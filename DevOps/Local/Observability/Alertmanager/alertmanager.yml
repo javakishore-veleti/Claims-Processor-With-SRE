@@ -1,0 +1,95 @@
+###############################################################################
+# Alertmanager Configuration – Claims Processor SRE
+#
+# This configuration uses webhook receivers as placeholders for local
+# development. In production, replace the webhook URLs with real integrations:
+#
+#   Slack:
+#     slack_configs:
+#       - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+#         channel: '#claims-alerts'
+#         send_resolved: true
+#
+#   PagerDuty:
+#     pagerduty_configs:
+#       - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+#         severity: '{{ .CommonLabels.severity }}'
+#
+#   Email:
+#     email_configs:
+#       - to: 'oncall-team@example.com'
+#         from: 'alertmanager@example.com'
+#         smarthost: 'smtp.example.com:587'
+#         auth_username: 'alertmanager@example.com'
+#         auth_password: 'password'
+#         send_resolved: true
+###############################################################################
+
+global:
+  resolve_timeout: 5m
+
+# ---- Notification Templates ------------------------------------------------
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ---- Route Tree -------------------------------------------------------------
+route:
+  receiver: 'default-receiver'
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts — short repeat interval, escalate immediately
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      repeat_interval: 1h
+
+    # SLO alerts — tighter repeat to ensure SLO breaches are addressed quickly
+    - match:
+        type: slo
+      receiver: 'slo-receiver'
+      repeat_interval: 30m
+
+    # Warning alerts — default receiver with standard repeat
+    - match:
+        severity: warning
+      receiver: 'default-receiver'
+
+# ---- Receivers ---------------------------------------------------------------
+receivers:
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/'
+        send_resolved: true
+    # ----- Production: replace webhook with Slack -----
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    #     channel: '#claims-alerts-warning'
+    #     send_resolved: true
+
+  - name: 'critical-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/'
+        send_resolved: true
+    # ----- Production: add PagerDuty for critical alerts -----
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+    #     severity: '{{ .CommonLabels.severity }}'
+
+  - name: 'slo-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/'
+        send_resolved: true
+
+# ---- Inhibition Rules --------------------------------------------------------
+# When a critical alert fires, suppress the corresponding warning alert
+# for the same alertname and service to reduce noise.
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']

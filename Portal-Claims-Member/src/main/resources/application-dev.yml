@@ -1,0 +1,40 @@
+# Dev environment profile - PostgreSQL defaults, debug logging
+# Activate with: --spring.profiles.active=dev
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/claims_db}
+    username: ${DB_USERNAME:claims_user}
+    password: ${DB_PASSWORD:claims_pass}
+    driver-class-name: org.postgresql.Driver
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  thymeleaf:
+    cache: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:claims_redis}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.healthcare.claims.portal.member: DEBUG
+    org.springframework.security: DEBUG

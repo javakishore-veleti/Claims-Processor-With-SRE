@@ -1,0 +1,553 @@
+# =============================================================================
+# Prometheus Alerting Rules - Claims Processor SRE
+# =============================================================================
+# Covers SLI/SLO alerts, application health, claims-specific business logic,
+# and infrastructure monitoring. Metric names follow Spring Boot Actuator /
+# Micrometer conventions.
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # SLI / SLO Alerts
+  # ===========================================================================
+  - name: slo_alerts
+    rules:
+      # -----------------------------------------------------------------------
+      # Availability SLO - 99.9% target (error rate must stay below 0.1%)
+      # -----------------------------------------------------------------------
+      - alert: AvailabilitySLOBreach
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count[5m]))
+          ) > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          slo: availability
+          team: claims-sre
+        annotations:
+          summary: "Availability SLO breach - error rate exceeds 0.1%"
+          description: >-
+            The aggregate HTTP 5xx error rate is {{ $value | humanizePercentage }}
+            over the last 5 minutes, breaching the 99.9% availability target.
+          runbook_url: "https://wiki.internal/runbooks/availability-slo-breach"
+
+      # -----------------------------------------------------------------------
+      # Latency SLO - p99 must stay below 500ms
+      # -----------------------------------------------------------------------
+      - alert: LatencyP99SLOBreach
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          slo: latency
+          team: claims-sre
+        annotations:
+          summary: "Latency SLO breach - p99 latency exceeds 500ms"
+          description: >-
+            Aggregate p99 latency is {{ $value | humanizeDuration }}, exceeding
+            the 500ms SLO target over a 5-minute window.
+          runbook_url: "https://wiki.internal/runbooks/latency-slo-breach"
+
+      # -----------------------------------------------------------------------
+      # Latency SLO - p95 must stay below 200ms
+      # -----------------------------------------------------------------------
+      - alert: LatencyP95SLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+          team: claims-sre
+        annotations:
+          summary: "Latency SLO breach - p95 latency exceeds 200ms"
+          description: >-
+            Aggregate p95 latency is {{ $value | humanizeDuration }}, exceeding
+            the 200ms SLO target over a 5-minute window.
+          runbook_url: "https://wiki.internal/runbooks/latency-slo-breach"
+
+      # -----------------------------------------------------------------------
+      # Error Budget - Fast Burn (14.4x burn rate over 1h)
+      # Consumes the 30-day error budget ~14.4x faster than sustainable.
+      # -----------------------------------------------------------------------
+      - alert: ErrorBudgetFastBurn
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[1h]))
+            /
+            sum(rate(http_server_requests_seconds_count[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          slo: error_budget
+          team: claims-sre
+        annotations:
+          summary: "Error budget fast burn - 14.4x burn rate detected"
+          description: >-
+            The 1-hour error rate is {{ $value | humanizePercentage }}, which
+            implies a burn rate of ~14.4x the sustainable rate. At this pace the
+            entire 30-day error budget will be exhausted in roughly 2 days.
+          runbook_url: "https://wiki.internal/runbooks/error-budget-burn"
+
+      # -----------------------------------------------------------------------
+      # Error Budget - Slow Burn (6x burn rate over 6h)
+      # -----------------------------------------------------------------------
+      - alert: ErrorBudgetSlowBurn
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[6h]))
+            /
+            sum(rate(http_server_requests_seconds_count[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          slo: error_budget
+          team: claims-sre
+        annotations:
+          summary: "Error budget slow burn - 6x burn rate detected"
+          description: >-
+            The 6-hour error rate is {{ $value | humanizePercentage }}, implying
+            a burn rate of ~6x sustainable. The 30-day error budget will be
+            exhausted in roughly 5 days at this pace.
+          runbook_url: "https://wiki.internal/runbooks/error-budget-burn"
+
+  # ===========================================================================
+  # Application Health Alerts
+  # ===========================================================================
+  - name: application_health
+    rules:
+      # -----------------------------------------------------------------------
+      # Service Down - any of the 5 services not responding
+      # -----------------------------------------------------------------------
+      - alert: ServiceDown
+        expr: up{job=~"claims-.*-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: >-
+            The Prometheus scrape target for {{ $labels.job }}
+            ({{ $labels.instance }}) has been unreachable for more than 1 minute.
+          runbook_url: "https://wiki.internal/runbooks/service-down"
+
+      # -----------------------------------------------------------------------
+      # High Error Rate - HTTP 5xx > 5% for any service
+      # -----------------------------------------------------------------------
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (job) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "High HTTP 5xx error rate on {{ $labels.job }}"
+          description: >-
+            Service {{ $labels.job }} has a 5xx error rate of
+            {{ $value | humanizePercentage }} over the last 5 minutes.
+          runbook_url: "https://wiki.internal/runbooks/high-error-rate"
+
+      # -----------------------------------------------------------------------
+      # High Request Latency - p99 > 1s for any service
+      # -----------------------------------------------------------------------
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (job, le) (rate(http_server_requests_seconds_bucket[10m]))
+          ) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "High p99 latency on {{ $labels.job }}"
+          description: >-
+            Service {{ $labels.job }} p99 latency is {{ $value | humanizeDuration }}
+            over the last 10 minutes.
+          runbook_url: "https://wiki.internal/runbooks/high-latency"
+
+      # -----------------------------------------------------------------------
+      # JVM Heap High - usage > 80% for > 5m
+      # -----------------------------------------------------------------------
+      - alert: JvmHeapHigh
+        expr: |
+          (
+            jvm_memory_used_bytes{area="heap"}
+            /
+            jvm_memory_max_bytes{area="heap"}
+          ) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "JVM heap usage above 80% on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} ({{ $labels.instance }}) heap usage is at
+            {{ $value | humanizePercentage }}. Consider tuning -Xmx or
+            investigating memory leaks.
+          runbook_url: "https://wiki.internal/runbooks/jvm-heap-high"
+
+      # -----------------------------------------------------------------------
+      # JVM GC Pressure - GC pause time > 500ms
+      # -----------------------------------------------------------------------
+      - alert: JvmGcPressure
+        expr: |
+          rate(jvm_gc_pause_seconds_sum[5m])
+          /
+          rate(jvm_gc_pause_seconds_count[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "High GC pause time on {{ $labels.job }}"
+          description: >-
+            Average GC pause on {{ $labels.job }} ({{ $labels.instance }}) is
+            {{ $value | humanizeDuration }}. This indicates significant GC pressure.
+          runbook_url: "https://wiki.internal/runbooks/jvm-gc-pressure"
+
+      # -----------------------------------------------------------------------
+      # Thread Pool Exhaustion - active threads > 90% of max
+      # -----------------------------------------------------------------------
+      - alert: ThreadPoolExhaustion
+        expr: |
+          (
+            jvm_threads_live_threads
+            /
+            jvm_threads_peak_threads
+          ) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "Thread pool near exhaustion on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} ({{ $labels.instance }}) is using
+            {{ $value | humanizePercentage }} of peak thread count. The service
+            may become unresponsive under additional load.
+          runbook_url: "https://wiki.internal/runbooks/thread-pool-exhaustion"
+
+      # -----------------------------------------------------------------------
+      # Connection Pool Exhaustion - active DB connections > 80% of max
+      # -----------------------------------------------------------------------
+      - alert: ConnectionPoolExhaustion
+        expr: |
+          (
+            hikaricp_connections_active
+            /
+            hikaricp_connections_max
+          ) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "DB connection pool near exhaustion on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} ({{ $labels.instance }}) is using
+            {{ $value | humanizePercentage }} of max HikariCP connections.
+          runbook_url: "https://wiki.internal/runbooks/connection-pool-exhaustion"
+
+  # ===========================================================================
+  # Claims Processing Specific Alerts
+  # ===========================================================================
+  - name: claims_processing
+    rules:
+      # -----------------------------------------------------------------------
+      # Claim Processing Backlog - Kafka consumer lag > 1000 for > 5m
+      # -----------------------------------------------------------------------
+      - alert: ClaimProcessingBacklog
+        expr: |
+          kafka_consumer_fetch_manager_records_lag_max{topic=~"claims.*"} > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "Claim processing backlog on topic {{ $labels.topic }}"
+          description: >-
+            Kafka consumer lag for group {{ $labels.group }} on topic
+            {{ $labels.topic }} is {{ $value }}, exceeding the 1000-message
+            threshold. Claims are backing up.
+          runbook_url: "https://wiki.internal/runbooks/claim-backlog"
+
+      # -----------------------------------------------------------------------
+      # Claim Stage Stuck - claims stuck in same stage > 30m
+      # Uses a custom metric exposed by the claims services.
+      # -----------------------------------------------------------------------
+      - alert: ClaimStageStuck
+        expr: |
+          (time() - claims_stage_last_transition_timestamp_seconds) > 1800
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "Claim stuck in stage {{ $labels.stage }}"
+          description: >-
+            Claim {{ $labels.claim_id }} has been in stage {{ $labels.stage }}
+            for more than 30 minutes without transitioning.
+          runbook_url: "https://wiki.internal/runbooks/claim-stage-stuck"
+
+      # -----------------------------------------------------------------------
+      # AI / Bedrock Document Extraction Failure Rate > 5%
+      # -----------------------------------------------------------------------
+      - alert: AiExtractionFailureRate
+        expr: |
+          (
+            sum(rate(bedrock_extraction_requests_total{status="error"}[10m]))
+            /
+            sum(rate(bedrock_extraction_requests_total[10m]))
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "AI document extraction failure rate exceeds 5%"
+          description: >-
+            Bedrock document-analysis extraction failure rate is
+            {{ $value | humanizePercentage }} over the last 10 minutes.
+          runbook_url: "https://wiki.internal/runbooks/ai-extraction-failure"
+
+      # -----------------------------------------------------------------------
+      # Batch Import Failure - any batch job failure
+      # -----------------------------------------------------------------------
+      - alert: BatchImportFailure
+        expr: |
+          increase(spring_batch_job_completions_total{status="FAILED"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "Batch import job failed"
+          description: >-
+            A Spring Batch job ({{ $labels.name }}) has failed. Check logs for
+            the root cause and whether a retry is appropriate.
+          runbook_url: "https://wiki.internal/runbooks/batch-import-failure"
+
+  # ===========================================================================
+  # Infrastructure Alerts
+  # ===========================================================================
+  - name: infrastructure
+    rules:
+      # -----------------------------------------------------------------------
+      # Database Connection Failure - PostgreSQL connection errors
+      # -----------------------------------------------------------------------
+      - alert: DatabaseConnectionFailure
+        expr: |
+          hikaricp_connections_timeout_total > 0
+          and
+          increase(hikaricp_connections_timeout_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "Database connection timeouts on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} ({{ $labels.instance }}) is experiencing HikariCP
+            connection timeouts, indicating PostgreSQL connectivity issues.
+          runbook_url: "https://wiki.internal/runbooks/database-connection-failure"
+
+      # -----------------------------------------------------------------------
+      # PostgreSQL Exporter Down
+      # -----------------------------------------------------------------------
+      - alert: PostgresExporterDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "PostgreSQL exporter is unreachable"
+          description: >-
+            The postgres_exporter target has been down for more than 2 minutes.
+            Database metrics are not being collected.
+          runbook_url: "https://wiki.internal/runbooks/postgres-exporter-down"
+
+      # -----------------------------------------------------------------------
+      # Redis Connection Failure
+      # -----------------------------------------------------------------------
+      - alert: RedisConnectionFailure
+        expr: up{job="redis-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "Redis exporter is unreachable"
+          description: >-
+            The Redis exporter target has been down for more than 2 minutes.
+            Redis may be unavailable.
+          runbook_url: "https://wiki.internal/runbooks/redis-connection-failure"
+
+      # -----------------------------------------------------------------------
+      # Redis application-level connection errors
+      # -----------------------------------------------------------------------
+      - alert: RedisOperationFailures
+        expr: |
+          increase(lettuce_command_completion_total{status="error"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "Redis operation failures on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} is experiencing Redis command failures via Lettuce
+            client. Check Redis health and network connectivity.
+          runbook_url: "https://wiki.internal/runbooks/redis-operation-failures"
+
+      # -----------------------------------------------------------------------
+      # Kafka Broker Down
+      # -----------------------------------------------------------------------
+      - alert: KafkaBrokerDown
+        expr: up{job="kafka-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: claims-sre
+        annotations:
+          summary: "Kafka exporter is unreachable"
+          description: >-
+            The Kafka exporter target has been down for more than 2 minutes.
+            Kafka broker may be unavailable, impacting async claim processing.
+          runbook_url: "https://wiki.internal/runbooks/kafka-broker-down"
+
+      # -----------------------------------------------------------------------
+      # Disk Space Low - > 85% used
+      # -----------------------------------------------------------------------
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"}
+            /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          team: claims-sre
+        annotations:
+          summary: "Disk space low on {{ $labels.instance }}"
+          description: >-
+            Instance {{ $labels.instance }} has only
+            {{ $value | humanizePercentage }} free disk space on root filesystem.
+          runbook_url: "https://wiki.internal/runbooks/disk-space-low"
+
+  # ===========================================================================
+  # Authentication & Authorization Alerts
+  # ===========================================================================
+  - name: auth_alerts
+    rules:
+      # High authentication failure rate (401 responses)
+      - alert: HighAuthenticationFailureRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status="401"}[5m])) by (job)
+            /
+            sum(rate(http_server_requests_seconds_count[5m])) by (job)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          type: security
+          team: claims-sre
+        annotations:
+          summary: "High authentication failure rate on {{ $labels.job }}"
+          description: "Authentication failures (401) exceed 5% of total requests on {{ $labels.job }} - current rate: {{ $value | humanizePercentage }}"
+          runbook_url: "https://wiki.internal/runbooks/auth-failure-rate"
+
+      # High authorization failure rate (403 responses)
+      - alert: HighAuthorizationFailureRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status="403"}[5m])) by (job)
+            /
+            sum(rate(http_server_requests_seconds_count[5m])) by (job)
+          ) > 0.03
+        for: 5m
+        labels:
+          severity: warning
+          type: security
+          team: claims-sre
+        annotations:
+          summary: "High authorization failure rate on {{ $labels.job }}"
+          description: "Authorization failures (403) exceed 3% on {{ $labels.job }} - possible privilege escalation attempt"
+
+      # Spike in auth failures (potential brute force)
+      - alert: AuthenticationFailureSpike
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status="401"}[5m])) by (job)
+          > 10
+        for: 2m
+        labels:
+          severity: critical
+          type: security
+          team: claims-sre
+        annotations:
+          summary: "Authentication failure spike on {{ $labels.job }}"
+          description: "More than 10 auth failures per second on {{ $labels.job }} - potential brute force attack"
+
+      # Inter-service communication failure
+      - alert: InterServiceCallFailure
+        expr: |
+          (
+            sum(rate(http_client_requests_seconds_count{status=~"5.."}[5m])) by (job, uri)
+            /
+            sum(rate(http_client_requests_seconds_count[5m])) by (job, uri)
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          type: inter-service
+          team: claims-sre
+        annotations:
+          summary: "Inter-service call failures from {{ $labels.job }} to {{ $labels.uri }}"
+          description: "More than 10% of outgoing HTTP calls from {{ $labels.job }} to {{ $labels.uri }} are failing"
+
+      # Circuit breaker open
+      - alert: CircuitBreakerOpen
+        expr: |
+          resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          type: resilience
+          team: claims-sre
+        annotations:
+          summary: "Circuit breaker OPEN for {{ $labels.name }} on {{ $labels.job }}"
+          description: "Circuit breaker {{ $labels.name }} is in OPEN state - downstream service is unhealthy"
+
+      # Bulkhead rejection rate
+      - alert: BulkheadRejectionRate
+        expr: |
+          sum(rate(resilience4j_bulkhead_calls_total{kind="rejected"}[5m])) by (job, name) > 0
+        for: 5m
+        labels:
+          severity: warning
+          type: resilience
+          team: claims-sre
+        annotations:
+          summary: "Bulkhead rejecting calls for {{ $labels.name }} on {{ $labels.job }}"
+          description: "Bulkhead {{ $labels.name }} is rejecting concurrent calls - service under heavy load"

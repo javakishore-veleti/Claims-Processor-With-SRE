@@ -1,0 +1,24 @@
+
+services:
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: Claims-Processor-kibana
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: "http://Claims-Processor-elasticsearch:9200"
+      XPACK_SECURITY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    networks:
+      - claims-processor-net
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

@@ -1,0 +1,17 @@
+package com.healthcare.claims.common.claims.model;
+
+public enum ClaimStage {
+    INTAKE_RECEIVED,
+    DOCUMENT_VERIFICATION,
+    DATA_EXTRACTION,
+    EXTRACTION_REVIEW,
+    ELIGIBILITY_CHECK,
+    ADJUDICATION,
+    ADJUDICATION_REVIEW,
+    APPROVED,
+    DENIED,
+    PARTIAL_APPROVED,
+    SETTLEMENT,
+    CLOSED,
+    APPEAL
+}

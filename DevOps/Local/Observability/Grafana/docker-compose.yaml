@@ -1,0 +1,35 @@
+
+services:
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: Claims-Processor-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: claims_admin
+      GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_UNIFIED_ALERTING_ENABLED: "true"
+      GF_ALERTING_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+      - ./provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - claims-processor-net
+
+volumes:
+  grafana_data:
+    driver: local
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

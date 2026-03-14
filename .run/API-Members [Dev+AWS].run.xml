@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="API-Members [Dev+AWS]" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="api-members" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.healthcare.claims.api.members.ApiMembersApplication" />
+    <option name="ACTIVE_PROFILES" value="dev,aws" />
+    <option name="ALTERNATIVE_JRE_PATH" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

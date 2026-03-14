@@ -1,0 +1,30 @@
+# GCP-specific configuration
+# Values injected from GCP Secret Manager / K8s ConfigMap
+# Compose with environment profile: --spring.profiles.active=dev,gcp
+spring:
+  datasource:
+    url: ${GCP_CLOUD_SQL_URL}
+    username: ${GCP_CLOUD_SQL_USERNAME}
+    password: ${GCP_CLOUD_SQL_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${GCP_MEMORYSTORE_HOST}
+      port: ${GCP_MEMORYSTORE_PORT:6379}
+      password: ${GCP_MEMORYSTORE_PASSWORD}
+
+# GCP-specific properties
+gcp:
+  project-id: ${GCP_PROJECT_ID}
+  region: ${GCP_REGION:us-central1}
+  storage:
+    bucket: ${GCP_GCS_BUCKET}
+  secret-manager:
+    enabled: true
+  pubsub:
+    enabled: true
+    topic: ${GCP_PUBSUB_TOPIC}
+    subscription: ${GCP_PUBSUB_SUBSCRIPTION}
+  vertex-ai:
+    enabled: true
+    region: ${GCP_VERTEX_AI_REGION:us-central1}

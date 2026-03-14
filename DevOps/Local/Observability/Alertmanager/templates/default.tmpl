@@ -1,0 +1,20 @@
+{{ define "default.title" -}}
+[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}
+{{- end }}
+
+{{ define "default.text" -}}
+{{ range .Alerts }}
+------------------------------------------------------
+Alert:       {{ .Labels.alertname }}
+Severity:    {{ .Labels.severity }}
+Service:     {{ .Labels.service }}
+Summary:     {{ .Annotations.summary }}
+Description: {{ .Annotations.description }}
+Runbook:     {{ .Annotations.runbook_url | default "N/A" }}
+Started:     {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+{{ if .EndsAt -}}
+Resolved:    {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}
+{{ end -}}
+------------------------------------------------------
+{{ end }}
+{{- end }}

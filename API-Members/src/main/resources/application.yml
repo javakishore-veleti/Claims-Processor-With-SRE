@@ -1,0 +1,159 @@
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: api-members
+  # Default: H2 in-memory (no Docker needed)
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:membersdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+    hikari:
+      pool-name: ${spring.application.name}-pool
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
+      maximum-pool-size: ${HIKARI_MAX_POOL:20}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT:300000}
+      max-lifetime: ${HIKARI_MAX_LIFETIME:1200000}
+      connection-timeout: ${HIKARI_CONN_TIMEOUT:30000}
+      leak-detection-threshold: ${HIKARI_LEAK_THRESHOLD:60000}
+  h2:
+    console:
+      enabled: ${H2_CONSOLE_ENABLED:true}
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:create-drop}
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: true
+  security:
+    user:
+      name: ${SECURITY_USER:admin}
+      password: ${SECURITY_PASSWORD:admin}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+
+logging:
+  level:
+    com.healthcare.claims.api.members: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}
+
+# Feature Toggles
+members:
+  features:
+    search:
+      enabled: false
+      provider: elasticsearch  # elasticsearch | opensearch | azure-cognitive | gcp-search
+      index-on-create: true
+      index-on-update: true
+      index-on-delete: true
+    event-stream:
+      enabled: false
+      provider: kafka  # kafka | kinesis | eventhub | pubsub
+      publish-on-create: true
+      publish-on-update: true
+      publish-on-delete: true
+    log-shipping:
+      enabled: false
+      destination: elasticsearch  # elasticsearch | cloudwatch | azure-monitor | gcp-logging
+    cache:
+      enabled: false
+      provider: redis  # redis | elasticache | azure-redis | memorystore
+    metrics:
+      enabled: true
+      exporter: prometheus  # prometheus | cloudwatch | azure-monitor | gcp-monitoring
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.io.IOException
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+      strict:
+        sliding-window-size: 5
+        failure-rate-threshold: 30
+        wait-duration-in-open-state: 60s
+    instances:
+      api-claims-service:
+        base-config: default
+      api-tenants-service:
+        base-config: default
+      api-entitlements-service:
+        base-config: default
+  bulkhead:
+    configs:
+      default:
+        max-concurrent-calls: 25
+        max-wait-duration: 500ms
+    instances:
+      api-claims-service:
+        base-config: default
+      api-tenants-service:
+        base-config: default
+      api-entitlements-service:
+        base-config: default
+  ratelimiter:
+    configs:
+      default:
+        limit-for-period: 100
+        limit-refresh-period: 1s
+        timeout-duration: 500ms
+    instances:
+      api-claims-service:
+        base-config: default
+      api-entitlements-service:
+        base-config: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 10s
+        cancel-running-future: true
+    instances:
+      api-claims-service:
+        base-config: default
+      api-entitlements-service:
+        base-config: default
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+        retry-exceptions:
+          - java.io.IOException
+          - java.net.ConnectException
+    instances:
+      api-claims-service:
+        base-config: default
+      api-entitlements-service:
+        base-config: default

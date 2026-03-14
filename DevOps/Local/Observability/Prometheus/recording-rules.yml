@@ -1,0 +1,169 @@
+# =============================================================================
+# Prometheus Recording Rules - Claims Processor SRE
+# =============================================================================
+# Pre-compute common SLI metrics to speed up dashboard queries and alert
+# evaluations. All rules use Spring Boot Actuator / Micrometer metric names.
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # Aggregate Request & Error Rates
+  # ===========================================================================
+  - name: sli_request_rates
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # Total request rate (req/s) over 5m - all services combined
+      # -----------------------------------------------------------------------
+      - record: claims:request_rate:5m
+        expr: |
+          sum(rate(http_server_requests_seconds_count[5m]))
+
+      # -----------------------------------------------------------------------
+      # Error rate (percentage) over 5m - all services combined
+      # -----------------------------------------------------------------------
+      - record: claims:error_rate:5m
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count[5m]))
+          ) * 100
+
+      # -----------------------------------------------------------------------
+      # Availability (success rate percentage) over 5m
+      # -----------------------------------------------------------------------
+      - record: claims:availability:5m
+        expr: |
+          (
+            1 - (
+              sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+              /
+              sum(rate(http_server_requests_seconds_count[5m]))
+            )
+          ) * 100
+
+  # ===========================================================================
+  # Aggregate Latency Quantiles
+  # ===========================================================================
+  - name: sli_latency
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # p99 latency over 5m - all services combined
+      # -----------------------------------------------------------------------
+      - record: claims:latency_p99:5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+          )
+
+      # -----------------------------------------------------------------------
+      # p95 latency over 5m - all services combined
+      # -----------------------------------------------------------------------
+      - record: claims:latency_p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+          )
+
+  # ===========================================================================
+  # Per-Service SLIs
+  # ===========================================================================
+  - name: sli_per_service
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # Per-service request rate (req/s) over 5m
+      # -----------------------------------------------------------------------
+      - record: claims:request_rate_by_service:5m
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count[5m]))
+
+      # -----------------------------------------------------------------------
+      # Per-service error rate (percentage) over 5m
+      # -----------------------------------------------------------------------
+      - record: claims:error_rate_by_service:5m
+        expr: |
+          (
+            sum by (job) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count[5m]))
+          ) * 100
+
+      # -----------------------------------------------------------------------
+      # Per-service availability (percentage) over 5m
+      # -----------------------------------------------------------------------
+      - record: claims:availability_by_service:5m
+        expr: |
+          (
+            1 - (
+              sum by (job) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+              /
+              sum by (job) (rate(http_server_requests_seconds_count[5m]))
+            )
+          ) * 100
+
+      # -----------------------------------------------------------------------
+      # Per-service p99 latency over 5m
+      # -----------------------------------------------------------------------
+      - record: claims:latency_p99_by_service:5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (job, le) (rate(http_server_requests_seconds_bucket[5m]))
+          )
+
+      # -----------------------------------------------------------------------
+      # Per-service p95 latency over 5m
+      # -----------------------------------------------------------------------
+      - record: claims:latency_p95_by_service:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (job, le) (rate(http_server_requests_seconds_bucket[5m]))
+          )
+
+  # ===========================================================================
+  # Error Budget (30-day rolling window)
+  # ===========================================================================
+  - name: sli_error_budget
+    interval: 1m
+    rules:
+      # -----------------------------------------------------------------------
+      # Total requests over the last 30 days
+      # -----------------------------------------------------------------------
+      - record: claims:requests_total:30d
+        expr: |
+          sum(increase(http_server_requests_seconds_count[30d]))
+
+      # -----------------------------------------------------------------------
+      # Total errors over the last 30 days
+      # -----------------------------------------------------------------------
+      - record: claims:errors_total:30d
+        expr: |
+          sum(increase(http_server_requests_seconds_count{status=~"5.."}[30d]))
+
+      # -----------------------------------------------------------------------
+      # Observed error ratio over 30 days
+      # -----------------------------------------------------------------------
+      - record: claims:error_ratio:30d
+        expr: |
+          claims:errors_total:30d / claims:requests_total:30d
+
+      # -----------------------------------------------------------------------
+      # Error budget remaining (percentage)
+      #   SLO target = 99.9% availability => allowed error ratio = 0.001
+      #   Remaining = 1 - (observed_error_ratio / allowed_error_ratio)
+      #   A value of 1.0 means 100% budget remaining; 0 means exhausted.
+      # -----------------------------------------------------------------------
+      - record: claims:error_budget_remaining:30d
+        expr: |
+          1 - (
+            claims:error_ratio:30d / 0.001
+          )
+
+      # -----------------------------------------------------------------------
+      # Error budget remaining as a percentage (0-100 scale)
+      # -----------------------------------------------------------------------
+      - record: claims:error_budget_remaining_pct:30d
+        expr: |
+          clamp_min(claims:error_budget_remaining:30d * 100, 0)

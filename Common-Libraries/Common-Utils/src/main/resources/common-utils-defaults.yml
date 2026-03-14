@@ -1,0 +1,43 @@
+# =============================================================================
+# Inter-Service Communication Configuration — Reference Defaults
+# =============================================================================
+# This file is NOT auto-loaded. Copy the relevant sections into each
+# module's application.yml as needed.
+# =============================================================================
+
+claims:
+  service-client:
+    auth:
+      enabled: false
+      provider: none  # none | basic | jwt | cognito | azure-ad | gcp-iam
+      # --- Basic auth ---
+      # username: svc-account
+      # password: ${SVC_PASSWORD}
+      # --- JWT auth ---
+      # jwt-secret: ${JWT_SECRET}
+      # jwt-issuer: claims-platform
+      # --- AWS Cognito ---
+      # cognito-user-pool-id: ${COGNITO_USER_POOL_ID}
+      # cognito-client-id: ${COGNITO_CLIENT_ID}
+      # cognito-region: us-east-1
+      # --- Azure AD ---
+      # azure-ad-tenant-id: ${AZURE_AD_TENANT_ID}
+      # azure-ad-client-id: ${AZURE_AD_CLIENT_ID}
+      # azure-ad-client-secret: ${AZURE_AD_CLIENT_SECRET}
+    services:
+      api-claims:
+        url: ${API_CLAIMS_URL:http://localhost:8083}
+        connect-timeout: 5000
+        read-timeout: 10000
+      api-members:
+        url: ${API_MEMBERS_URL:http://localhost:8084}
+        connect-timeout: 5000
+        read-timeout: 10000
+      api-tenants:
+        url: ${API_TENANTS_URL:http://localhost:8086}
+        connect-timeout: 5000
+        read-timeout: 10000
+      api-entitlements:
+        url: ${API_ENTITLEMENTS_URL:http://localhost:8087}
+        connect-timeout: 5000
+        read-timeout: 10000

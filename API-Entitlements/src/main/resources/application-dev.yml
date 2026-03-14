@@ -1,0 +1,43 @@
+# Dev environment profile - values from env vars or K8s ConfigMap
+# Activate with: --spring.profiles.active=dev
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/entitlements_db}
+    username: ${DB_USERNAME:entitlements_user}
+    password: ${DB_PASSWORD:entitlements_pass}
+    driver-class-name: org.postgresql.Driver
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    user:
+      name: dev
+      password: dev
+
+# Feature toggles enabled in dev
+entitlements:
+  features:
+    auth-provider:
+      provider: local
+    search:
+      enabled: true
+    event-stream:
+      enabled: true
+    log-shipping:
+      enabled: true
+    cache:
+      enabled: true
+
+logging:
+  level:
+    com.healthcare.claims.api.entitlements: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

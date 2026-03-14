@@ -1,0 +1,131 @@
+{
+  "name": "claims-processor-with-sre-devops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Developer operations scripts for Claims Processor With SRE. Not a Node.js application.",
+  "scripts": {
+    "------- SERVICES: Individual -------": "",
+
+    "services:start:portal-advisor": "mvn spring-boot:run -pl Portal-Claims-Advisor -Dspring-boot.run.profiles=dev &",
+    "services:start:portal-advisor:postgres": "mvn spring-boot:run -pl Portal-Claims-Advisor -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:portal-advisor": "lsof -ti:8081 | xargs kill -9 2>/dev/null || echo 'Portal-Claims-Advisor not running'",
+    "services:status:portal-advisor": "curl -s http://localhost:8081/actuator/health 2>/dev/null && echo '' || echo 'Portal-Claims-Advisor: DOWN'",
+
+    "services:start:portal-member": "mvn spring-boot:run -pl Portal-Claims-Member -Dspring-boot.run.profiles=dev &",
+    "services:start:portal-member:postgres": "mvn spring-boot:run -pl Portal-Claims-Member -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:portal-member": "lsof -ti:8082 | xargs kill -9 2>/dev/null || echo 'Portal-Claims-Member not running'",
+    "services:status:portal-member": "curl -s http://localhost:8082/actuator/health 2>/dev/null && echo '' || echo 'Portal-Claims-Member: DOWN'",
+
+    "services:start:api-claims": "mvn spring-boot:run -pl API-Claims -Dspring-boot.run.profiles=dev &",
+    "services:start:api-claims:postgres": "mvn spring-boot:run -pl API-Claims -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:api-claims": "lsof -ti:8083 | xargs kill -9 2>/dev/null || echo 'API-Claims not running'",
+    "services:status:api-claims": "curl -s http://localhost:8083/actuator/health 2>/dev/null && echo '' || echo 'API-Claims: DOWN'",
+
+    "services:start:api-members": "mvn spring-boot:run -pl API-Members -Dspring-boot.run.profiles=dev &",
+    "services:start:api-members:postgres": "mvn spring-boot:run -pl API-Members -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:api-members": "lsof -ti:8084 | xargs kill -9 2>/dev/null || echo 'API-Members not running'",
+    "services:status:api-members": "curl -s http://localhost:8084/actuator/health 2>/dev/null && echo '' || echo 'API-Members: DOWN'",
+
+    "services:start:portal-batch": "mvn spring-boot:run -pl Portal-Batch-Assignment -Dspring-boot.run.profiles=dev &",
+    "services:start:portal-batch:postgres": "mvn spring-boot:run -pl Portal-Batch-Assignment -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:portal-batch": "lsof -ti:8085 | xargs kill -9 2>/dev/null || echo 'Portal-Batch-Assignment not running'",
+    "services:status:portal-batch": "curl -s http://localhost:8085/actuator/health 2>/dev/null && echo '' || echo 'Portal-Batch-Assignment: DOWN'",
+
+    "services:start:api-tenants": "mvn spring-boot:run -pl API-Tenants -Dspring-boot.run.profiles=dev &",
+    "services:start:api-tenants:postgres": "mvn spring-boot:run -pl API-Tenants -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:api-tenants": "lsof -ti:8086 | xargs kill -9 2>/dev/null || echo 'API-Tenants not running'",
+    "services:status:api-tenants": "curl -s http://localhost:8086/actuator/health 2>/dev/null && echo '' || echo 'API-Tenants: DOWN'",
+
+    "services:start:api-entitlements": "mvn spring-boot:run -pl API-Entitlements -Dspring-boot.run.profiles=dev &",
+    "services:start:api-entitlements:postgres": "mvn spring-boot:run -pl API-Entitlements -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:api-entitlements": "lsof -ti:8087 | xargs kill -9 2>/dev/null || echo 'API-Entitlements not running'",
+    "services:status:api-entitlements": "curl -s http://localhost:8087/actuator/health 2>/dev/null && echo '' || echo 'API-Entitlements: DOWN'",
+
+    "services:start:portal-tenants": "mvn spring-boot:run -pl Portal-Tenants -Dspring-boot.run.profiles=dev &",
+    "services:start:portal-tenants:postgres": "mvn spring-boot:run -pl Portal-Tenants -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:portal-tenants": "lsof -ti:8088 | xargs kill -9 2>/dev/null || echo 'Portal-Tenants not running'",
+    "services:status:portal-tenants": "curl -s http://localhost:8088/actuator/health 2>/dev/null && echo '' || echo 'Portal-Tenants: DOWN'",
+
+    "services:start:portal-entitlements": "mvn spring-boot:run -pl Portal-Entitlements -Dspring-boot.run.profiles=dev &",
+    "services:start:portal-entitlements:postgres": "mvn spring-boot:run -pl Portal-Entitlements -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:portal-entitlements": "lsof -ti:8089 | xargs kill -9 2>/dev/null || echo 'Portal-Entitlements not running'",
+    "services:status:portal-entitlements": "curl -s http://localhost:8089/actuator/health 2>/dev/null && echo '' || echo 'Portal-Entitlements: DOWN'",
+
+    "services:start:portal-sre": "mvn spring-boot:run -pl Portal-SRE -Dspring-boot.run.profiles=dev &",
+    "services:start:portal-sre:postgres": "mvn spring-boot:run -pl Portal-SRE -Dspring-boot.run.profiles=dev,local-postgres &",
+    "services:stop:portal-sre": "lsof -ti:8090 | xargs kill -9 2>/dev/null || echo 'Portal-SRE not running'",
+    "services:status:portal-sre": "curl -s http://localhost:8090/actuator/health 2>/dev/null && echo '' || echo 'Portal-SRE: DOWN'",
+
+    "------- SERVICES: All -------": "",
+
+    "services:start:all": "npm run services:start:portal-advisor && npm run services:start:portal-member && npm run services:start:api-claims && npm run services:start:api-members && npm run services:start:portal-batch && npm run services:start:api-tenants && npm run services:start:api-entitlements && npm run services:start:portal-tenants && npm run services:start:portal-entitlements && npm run services:start:portal-sre",
+    "services:start:all:postgres": "npm run services:start:portal-advisor:postgres && npm run services:start:portal-member:postgres && npm run services:start:api-claims:postgres && npm run services:start:api-members:postgres && npm run services:start:portal-batch:postgres && npm run services:start:api-tenants:postgres && npm run services:start:api-entitlements:postgres && npm run services:start:portal-tenants:postgres && npm run services:start:portal-entitlements:postgres && npm run services:start:portal-sre:postgres",
+    "services:stop:all": "npm run services:stop:portal-advisor; npm run services:stop:portal-member; npm run services:stop:api-claims; npm run services:stop:api-members; npm run services:stop:portal-batch; npm run services:stop:api-tenants; npm run services:stop:api-entitlements; npm run services:stop:portal-tenants; npm run services:stop:portal-entitlements; npm run services:stop:portal-sre",
+    "services:status:all": "npm run services:status:portal-advisor; npm run services:status:portal-member; npm run services:status:api-claims; npm run services:status:api-members; npm run services:status:portal-batch; npm run services:status:api-tenants; npm run services:status:api-entitlements; npm run services:status:portal-tenants; npm run services:status:portal-entitlements; npm run services:status:portal-sre",
+
+    "------- DEVOPS: Docker Infrastructure -------": "",
+
+    "devops:start:all": "cd DevOps/Local && ./docker-all-up.sh",
+    "devops:stop:all": "cd DevOps/Local && ./docker-all-down.sh",
+    "devops:status:all": "cd DevOps/Local && ./docker-all-status.sh",
+
+    "devops:start:postgres": "cd DevOps/Local/Postgres && docker compose -p claims-processor-devops up -d",
+    "devops:stop:postgres": "cd DevOps/Local/Postgres && docker compose -p claims-processor-devops down",
+    "devops:status:postgres": "cd DevOps/Local/Postgres && docker compose -p claims-processor-devops ps",
+
+    "devops:start:redis": "cd DevOps/Local/Redis && docker compose -p claims-processor-devops up -d",
+    "devops:stop:redis": "cd DevOps/Local/Redis && docker compose -p claims-processor-devops down",
+    "devops:status:redis": "cd DevOps/Local/Redis && docker compose -p claims-processor-devops ps",
+
+    "devops:start:kafka": "cd DevOps/Local/Kafka && docker compose -p claims-processor-devops up -d",
+    "devops:stop:kafka": "cd DevOps/Local/Kafka && docker compose -p claims-processor-devops down",
+    "devops:status:kafka": "cd DevOps/Local/Kafka && docker compose -p claims-processor-devops ps",
+
+    "devops:start:prometheus": "cd DevOps/Local/Observability/Prometheus && docker compose -p claims-processor-devops up -d",
+    "devops:stop:prometheus": "cd DevOps/Local/Observability/Prometheus && docker compose -p claims-processor-devops down",
+    "devops:status:prometheus": "cd DevOps/Local/Observability/Prometheus && docker compose -p claims-processor-devops ps",
+
+    "devops:start:alertmanager": "cd DevOps/Local/Observability/Alertmanager && docker compose -p claims-processor-devops up -d",
+    "devops:stop:alertmanager": "cd DevOps/Local/Observability/Alertmanager && docker compose -p claims-processor-devops down",
+    "devops:status:alertmanager": "cd DevOps/Local/Observability/Alertmanager && docker compose -p claims-processor-devops ps",
+
+    "devops:start:grafana": "cd DevOps/Local/Observability/Grafana && docker compose -p claims-processor-devops up -d",
+    "devops:stop:grafana": "cd DevOps/Local/Observability/Grafana && docker compose -p claims-processor-devops down",
+    "devops:status:grafana": "cd DevOps/Local/Observability/Grafana && docker compose -p claims-processor-devops ps",
+
+    "devops:start:elastic": "cd DevOps/Local/Search/Elastic && docker compose -p claims-processor-devops up -d",
+    "devops:stop:elastic": "cd DevOps/Local/Search/Elastic && docker compose -p claims-processor-devops down",
+    "devops:status:elastic": "cd DevOps/Local/Search/Elastic && docker compose -p claims-processor-devops ps",
+
+    "devops:start:kibana": "cd DevOps/Local/Observability/Kibana && docker compose -p claims-processor-devops up -d",
+    "devops:stop:kibana": "cd DevOps/Local/Observability/Kibana && docker compose -p claims-processor-devops down",
+    "devops:status:kibana": "cd DevOps/Local/Observability/Kibana && docker compose -p claims-processor-devops ps",
+
+    "devops:start:filebeat": "cd DevOps/Local/Search/Filebeat && docker compose -p claims-processor-devops up -d",
+    "devops:stop:filebeat": "cd DevOps/Local/Search/Filebeat && docker compose -p claims-processor-devops down",
+    "devops:status:filebeat": "cd DevOps/Local/Search/Filebeat && docker compose -p claims-processor-devops ps",
+
+    "devops:start:jaeger": "cd DevOps/Local/Tracing/Jaeger && docker compose -p claims-processor-devops up -d",
+    "devops:stop:jaeger": "cd DevOps/Local/Tracing/Jaeger && docker compose -p claims-processor-devops down",
+    "devops:status:jaeger": "cd DevOps/Local/Tracing/Jaeger && docker compose -p claims-processor-devops ps",
+
+    "devops:start:zipkin": "cd DevOps/Local/Tracing/Zipkin && docker compose -p claims-processor-devops up -d",
+    "devops:stop:zipkin": "cd DevOps/Local/Tracing/Zipkin && docker compose -p claims-processor-devops down",
+    "devops:status:zipkin": "cd DevOps/Local/Tracing/Zipkin && docker compose -p claims-processor-devops ps",
+
+    "devops:start:wiremock": "cd DevOps/Local/Wiremock && docker compose -p claims-processor-devops up -d",
+    "devops:stop:wiremock": "cd DevOps/Local/Wiremock && docker compose -p claims-processor-devops down",
+    "devops:status:wiremock": "cd DevOps/Local/Wiremock && docker compose -p claims-processor-devops ps",
+
+    "devops:start:ollama": "cd DevOps/Local/Ollama && docker compose -p claims-processor-devops up -d",
+    "devops:stop:ollama": "cd DevOps/Local/Ollama && docker compose -p claims-processor-devops down",
+    "devops:status:ollama": "cd DevOps/Local/Ollama && docker compose -p claims-processor-devops ps",
+
+    "------- BUILD: Maven -------": "",
+
+    "build": "mvn clean install -DskipTests",
+    "build:tests": "mvn clean install",
+    "test": "mvn test",
+    "clean": "mvn clean"
+  }
+}

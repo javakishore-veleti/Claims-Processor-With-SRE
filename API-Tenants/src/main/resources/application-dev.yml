@@ -1,0 +1,29 @@
+# Dev environment profile - values from env vars or K8s ConfigMap
+# Activate with: --spring.profiles.active=dev
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tenants_db}
+    username: ${DB_USERNAME:tenants_user}
+    password: ${DB_PASSWORD:tenants_pass}
+    driver-class-name: org.postgresql.Driver
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    user:
+      name: dev
+      password: dev
+
+logging:
+  level:
+    com.healthcare.claims.api.tenants: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

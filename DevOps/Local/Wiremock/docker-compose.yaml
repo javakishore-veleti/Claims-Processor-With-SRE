@@ -1,0 +1,17 @@
+
+services:
+  wiremock:
+    image: wiremock/wiremock:3.4.2
+    container_name: Claims-Processor-wiremock
+    restart: unless-stopped
+    ports:
+      - "8443:8080"
+    volumes:
+      - ./mappings:/home/wiremock/mappings:ro
+    networks:
+      - claims-processor-net
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

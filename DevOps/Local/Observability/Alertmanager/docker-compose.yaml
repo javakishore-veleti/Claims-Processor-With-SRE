@@ -1,0 +1,25 @@
+###############################################################################
+# Alertmanager – Docker Compose
+# Handles alert routing, grouping, silencing, and notification dispatch.
+###############################################################################
+
+services:
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: Claims-Processor-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./templates:/etc/alertmanager/templates
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+    networks:
+      - claims-processor-net
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

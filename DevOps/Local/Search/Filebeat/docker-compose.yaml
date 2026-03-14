@@ -1,0 +1,16 @@
+services:
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.0
+    container_name: Claims-Processor-filebeat
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ../../../../logs:/var/log/claims:ro
+    networks:
+      - claims-processor-net
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network

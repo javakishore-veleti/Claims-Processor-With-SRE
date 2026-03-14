@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="API-Tenants [Dev+GCP]" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="api-tenants" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.healthcare.claims.api.tenants.ApiTenantsApplication" />
+    <option name="ACTIVE_PROFILES" value="dev,gcp" />
+    <option name="ALTERNATIVE_JRE_PATH" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

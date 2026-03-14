@@ -1,0 +1,16 @@
+# Local PostgreSQL profile - activate with: --spring.profiles.active=local,local-postgres
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/claims_db
+    username: claims_user
+    password: claims_pass
+    driver-class-name: org.postgresql.Driver
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect

@@ -1,0 +1,35 @@
+# Local development profile - H2 in-memory database, debug logging
+# Activate with: --spring.profiles.active=local
+spring:
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  batch:
+    jdbc:
+      initialize-schema: always
+  thymeleaf:
+    cache: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.healthcare.claims.portal.batch: DEBUG
+    org.springframework.batch: DEBUG
+    org.springframework.web: DEBUG

@@ -895,13 +895,124 @@ Each blueprint ensures **consistent, structured JSON output** regardless of whet
 
 - **Parent project**: HealthCare-Plans-AI-Platform (multi-microservice architecture)
 - **License**: Apache 2.0
-- **Language expectation**: Java (based on .gitignore targeting .class, .jar, .war, .ear files)
+- **Language**: Java 17 / Spring Boot 3.5.6 / Angular 18
+- **Build**: Maven multi-module (parent pom.xml at root)
+- **Modules**: 10 (Common-Libraries/Common-Utils + 5 Portal modules + 4 API modules)
+- **Multi-tenant**: All entities scoped by tenantId
+- **CQRS**: Command/Query separation in API-Tenants, API-Entitlements
+- **Feature toggles**: Search, events, caching, log shipping, metrics — all provider-agnostic
+
+### Module Map
+
+| Module | Port | Purpose |
+|---|---|---|
+| Common-Libraries/Common-Utils | — | Shared encryption (AES-256-GCM), DTOs (ApiResponse, PagedResponse), IdType |
+| Portal-Claims-Advisor | 8081 | Claims staff portal (Spring Boot + Angular) |
+| Portal-Claims-Member | 8082 | Customer/member portal (Spring Boot + Angular) |
+| API-Claims | 8083 | Claims CRUD, search, stage management |
+| API-Members | 8084 | Member/customer CRUD, search, lookup |
+| Portal-Batch-Assignment | 8085 | Batch member creation, Excel import |
+| API-Tenants | 8086 | Tenant CRUD, 100 seed tenants |
+| API-Entitlements | 8087 | Users, roles, privileges, groups, auth (login/signup) |
+| Portal-Tenants | 8088 | Tenant management UI |
+| Portal-Entitlements | 8089 | Entitlements management UI |
+
+### Profiles
+
+Compose environment + cloud profiles:
+- `spring.profiles.active=local` → H2, no Docker needed
+- `spring.profiles.active=dev,aws` → Dev on AWS (RDS, MSK, OpenSearch)
+- `spring.profiles.active=prod,azure` → Prod on Azure (Azure SQL, Event Hub, Key Vault)
+
+Environments: local, dev, test, staging, pre-prod, prod
+Cloud: aws, azure, gcp
+
+### Feature Toggles (API modules)
+
+```yaml
+claims.features:  # or members.features or entitlements.features
+  search:
+    enabled: false          # elasticsearch | opensearch | azure-cognitive | gcp-search
+  event-stream:
+    enabled: false          # kafka | kinesis | eventhub | pubsub
+  log-shipping:
+    enabled: false          # elasticsearch | cloudwatch | azure-monitor | gcp-logging
+  cache:
+    enabled: false          # redis | elasticache | azure-redis | memorystore
+  metrics:
+    enabled: true           # prometheus | cloudwatch | azure-monitor | gcp-monitoring
+```
+
+### Encryption
+
+All external-facing IDs (tenant, customer, claim, user) are encrypted via `EncryptionService` from Common-Utils:
+- `claims.crypto.enabled=true` → AES-256-GCM with per-IdType key derivation
+- `claims.crypto.enabled=false` → NoOp (prefix only, for local dev)
 
 ## Build & Test Commands
 
-No build system is configured yet. When one is added, update this section with:
-- Build command (e.g., `mvn clean install` or `gradle build`)
-- Run tests (e.g., `mvn test` or `gradle test`)
-- Run single test (e.g., `mvn -pl module -Dtest=TestClass#method test`)
-- Lint/format (e.g., `mvn checkstyle:check`)
-- Run locally (e.g., `mvn spring-boot:run`)
+```bash
+# Build all modules (skip tests)
+npm run build
+# or: mvn clean install -DskipTests
+
+# Build with tests
+npm run build:tests
+# or: mvn clean install
+
+# Run tests only
+npm run test
+# or: mvn test
+
+# Run single test
+mvn -pl API-Claims -Dtest=ApiClaimsApplicationTests test
+
+# Clean
+npm run clean
+# or: mvn clean
+```
+
+### Start Services
+
+```bash
+# H2 mode (no Docker needed)
+npm run services:start:all
+
+# With PostgreSQL (start Docker first)
+npm run devops:start:all
+npm run services:start:all:postgres
+
+# Individual service
+npm run services:start:api-claims
+npm run services:stop:api-claims
+npm run services:status:api-claims
+```
+
+### Docker Infrastructure
+
+```bash
+npm run devops:start:all       # Start all containers
+npm run devops:stop:all        # Stop all containers
+npm run devops:status:all      # Check status
+npm run devops:start:postgres  # Individual container
+```
+
+### IntelliJ IDEA
+
+Run configurations in `.run/` folder — 6 per module:
+- [H2], [Postgres], [Local], [Dev+AWS], [Dev+Azure], [Dev+GCP]
+
+### Developer Portal
+
+Open `index.html` in browser for all links (UIs, Swagger, Grafana dashboards, Kibana, credentials).
+
+### Local Credentials
+
+| Service | User | Password | Connection |
+|---|---|---|---|
+| H2 | sa | (empty) | jdbc:h2:mem:claimsdb |
+| PostgreSQL | claims_user | claims_pass | localhost:5432/claims_db |
+| Redis | — | claims_redis | localhost:6379 |
+| Grafana | admin | claims_admin | localhost:3000 |
+| Elasticsearch | — | — (security off) | localhost:9200 |
+| Kibana | — | — (security off) | localhost:5601 |

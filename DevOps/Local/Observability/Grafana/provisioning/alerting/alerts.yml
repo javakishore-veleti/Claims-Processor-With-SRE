@@ -1,0 +1,742 @@
+apiVersion: 1
+
+groups:
+  # ============================================================
+  # SLO Alerts
+  # ============================================================
+  - orgId: 1
+    name: SLO Alerts
+    folder: Claims Processor SRE
+    interval: 1m
+    rules:
+      - uid: slo-availability-breach
+        title: "Availability SLO Breach (99.9%)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                / sum(rate(http_server_requests_seconds_count[5m]))) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.1
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "HTTP 5xx error rate exceeds 0.1% - breaching 99.9% availability SLO"
+          description: >
+            The current HTTP 5xx error rate has exceeded 0.1%, which means the
+            service is breaching its 99.9% availability SLO target. Investigate
+            failing endpoints and recent deployments immediately.
+        labels:
+          severity: critical
+          type: slo
+          team: claims-sre
+
+      - uid: slo-latency-p99-breach
+        title: "Latency P99 SLO Breach (>500ms)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                histogram_quantile(0.99,
+                  sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "P99 latency exceeds 500ms SLO target"
+          description: >
+            The 99th percentile request latency has exceeded the 500ms SLO
+            target for more than 5 minutes. Check for database slowness,
+            downstream service degradation, or resource contention.
+        labels:
+          severity: critical
+          type: slo
+          team: claims-sre
+
+      - uid: slo-latency-p95-breach
+        title: "Latency P95 SLO Breach (>200ms)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                histogram_quantile(0.95,
+                  sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.2
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "P95 latency exceeds 200ms SLO target"
+          description: >
+            The 95th percentile request latency has exceeded the 200ms SLO
+            target for more than 5 minutes. This indicates general performance
+            degradation affecting the majority of users.
+        labels:
+          severity: warning
+          type: slo
+          team: claims-sre
+
+      - uid: slo-error-budget-fast-burn
+        title: "Error Budget Fast Burn Rate"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                (
+                  sum(rate(http_server_requests_seconds_count{status=~"5.."}[1h]))
+                  / sum(rate(http_server_requests_seconds_count[1h]))
+                ) / (1 - 0.999)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 14.4
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "Error budget is being consumed at an unsustainable rate (fast burn)"
+          description: >
+            The error budget burn rate over the past 1 hour exceeds 14.4x the
+            sustainable rate. At this pace the monthly error budget will be
+            exhausted within hours. Immediate action is required.
+        labels:
+          severity: critical
+          type: slo
+          team: claims-sre
+
+  # ============================================================
+  # Application Health Alerts
+  # ============================================================
+  - orgId: 1
+    name: Application Health Alerts
+    folder: Claims Processor SRE
+    interval: 1m
+    rules:
+      - uid: app-service-down
+        title: "Service Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="claims-processor"} == 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: lt
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "Claims Processor service is down"
+          description: >
+            The actuator health endpoint for Claims Processor is not responding.
+            The service may have crashed or become unreachable. Check container
+            logs and pod status.
+        labels:
+          severity: critical
+          type: health
+          team: claims-sre
+
+      - uid: app-high-error-rate
+        title: "High Error Rate (>5%)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                / sum(rate(http_server_requests_seconds_count[5m]))) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "HTTP 5xx error rate exceeds 5%"
+          description: >
+            More than 5% of all HTTP requests are returning 5xx status codes.
+            This indicates a significant service degradation. Review application
+            logs for exceptions and stack traces.
+        labels:
+          severity: critical
+          type: health
+          team: claims-sre
+
+      - uid: app-jvm-heap-high
+        title: "JVM Heap Usage High (>80%)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                (jvm_memory_used_bytes{area="heap"}
+                / jvm_memory_max_bytes{area="heap"}) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "JVM heap memory usage exceeds 80%"
+          description: >
+            JVM heap usage has been above 80% for more than 5 minutes. The
+            application is at risk of OutOfMemoryError. Consider increasing
+            heap size or investigating memory leaks via heap dump analysis.
+        labels:
+          severity: warning
+          type: health
+          team: claims-sre
+
+      - uid: app-connection-pool-exhaustion
+        title: "HikariCP Connection Pool Exhaustion (>80%)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                (hikaricp_connections_active
+                / hikaricp_connections_max) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "HikariCP connection pool utilization exceeds 80%"
+          description: >
+            More than 80% of the HikariCP database connection pool is in use.
+            The application may soon be unable to acquire new database
+            connections, leading to request timeouts and failures.
+        labels:
+          severity: warning
+          type: health
+          team: claims-sre
+
+  # ============================================================
+  # Claims Processing Alerts
+  # ============================================================
+  - orgId: 1
+    name: Claims Processing Alerts
+    folder: Claims Processor SRE
+    interval: 1m
+    rules:
+      - uid: claims-processing-backlog
+        title: "Claim Processing Backlog (Kafka Consumer Lag >1000)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                sum(kafka_consumer_lag{group=~"claims-.*"}) by (group, topic)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 1000
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "Kafka consumer lag exceeds 1000 messages"
+          description: >
+            The claims processing consumer group has a lag of more than 1000
+            messages. Claims are accumulating faster than they can be processed.
+            Consider scaling consumers or investigating processing bottlenecks.
+        labels:
+          severity: warning
+          type: claims
+          team: claims-sre
+
+      - uid: claims-ai-extraction-failure
+        title: "AI Extraction Failure Rate (>5%)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                (sum(rate(claims_ai_extraction_errors_total[10m]))
+                / sum(rate(claims_ai_extraction_requests_total[10m]))) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: "AI-based claim extraction failure rate exceeds 5%"
+          description: >
+            More than 5% of AI extraction requests are failing. This may
+            indicate issues with the AI model service, malformed input
+            documents, or resource exhaustion on the inference endpoint.
+        labels:
+          severity: warning
+          type: claims
+          team: claims-sre
+
+      - uid: claims-batch-import-failure
+        title: "Batch Import Failure"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                increase(claims_batch_import_failures_total[5m]) > 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "A batch import job has failed"
+          description: >
+            One or more batch claim import jobs have failed in the last 5
+            minutes. Check the batch job logs and the source file integrity.
+            Failed batches may need to be re-submitted.
+        labels:
+          severity: critical
+          type: claims
+          team: claims-sre
+
+  # ============================================================
+  # Infrastructure Alerts
+  # ============================================================
+  - orgId: 1
+    name: Infrastructure Alerts
+    folder: Claims Processor SRE
+    interval: 1m
+    rules:
+      - uid: infra-database-down
+        title: "Database Connection Failure (PostgreSQL)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: pg_up{job="postgres-exporter"} == 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: lt
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "PostgreSQL database is unreachable"
+          description: >
+            The PostgreSQL exporter reports the database is down. All claims
+            processing operations that depend on the database will fail.
+            Check database container status, network connectivity, and disk space.
+        labels:
+          severity: critical
+          type: infrastructure
+          team: claims-sre
+
+      - uid: infra-redis-down
+        title: "Redis Connection Failure"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: redis_up{job="redis-exporter"} == 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: lt
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "Redis instance is unreachable"
+          description: >
+            The Redis exporter reports that Redis is down. Caching, session
+            storage, and any Redis-backed features will be unavailable.
+            Check Redis container status and memory usage.
+        labels:
+          severity: critical
+          type: infrastructure
+          team: claims-sre
+
+      - uid: infra-kafka-down
+        title: "Kafka Broker Unavailable"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: kafka_brokers{job="kafka-exporter"} < 1
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: lt
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "No Kafka brokers available"
+          description: >
+            The Kafka exporter reports zero available brokers. All event-driven
+            claims processing will halt. Check Kafka container status,
+            ZooKeeper connectivity, and broker logs.
+        labels:
+          severity: critical
+          type: infrastructure
+          team: claims-sre

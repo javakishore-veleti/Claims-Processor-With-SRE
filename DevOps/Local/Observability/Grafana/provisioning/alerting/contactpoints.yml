@@ -1,0 +1,16 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: claims-default
+    receivers:
+      - uid: claims-default-email
+        type: email
+        settings:
+          addresses: "claims-sre@example.com"
+          singleEmail: true
+      - uid: claims-default-webhook
+        type: webhook
+        settings:
+          url: "http://localhost:5001/alerts"
+          httpMethod: POST

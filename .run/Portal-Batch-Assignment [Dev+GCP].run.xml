@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Portal-Batch-Assignment [Dev+GCP]" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="portal-batch-assignment" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.healthcare.claims.portal.batch.PortalBatchAssignmentApplication" />
+    <option name="ACTIVE_PROFILES" value="dev,gcp" />
+    <option name="ALTERNATIVE_JRE_PATH" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

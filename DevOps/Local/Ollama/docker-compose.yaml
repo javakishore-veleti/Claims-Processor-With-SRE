@@ -1,0 +1,29 @@
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: Claims-Processor-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    # GPU support (uncomment for NVIDIA GPU):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    networks:
+      - claims-processor-net
+
+volumes:
+  ollama_models:
+    driver: local
+
+networks:
+  claims-processor-net:
+    external: true
+    name: claims-processor-network
