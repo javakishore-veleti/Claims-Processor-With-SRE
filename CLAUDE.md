@@ -79,6 +79,114 @@ flowchart TB
     ClaimLifecycle -.->|"Emits metrics"| SLOs
 ```
 
+##### Claim Intake & Processing Workflow
+
+> **Precondition:** Claims are always uploaded for an existing customer. The customer must already exist in the system before a claim can be submitted.
+
+**Supported file formats:** PNG, JPG, TIFF (screenshots/images), PDF, DOCX, XLSX, CSV, and EDI (X12 837) claim files.
+
+**Claim Processing Stages (Staff Dropdown):**
+
+| Stage | Description |
+|-------|-------------|
+| `INTAKE_RECEIVED` | Claim artifact uploaded, pending initial review |
+| `DOCUMENT_VERIFICATION` | Verifying document legibility, completeness, and format |
+| `DATA_EXTRACTION` | AI extracts structured data from the uploaded artifact |
+| `EXTRACTION_REVIEW` | Staff reviews and corrects AI-extracted data |
+| `ELIGIBILITY_CHECK` | Verifying customer eligibility and policy coverage |
+| `ADJUDICATION` | AI-assisted decision on claim approval, denial, or partial |
+| `ADJUDICATION_REVIEW` | Staff reviews AI adjudication recommendation |
+| `APPROVED` | Claim approved for payment |
+| `DENIED` | Claim denied with reason codes |
+| `PARTIAL_APPROVED` | Claim partially approved with adjustments |
+| `SETTLEMENT` | Payment processing initiated |
+| `CLOSED` | Claim fully settled and archived |
+| `APPEAL` | Customer disputed denial, claim re-opened for review |
+
+```mermaid
+flowchart TB
+    subgraph StaffUI["Claims Support Staff - Admin Portal (Angular)"]
+        SearchCust["1. Search & Select<br/>Existing Customer"]
+        SelectStage["2. Select Stage<br/>from Dropdown"]
+        UploadFiles["3. Upload Claim Artifact(s)<br/>(Image / PDF / Doc / EDI)"]
+        SubmitClaim["4. Submit Claim"]
+    end
+
+    subgraph Backend["Backend Processing (Spring Boot)"]
+        direction TB
+        Validate["Validate Customer Exists<br/>& File Format Check"]
+
+        subgraph FileProcessing["File Processing"]
+            Store["Store Original File<br/>(S3 / Document Store)"]
+            Classify["Classify Document Type<br/>(Image vs PDF vs EDI)"]
+        end
+
+        subgraph AIExtraction["AI Data Extraction"]
+            OCR["OCR & Text Extraction<br/>(Images / Scanned PDFs)"]
+            Parse["Structured Data Parsing<br/>(Digital PDFs / EDI / CSV)"]
+            NLP["NLP Entity Extraction<br/>(Provider, Diagnosis, CPT Codes,<br/>Dates, Amounts)"]
+        end
+
+        subgraph Enrichment["Data Enrichment & Validation"]
+            CodeLookup["Medical Code Validation<br/>(ICD-10, CPT, NPI Lookup)"]
+            PolicyCheck["Eligibility &<br/>Policy Coverage Check"]
+            DupCheck["Duplicate &<br/>Fraud Detection"]
+        end
+
+        subgraph Adjudication["AI-Assisted Adjudication"]
+            Rules["Business Rules<br/>Engine"]
+            AIDecision["AI Recommendation<br/>(Approve / Deny / Partial)"]
+            Confidence["Confidence Score<br/>& Reason Codes"]
+        end
+
+        SaveResult["Persist Claim Record<br/>(PostgreSQL)"]
+    end
+
+    subgraph Events["Event Notifications (Kafka)"]
+        ClaimCreated["claim.created"]
+        ExtractionComplete["claim.extraction.complete"]
+        AdjudicationComplete["claim.adjudication.complete"]
+        StageChanged["claim.stage.changed"]
+    end
+
+    subgraph CustomerUI["Customer Portal (Angular)"]
+        ClaimStatus["View Claim Status<br/>& Current Stage"]
+        ExtractedData["View Extracted<br/>Claim Details"]
+        Timeline["Claim Processing<br/>Timeline"]
+        Documents["View Uploaded<br/>Documents"]
+    end
+
+    SearchCust --> SelectStage --> UploadFiles --> SubmitClaim
+    SubmitClaim --> Validate
+    Validate --> Store --> Classify
+    Classify -->|"Image / Scanned"| OCR
+    Classify -->|"Digital PDF / EDI"| Parse
+    OCR & Parse --> NLP
+    NLP --> CodeLookup --> PolicyCheck --> DupCheck
+    DupCheck --> Rules --> AIDecision --> Confidence
+    Confidence --> SaveResult
+
+    Validate --> ClaimCreated
+    NLP --> ExtractionComplete
+    Confidence --> AdjudicationComplete
+    SelectStage --> StageChanged
+
+    ClaimCreated & ExtractionComplete & AdjudicationComplete & StageChanged --> CustomerUI
+    SaveResult --> ExtractedData
+```
+
+**Workflow summary:**
+1. **Staff searches and selects an existing customer** in the Admin Portal
+2. **Staff selects the claim stage** from the dropdown (typically starts at `INTAKE_RECEIVED`)
+3. **Staff uploads one or more claim artifacts** — the system supports multiple files per claim (e.g., a scanned claim form image + an itemized bill PDF)
+4. **Backend validates** customer existence and file formats, then stores originals in S3
+5. **AI extracts structured data** — OCR for images/scanned PDFs, structured parsing for digital PDFs/EDI/CSV, then NLP extracts medical codes, provider info, diagnosis, dates, and amounts
+6. **Data is enriched and validated** — medical code lookups (ICD-10, CPT, NPI), eligibility/policy checks, duplicate and fraud detection
+7. **AI-assisted adjudication** — business rules + AI model produce a recommendation (approve/deny/partial) with confidence score and reason codes
+8. **Staff reviews** extracted data and adjudication recommendation, corrects if needed, and advances the stage via the dropdown
+9. **Customer sees results** in the Customer Portal — claim status, extracted details, processing timeline, and uploaded documents
+10. **Kafka events** are emitted at each stage transition, enabling async downstream processing, audit trails, and real-time UI updates
+
 ##### 1. Core Application Architecture
 ```mermaid
 flowchart LR
