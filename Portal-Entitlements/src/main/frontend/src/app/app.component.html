@@ -1,6 +1,204 @@
-<header>
-  <h1>{{ title }}</h1>
-</header>
-<main>
-  <router-outlet />
-</main>
+<div class="app-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>AccessCtrl</h2>
+      <div class="subtitle">Entitlements Mgmt</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" [class.active]="activeNav === 'dashboard'" (click)="setActiveNav('dashboard')">
+        <span class="icon">&#9633;</span> Dashboard
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'users'" (click)="setActiveNav('users')">
+        <span class="icon">&#128101;</span> Users
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'groups'" (click)="setActiveNav('groups')">
+        <span class="icon">&#128106;</span> Groups
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'roles'" (click)="setActiveNav('roles')">
+        <span class="icon">&#128272;</span> Roles
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'privileges'" (click)="setActiveNav('privileges')">
+        <span class="icon">&#128274;</span> Privileges
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'audit'" (click)="setActiveNav('audit')">
+        <span class="icon">&#128209;</span> Audit Log
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      Entitlements Portal v2.0.0
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Top Header -->
+    <header class="top-header">
+      <h1>Entitlements Dashboard</h1>
+      <div class="header-actions">
+        <input type="text" class="search-box" placeholder="Search users...">
+        <div class="user-avatar">EA</div>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card accent-primary">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value">1,284</div>
+          <div class="stat-change positive">+18 this week</div>
+        </div>
+        <div class="stat-card accent-success">
+          <div class="stat-label">Active Users</div>
+          <div class="stat-value">1,156</div>
+          <div class="stat-change positive">90.1% active</div>
+        </div>
+        <div class="stat-card accent-info">
+          <div class="stat-label">Groups</div>
+          <div class="stat-value">24</div>
+          <div class="stat-change">3 custom groups</div>
+        </div>
+        <div class="stat-card accent-warning">
+          <div class="stat-label">Roles</div>
+          <div class="stat-value">12</div>
+          <div class="stat-change">8 system, 4 custom</div>
+        </div>
+      </div>
+
+      <!-- Users Table -->
+      <div class="section-card">
+        <div class="section-header">
+          <h3>Users</h3>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm">Export</button>
+            <button class="btn btn-primary btn-sm">+ Add User</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Groups</th>
+                <th>Last Login</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-mono">jsmith</td>
+                <td>John Smith</td>
+                <td>john.smith&#64;acme.com</td>
+                <td><span class="badge badge-success">Active</span></td>
+                <td>Admin, Claims-Ops</td>
+                <td>Mar 14, 2026 09:12 AM</td>
+                <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">mjohnson</td>
+                <td>Maria Johnson</td>
+                <td>maria.j&#64;acme.com</td>
+                <td><span class="badge badge-success">Active</span></td>
+                <td>Claims-Reviewer</td>
+                <td>Mar 14, 2026 08:45 AM</td>
+                <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">rwilliams</td>
+                <td>Robert Williams</td>
+                <td>r.williams&#64;acme.com</td>
+                <td><span class="badge badge-success">Active</span></td>
+                <td>Claims-Ops, Audit</td>
+                <td>Mar 13, 2026 04:30 PM</td>
+                <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">lchen</td>
+                <td>Lisa Chen</td>
+                <td>l.chen&#64;acme.com</td>
+                <td><span class="badge badge-warning">Locked</span></td>
+                <td>Claims-Reviewer</td>
+                <td>Mar 10, 2026 02:15 PM</td>
+                <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">dbrown</td>
+                <td>David Brown</td>
+                <td>d.brown&#64;acme.com</td>
+                <td><span class="badge badge-danger">Disabled</span></td>
+                <td>--</td>
+                <td>Feb 28, 2026 11:00 AM</td>
+                <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">kpatel</td>
+                <td>Kavita Patel</td>
+                <td>k.patel&#64;acme.com</td>
+                <td><span class="badge badge-success">Active</span></td>
+                <td>Admin, SRE</td>
+                <td>Mar 14, 2026 10:05 AM</td>
+                <td><button class="btn btn-secondary btn-xs">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Roles Overview -->
+      <div class="section-card">
+        <div class="section-header">
+          <h3>Roles Overview</h3>
+          <button class="btn btn-primary btn-sm">+ Create Role</button>
+        </div>
+        <div class="section-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Type</th>
+                <th>Users Assigned</th>
+                <th>Privileges</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Super Admin</td>
+                <td><span class="badge badge-gray">System</span></td>
+                <td>3</td>
+                <td>All (142)</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+              <tr>
+                <td>Claims Administrator</td>
+                <td><span class="badge badge-gray">System</span></td>
+                <td>12</td>
+                <td>45</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+              <tr>
+                <td>Claims Reviewer</td>
+                <td><span class="badge badge-gray">System</span></td>
+                <td>28</td>
+                <td>22</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+              <tr>
+                <td>Custom Auditor</td>
+                <td><span class="badge badge-info">Custom</span></td>
+                <td>5</td>
+                <td>18</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

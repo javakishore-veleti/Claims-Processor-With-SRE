@@ -2,6 +2,9 @@ server:
   port: 8081
 
 spring:
+  cloud:
+    compatibility-verifier:
+      enabled: false
   application:
     name: portal-claims-advisor
   datasource:
@@ -31,6 +34,13 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 management:
+  health:
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
+    kafka:
+      enabled: ${KAFKA_HEALTH_ENABLED:false}
+    elasticsearch:
+      enabled: ${ES_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:

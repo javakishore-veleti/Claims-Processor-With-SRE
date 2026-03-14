@@ -58,8 +58,8 @@
 
     "------- SERVICES: All -------": "",
 
-    "services:start:all": "npm run services:start:portal-advisor && npm run services:start:portal-member && npm run services:start:api-claims && npm run services:start:api-members && npm run services:start:portal-batch && npm run services:start:api-tenants && npm run services:start:api-entitlements && npm run services:start:portal-tenants && npm run services:start:portal-entitlements && npm run services:start:portal-sre",
-    "services:start:all:postgres": "npm run services:start:portal-advisor:postgres && npm run services:start:portal-member:postgres && npm run services:start:api-claims:postgres && npm run services:start:api-members:postgres && npm run services:start:portal-batch:postgres && npm run services:start:api-tenants:postgres && npm run services:start:api-entitlements:postgres && npm run services:start:portal-tenants:postgres && npm run services:start:portal-entitlements:postgres && npm run services:start:portal-sre:postgres",
+    "services:start:all": "npm run build:libs && npm run services:start:portal-advisor && npm run services:start:portal-member && npm run services:start:api-claims && npm run services:start:api-members && npm run services:start:portal-batch && npm run services:start:api-tenants && npm run services:start:api-entitlements && npm run services:start:portal-tenants && npm run services:start:portal-entitlements && npm run services:start:portal-sre",
+    "services:start:all:postgres": "npm run build:libs && npm run services:start:portal-advisor:postgres && npm run services:start:portal-member:postgres && npm run services:start:api-claims:postgres && npm run services:start:api-members:postgres && npm run services:start:portal-batch:postgres && npm run services:start:api-tenants:postgres && npm run services:start:api-entitlements:postgres && npm run services:start:portal-tenants:postgres && npm run services:start:portal-entitlements:postgres && npm run services:start:portal-sre:postgres",
     "services:stop:all": "npm run services:stop:portal-advisor; npm run services:stop:portal-member; npm run services:stop:api-claims; npm run services:stop:api-members; npm run services:stop:portal-batch; npm run services:stop:api-tenants; npm run services:stop:api-entitlements; npm run services:stop:portal-tenants; npm run services:stop:portal-entitlements; npm run services:stop:portal-sre",
     "services:status:all": "npm run services:status:portal-advisor; npm run services:status:portal-member; npm run services:status:api-claims; npm run services:status:api-members; npm run services:status:portal-batch; npm run services:status:api-tenants; npm run services:status:api-entitlements; npm run services:status:portal-tenants; npm run services:status:portal-entitlements; npm run services:status:portal-sre",
 
@@ -123,6 +123,7 @@
 
     "------- BUILD: Maven -------": "",
 
+    "build:libs": "mvn clean install -DskipTests -pl Common-Libraries/Common-Utils,Common-Libraries/Common-Claims,Common-Libraries/Common-Members,Common-Libraries/Common-Tenants,Common-Libraries/Common-Entitlements,Common-Libraries/Common-Apps -am",
     "build": "mvn clean install -DskipTests",
     "build:tests": "mvn clean install",
     "test": "mvn test",

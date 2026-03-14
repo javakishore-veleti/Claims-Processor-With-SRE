@@ -28,6 +28,13 @@ spring:
       password: ${REDIS_PASSWORD:claims_redis}
 
 management:
+  health:
+    redis:
+      enabled: true
+    kafka:
+      enabled: true
+    elasticsearch:
+      enabled: true
   endpoints:
     web:
       exposure:

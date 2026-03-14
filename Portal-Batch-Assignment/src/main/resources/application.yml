@@ -2,6 +2,9 @@ server:
   port: 8085
 
 spring:
+  cloud:
+    compatibility-verifier:
+      enabled: false
   application:
     name: portal-batch-assignment
   datasource:
@@ -36,6 +39,13 @@ spring:
     cache: true
 
 management:
+  health:
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
+    kafka:
+      enabled: ${KAFKA_HEALTH_ENABLED:false}
+    elasticsearch:
+      enabled: ${ES_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:

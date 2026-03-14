@@ -15,4 +15,6 @@ public class GroupRespDTO {
     private String tenantId;
     private String name;
     private String description;
+    private String createdAt;
+    private String updatedAt;
 }

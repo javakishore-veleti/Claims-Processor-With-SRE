@@ -18,8 +18,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -58,8 +56,7 @@ public class Claim {
     @Column(name = "document_url")
     private List<String> documents;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "extracted_data", columnDefinition = "jsonb")
+    @Column(name = "extracted_data", length = 10000)
     private String extractedData;
 
     @Column(name = "adjudication_result")

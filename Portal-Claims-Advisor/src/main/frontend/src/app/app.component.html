@@ -1,6 +1,181 @@
-<header>
-  <h1>{{ title }}</h1>
-</header>
-<main>
-  <router-outlet></router-outlet>
-</main>
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">CP</div>
+            <div class="app-name">
+                Claims Advisor
+                <small>Claims Processing Platform</small>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section">Main</div>
+            <a class="sidebar-link active" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+                <span class="icon">&#x1F4CA;</span> Dashboard
+            </a>
+            <a class="sidebar-link" routerLink="/claims" routerLinkActive="active">
+                <span class="icon">&#x1F4C4;</span> Claims
+            </a>
+            <a class="sidebar-link" routerLink="/intake" routerLinkActive="active">
+                <span class="icon">&#x1F4E5;</span> Intake New Claim
+            </a>
+
+            <div class="sidebar-section">Management</div>
+            <a class="sidebar-link" routerLink="/members" routerLinkActive="active">
+                <span class="icon">&#x1F465;</span> Members
+            </a>
+            <a class="sidebar-link" routerLink="/adjudication" routerLinkActive="active">
+                <span class="icon">&#x2696;</span> Adjudication Queue
+            </a>
+            <a class="sidebar-link" routerLink="/extraction-review" routerLinkActive="active">
+                <span class="icon">&#x1F50D;</span> Extraction Review
+            </a>
+
+            <div class="sidebar-section">Reports</div>
+            <a class="sidebar-link" routerLink="/reports" routerLinkActive="active">
+                <span class="icon">&#x1F4C8;</span> Analytics
+            </a>
+            <a class="sidebar-link" routerLink="/audit" routerLinkActive="active">
+                <span class="icon">&#x1F4DD;</span> Audit Trail
+            </a>
+
+            <div class="sidebar-section">System</div>
+            <a class="sidebar-link" href="http://localhost:8081/swagger-ui.html" target="_blank">
+                <span class="icon">&#x1F4D6;</span> API Docs
+            </a>
+            <a class="sidebar-link" href="http://localhost:8081/actuator/health" target="_blank">
+                <span class="icon">&#x1F49A;</span> Health
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            Claims Processor v0.1.0<br/>
+            &copy; 2026 HealthCare Plans AI
+        </div>
+    </aside>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h2>Dashboard</h2>
+        </div>
+        <div class="header-right">
+            <span class="header-badge env">DEV</span>
+            <div class="search-input-container">
+                <input class="search-input" type="text" placeholder="Search claims, members..."/>
+            </div>
+            <div class="user-menu">
+                <div class="user-avatar">AU</div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 500;">Admin User</div>
+                    <div style="font-size: 0.7rem; color: var(--gray-500);">default-tenant</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Claims Today</div>
+                <div class="stat-value">142</div>
+                <div class="stat-change up">+12% vs yesterday</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pending Review</div>
+                <div class="stat-value">28</div>
+                <div class="stat-change down">-3 from last hour</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">AI Extractions</div>
+                <div class="stat-value">98.2%</div>
+                <div class="stat-change up">Success rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Processing Time</div>
+                <div class="stat-value">4.2m</div>
+                <div class="stat-change up">-15% improvement</div>
+            </div>
+        </div>
+
+        <!-- Recent Claims Table -->
+        <div class="data-table-container">
+            <div class="data-table-header">
+                <h3>Recent Claims</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-primary btn-sm">+ New Claim</button>
+                    <button class="btn btn-outline btn-sm">Export</button>
+                </div>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Claim #</th>
+                        <th>Member</th>
+                        <th>Provider</th>
+                        <th>Stage</th>
+                        <th>Amount</th>
+                        <th>Confidence</th>
+                        <th>Submitted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>CLM-2026-0142</strong></td>
+                        <td>John Smith</td>
+                        <td>Pacific Wellness Group</td>
+                        <td><span class="badge badge-warning">EXTRACTION_REVIEW</span></td>
+                        <td>$1,245.00</td>
+                        <td><span class="badge badge-success">96.8%</span></td>
+                        <td>Mar 14, 2026</td>
+                        <td><button class="btn btn-outline btn-sm">Review</button></td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLM-2026-0141</strong></td>
+                        <td>Jane Doe</td>
+                        <td>Summit Care Alliance</td>
+                        <td><span class="badge badge-info">ADJUDICATION</span></td>
+                        <td>$3,780.00</td>
+                        <td><span class="badge badge-warning">82.1%</span></td>
+                        <td>Mar 14, 2026</td>
+                        <td><button class="btn btn-outline btn-sm">Review</button></td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLM-2026-0140</strong></td>
+                        <td>Robert Johnson</td>
+                        <td>Horizon Health Partners</td>
+                        <td><span class="badge badge-success">APPROVED</span></td>
+                        <td>$892.50</td>
+                        <td><span class="badge badge-success">99.1%</span></td>
+                        <td>Mar 14, 2026</td>
+                        <td><button class="btn btn-outline btn-sm">View</button></td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLM-2026-0139</strong></td>
+                        <td>Emily Wilson</td>
+                        <td>Cascade Medical Center</td>
+                        <td><span class="badge badge-danger">DENIED</span></td>
+                        <td>$5,200.00</td>
+                        <td><span class="badge badge-danger">45.3%</span></td>
+                        <td>Mar 13, 2026</td>
+                        <td><button class="btn btn-outline btn-sm">View</button></td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLM-2026-0138</strong></td>
+                        <td>Michael Brown</td>
+                        <td>Evergreen Primary Care</td>
+                        <td><span class="badge badge-info">DATA_EXTRACTION</span></td>
+                        <td>$1,890.00</td>
+                        <td><span class="badge badge-info">Processing...</span></td>
+                        <td>Mar 13, 2026</td>
+                        <td><button class="btn btn-outline btn-sm">Track</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <router-outlet></router-outlet>
+    </main>
+</div>

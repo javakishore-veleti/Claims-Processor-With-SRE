@@ -1,6 +1,186 @@
-<header>
-  <h1>{{ title }}</h1>
-</header>
-<main>
-  <router-outlet></router-outlet>
-</main>
+<div class="app-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>MemberHub</h2>
+      <div class="subtitle">Patient Portal</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" [class.active]="activeNav === 'dashboard'" (click)="setActiveNav('dashboard')">
+        <span class="icon">&#9633;</span> Dashboard
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'my-claims'" (click)="setActiveNav('my-claims')">
+        <span class="icon">&#9776;</span> My Claims
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'claim-status'" (click)="setActiveNav('claim-status')">
+        <span class="icon">&#10003;</span> Claim Status
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'documents'" (click)="setActiveNav('documents')">
+        <span class="icon">&#128196;</span> Documents
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'eob'" (click)="setActiveNav('eob')">
+        <span class="icon">&#128203;</span> EOB / Statements
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'appeal'" (click)="setActiveNav('appeal')">
+        <span class="icon">&#9888;</span> File Appeal
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'profile'" (click)="setActiveNav('profile')">
+        <span class="icon">&#128100;</span> Profile
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      Member Portal v2.4.0
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Top Header -->
+    <header class="top-header">
+      <h1>My Claims Dashboard</h1>
+      <div class="header-actions">
+        <input type="text" class="search-box" placeholder="Search claims...">
+        <div class="user-avatar">JD</div>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card accent-primary">
+          <div class="stat-label">Active Claims</div>
+          <div class="stat-value">3</div>
+          <div class="stat-change positive">1 submitted this week</div>
+        </div>
+        <div class="stat-card accent-success">
+          <div class="stat-label">Latest Claim Status</div>
+          <div class="stat-value" style="font-size: 20px;">In Review</div>
+          <div class="stat-change positive">CLM-2024-0892</div>
+        </div>
+        <div class="stat-card accent-warning">
+          <div class="stat-label">Recent EOB</div>
+          <div class="stat-value">$1,240</div>
+          <div class="stat-change">Posted Mar 10, 2026</div>
+        </div>
+        <div class="stat-card accent-danger">
+          <div class="stat-label">Pending Actions</div>
+          <div class="stat-value">2</div>
+          <div class="stat-change negative">Documents needed</div>
+        </div>
+      </div>
+
+      <!-- Recent Claims Table -->
+      <div class="section-card">
+        <div class="section-header">
+          <h3>Recent Claims</h3>
+          <button class="btn btn-primary btn-sm">+ New Claim</button>
+        </div>
+        <div class="section-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Claim #</th>
+                <th>Stage</th>
+                <th>Amount</th>
+                <th>Filed Date</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-mono">CLM-2024-0892</td>
+                <td><span class="badge badge-primary">In Review</span></td>
+                <td>$2,450.00</td>
+                <td>Mar 8, 2026</td>
+                <td>Mar 12, 2026</td>
+                <td><button class="btn btn-secondary btn-xs">View Details</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">CLM-2024-0876</td>
+                <td><span class="badge badge-warning">Pending Info</span></td>
+                <td>$890.00</td>
+                <td>Mar 2, 2026</td>
+                <td>Mar 10, 2026</td>
+                <td><button class="btn btn-secondary btn-xs">View Details</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">CLM-2024-0854</td>
+                <td><span class="badge badge-success">Approved</span></td>
+                <td>$1,240.00</td>
+                <td>Feb 20, 2026</td>
+                <td>Mar 5, 2026</td>
+                <td><button class="btn btn-secondary btn-xs">View Details</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">CLM-2024-0831</td>
+                <td><span class="badge badge-success">Approved</span></td>
+                <td>$560.00</td>
+                <td>Feb 10, 2026</td>
+                <td>Feb 28, 2026</td>
+                <td><button class="btn btn-secondary btn-xs">View Details</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">CLM-2024-0798</td>
+                <td><span class="badge badge-danger">Denied</span></td>
+                <td>$3,200.00</td>
+                <td>Jan 28, 2026</td>
+                <td>Feb 15, 2026</td>
+                <td><button class="btn btn-secondary btn-xs">View Details</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent EOB Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <h3>Recent Explanation of Benefits</h3>
+          <button class="btn btn-secondary btn-sm">View All</button>
+        </div>
+        <div class="section-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>EOB #</th>
+                <th>Service Date</th>
+                <th>Provider</th>
+                <th>Billed</th>
+                <th>Plan Paid</th>
+                <th>You Owe</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-mono">EOB-4821</td>
+                <td>Mar 1, 2026</td>
+                <td>Valley Medical Center</td>
+                <td>$1,800.00</td>
+                <td>$1,440.00</td>
+                <td>$360.00</td>
+              </tr>
+              <tr>
+                <td class="font-mono">EOB-4790</td>
+                <td>Feb 15, 2026</td>
+                <td>Dr. Sarah Mitchell</td>
+                <td>$250.00</td>
+                <td>$200.00</td>
+                <td>$50.00</td>
+              </tr>
+              <tr>
+                <td class="font-mono">EOB-4756</td>
+                <td>Feb 1, 2026</td>
+                <td>City Pharmacy</td>
+                <td>$120.00</td>
+                <td>$96.00</td>
+                <td>$24.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

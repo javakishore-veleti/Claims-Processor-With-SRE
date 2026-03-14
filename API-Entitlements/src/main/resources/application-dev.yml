@@ -2,9 +2,9 @@
 # Activate with: --spring.profiles.active=dev
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/entitlements_db}
-    username: ${DB_USERNAME:entitlements_user}
-    password: ${DB_PASSWORD:entitlements_pass}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/claims_db}
+    username: ${DB_USERNAME:claims_user}
+    password: ${DB_PASSWORD:claims_pass}
     driver-class-name: org.postgresql.Driver
   h2:
     console:
@@ -37,6 +37,13 @@ logging:
     com.healthcare.claims.api.entitlements: DEBUG
 
 management:
+  health:
+    redis:
+      enabled: true
+    kafka:
+      enabled: true
+    elasticsearch:
+      enabled: true
   endpoints:
     web:
       exposure:

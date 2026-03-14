@@ -2,9 +2,9 @@
 # Activate with: --spring.profiles.active=dev
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/tenants_db}
-    username: ${DB_USERNAME:tenants_user}
-    password: ${DB_PASSWORD:tenants_pass}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/claims_db}
+    username: ${DB_USERNAME:claims_user}
+    password: ${DB_PASSWORD:claims_pass}
     driver-class-name: org.postgresql.Driver
   h2:
     console:
@@ -23,6 +23,13 @@ logging:
     com.healthcare.claims.api.tenants: DEBUG
 
 management:
+  health:
+    redis:
+      enabled: true
+    kafka:
+      enabled: true
+    elasticsearch:
+      enabled: true
   endpoints:
     web:
       exposure:

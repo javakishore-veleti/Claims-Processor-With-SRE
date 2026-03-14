@@ -17,4 +17,6 @@ public class PrivilegeRespDTO {
     private String description;
     private String resource;
     private String action;
+    private String createdAt;
+    private String updatedAt;
 }

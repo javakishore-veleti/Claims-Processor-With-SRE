@@ -16,4 +16,6 @@ public class RoleRespDTO {
     private String name;
     private String description;
     private boolean systemRole;
+    private String createdAt;
+    private String updatedAt;
 }

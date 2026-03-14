@@ -1,6 +1,188 @@
-<header>
-  <h1>{{ title }}</h1>
-</header>
-<main>
-  <router-outlet />
-</main>
+<div class="app-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>BatchOps</h2>
+      <div class="subtitle">Batch Operations</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" [class.active]="activeNav === 'dashboard'" (click)="setActiveNav('dashboard')">
+        <span class="icon">&#9633;</span> Dashboard
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'import'" (click)="setActiveNav('import')">
+        <span class="icon">&#8679;</span> Import Members
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'jobs'" (click)="setActiveNav('jobs')">
+        <span class="icon">&#9881;</span> Batch Jobs
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'history'" (click)="setActiveNav('history')">
+        <span class="icon">&#128339;</span> Job History
+      </a>
+      <a class="nav-item" [class.active]="activeNav === 'templates'" (click)="setActiveNav('templates')">
+        <span class="icon">&#128196;</span> Templates
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      Batch Portal v1.8.0
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Top Header -->
+    <header class="top-header">
+      <h1>Batch Operations Dashboard</h1>
+      <div class="header-actions">
+        <input type="text" class="search-box" placeholder="Search jobs...">
+        <div class="user-avatar">BO</div>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card accent-primary">
+          <div class="stat-label">Total Imports Today</div>
+          <div class="stat-value">14</div>
+          <div class="stat-change positive">+3 from yesterday</div>
+        </div>
+        <div class="stat-card accent-success">
+          <div class="stat-label">Members Created</div>
+          <div class="stat-value">2,847</div>
+          <div class="stat-change positive">+412 today</div>
+        </div>
+        <div class="stat-card accent-warning">
+          <div class="stat-label">Jobs Running</div>
+          <div class="stat-value">3</div>
+          <div class="stat-change">2 queued</div>
+        </div>
+        <div class="stat-card accent-danger">
+          <div class="stat-label">Failed Jobs</div>
+          <div class="stat-value">1</div>
+          <div class="stat-change negative">Requires attention</div>
+        </div>
+      </div>
+
+      <!-- Upload Area -->
+      <div class="section-card">
+        <div class="section-header">
+          <h3>Import Members</h3>
+          <button class="btn btn-secondary btn-sm">Download Template</button>
+        </div>
+        <div class="section-body" style="padding: 24px;">
+          <div class="upload-area">
+            <div class="upload-icon">&#128194;</div>
+            <div class="upload-text">Drag & drop Excel files here, or click to browse</div>
+            <div class="upload-hint">Supports .xlsx, .xls, .csv - Max 50MB per file</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Jobs Table -->
+      <div class="section-card">
+        <div class="section-header">
+          <h3>Active Jobs</h3>
+          <button class="btn btn-primary btn-sm">+ New Job</button>
+        </div>
+        <div class="section-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Records</th>
+                <th>Progress</th>
+                <th>Started</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-mono">JOB-20260314-001</td>
+                <td>Member Import</td>
+                <td><span class="badge badge-primary">Running</span></td>
+                <td>1,250</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill primary" style="width: 72%;"></div>
+                    </div>
+                    <span class="text-sm">72%</span>
+                  </div>
+                </td>
+                <td>10:24 AM</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">JOB-20260314-002</td>
+                <td>Claims Batch</td>
+                <td><span class="badge badge-primary">Running</span></td>
+                <td>890</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill primary" style="width: 45%;"></div>
+                    </div>
+                    <span class="text-sm">45%</span>
+                  </div>
+                </td>
+                <td>10:38 AM</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">JOB-20260314-003</td>
+                <td>EOB Generation</td>
+                <td><span class="badge badge-warning">Queued</span></td>
+                <td>3,400</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill primary" style="width: 0%;"></div>
+                    </div>
+                    <span class="text-sm">0%</span>
+                  </div>
+                </td>
+                <td>--</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">JOB-20260314-004</td>
+                <td>Member Import</td>
+                <td><span class="badge badge-danger">Failed</span></td>
+                <td>500</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill danger" style="width: 23%;"></div>
+                    </div>
+                    <span class="text-sm">23%</span>
+                  </div>
+                </td>
+                <td>09:15 AM</td>
+                <td><button class="btn btn-danger btn-xs">Retry</button></td>
+              </tr>
+              <tr>
+                <td class="font-mono">JOB-20260313-018</td>
+                <td>Claims Batch</td>
+                <td><span class="badge badge-success">Completed</span></td>
+                <td>2,100</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill success" style="width: 100%;"></div>
+                    </div>
+                    <span class="text-sm">100%</span>
+                  </div>
+                </td>
+                <td>Yesterday</td>
+                <td><button class="btn btn-secondary btn-xs">View</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

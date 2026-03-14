@@ -2,9 +2,9 @@
 # Activate with: --spring.profiles.active=dev
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/members_db}
-    username: ${DB_USERNAME:members_user}
-    password: ${DB_PASSWORD:members_pass}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/claims_db}
+    username: ${DB_USERNAME:claims_user}
+    password: ${DB_PASSWORD:claims_pass}
     driver-class-name: org.postgresql.Driver
   h2:
     console:
@@ -19,7 +19,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:members_redis}
+      password: ${REDIS_PASSWORD:claims_redis}
   security:
     user:
       name: dev
@@ -42,6 +42,13 @@ logging:
     com.healthcare.claims.api.members: DEBUG
 
 management:
+  health:
+    redis:
+      enabled: true
+    kafka:
+      enabled: true
+    elasticsearch:
+      enabled: true
   endpoints:
     web:
       exposure:

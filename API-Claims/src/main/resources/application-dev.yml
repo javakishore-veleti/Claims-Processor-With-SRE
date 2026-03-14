@@ -38,6 +38,13 @@ logging:
     com.healthcare.claims: DEBUG
 
 management:
+  health:
+    redis:
+      enabled: true
+    kafka:
+      enabled: true
+    elasticsearch:
+      enabled: true
   endpoints:
     web:
       exposure:

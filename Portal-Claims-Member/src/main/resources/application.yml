@@ -2,6 +2,9 @@ server:
   port: 8082
 
 spring:
+  cloud:
+    compatibility-verifier:
+      enabled: false
   application:
     name: portal-claims-member
   datasource:
@@ -27,6 +30,13 @@ spring:
     cache: true
 
 management:
+  health:
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
+    kafka:
+      enabled: ${KAFKA_HEALTH_ENABLED:false}
+    elasticsearch:
+      enabled: ${ES_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:
