@@ -37,6 +37,8 @@ management:
   endpoint:
     health:
       show-details: always
+  tracing:
+    enabled: false
 
 logging:
   level:

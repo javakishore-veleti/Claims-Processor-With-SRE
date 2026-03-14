@@ -2,7 +2,7 @@
 
 Tracks all remaining work to make the platform fully functional end-to-end. Work through Priority 1 first, then 2, etc.
 
-> Last updated: 2026-03-14 (P1 + P2 + P3 completed)
+> Last updated: 2026-03-14 (P1 + P2 + P3 + P4 completed)
 
 ---
 
@@ -62,14 +62,14 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
-| 4.1 | Configure OTel auto-instrumentation via application.yml | All services | NOT STARTED | management.tracing.*, otel exporter endpoint |
-| 4.2 | Set OTLP exporter to Jaeger endpoint | All services | NOT STARTED | otel.exporter.otlp.endpoint=http://localhost:4317 |
-| 4.3 | Add trace propagation headers to Feign clients | Portal modules | NOT STARTED | W3C TraceContext propagation |
-| 4.4 | Verify traces appear in Jaeger UI | All | NOT STARTED | End-to-end trace: Portal → API → DB |
-| 4.5 | Verify traces appear in Zipkin UI | All | NOT STARTED | |
-| 4.6 | Add custom spans for business operations | API-Claims | NOT STARTED | claim.intake, claim.extraction, claim.adjudication spans |
-| 4.7 | Wire Angular OTel SDK for browser traces | All Portals | NOT STARTED | Document load, fetch, user interaction instrumentation |
-| 4.8 | Verify browser → backend trace correlation | All Portals | NOT STARTED | traceparent header from Angular to Spring |
+| 4.1 | Configure OTel auto-instrumentation via application.yml | All services | COMPLETED | management.tracing + otel config in all 10 modules |
+| 4.2 | Set OTLP exporter to Jaeger endpoint | All services | COMPLETED | localhost:4317 in dev, disabled in local |
+| 4.3 | Add trace propagation headers to Feign clients | Portal modules | COMPLETED | Auto via Spring Cloud + Micrometer; logging interceptor added |
+| 4.4 | Verify traces appear in Jaeger UI | All | NEEDS VERIFICATION | Requires dev profile + Docker Jaeger running |
+| 4.5 | Verify traces appear in Zipkin UI | All | NEEDS VERIFICATION | Same as 4.4 |
+| 4.6 | Add custom spans for business operations | Common-Utils | COMPLETED | BusinessSpanUtil with traced() methods via Micrometer Observation |
+| 4.7 | Wire Angular OTel SDK for browser traces | All Portals | COMPLETED | TracingService in all 6 portals: fetch, document-load, user-interaction |
+| 4.8 | Verify browser → backend trace correlation | All Portals | NEEDS VERIFICATION | traceparent propagation via FetchInstrumentation |
 
 ## Priority 5: Elasticsearch & Kibana
 
@@ -171,7 +171,7 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P1 | Fix & Stabilize | 7 | **7** | 0 |
 | P2 | Database Layer | 10 | **9** | 1 (deferred) |
 | P3 | Angular UIs | 20 | **17** | 3 (deferred) |
-| P4 | OpenTelemetry | 8 | 0 | 8 |
+| P4 | OpenTelemetry | 8 | **6** | 2 (verify) |
 | P5 | Elasticsearch & Kibana | 9 | 0 | 9 |
 | P6 | Event-Driven (Kafka) | 7 | 0 | 7 |
 | P7 | Security & Auth | 8 | 0 | 8 |
@@ -179,7 +179,7 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P9 | Testing | 8 | 0 | 8 |
 | P10 | CI/CD & Deployment | 8 | 0 | 8 |
 | P11 | Documentation | 7 | 2 | 5 |
-| | **TOTAL** | **101** | **35** | **66** |
+| | **TOTAL** | **101** | **41** | **60** |
 
 ---
 

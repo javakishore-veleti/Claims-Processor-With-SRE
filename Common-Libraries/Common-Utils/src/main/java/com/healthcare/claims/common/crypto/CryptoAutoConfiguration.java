@@ -11,6 +11,6 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 @EnableConfigurationProperties(EncryptionProperties.class)
-@ComponentScan(basePackageClasses = CryptoAutoConfiguration.class)
+@ComponentScan(basePackages = {"com.healthcare.claims.common.crypto", "com.healthcare.claims.common.client", "com.healthcare.claims.common.tracing"})
 public class CryptoAutoConfiguration {
 }

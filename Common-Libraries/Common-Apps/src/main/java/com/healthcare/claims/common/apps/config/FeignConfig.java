@@ -3,10 +3,12 @@ package com.healthcare.claims.common.apps.config;
 import feign.Logger;
 import feign.RequestInterceptor;
 import feign.codec.ErrorDecoder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@Slf4j
 public class FeignConfig {
 
     /**
@@ -22,6 +24,18 @@ public class FeignConfig {
             if (tenantId != null && !tenantId.isBlank()) {
                 requestTemplate.header("X-Tenant-Id", tenantId);
             }
+        };
+    }
+
+    /**
+     * Logs Feign requests for trace debugging.
+     * W3C trace context (traceparent/tracestate headers) is auto-propagated
+     * by Spring Cloud OpenFeign when micrometer-tracing is on the classpath.
+     */
+    @Bean
+    public RequestInterceptor tracePropagationInterceptor() {
+        return requestTemplate -> {
+            log.debug("Feign request: {} {}", requestTemplate.method(), requestTemplate.url());
         };
     }
 
