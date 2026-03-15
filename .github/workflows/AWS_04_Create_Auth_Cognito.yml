@@ -12,10 +12,15 @@ on:
           - staging
           - prod
       callback_url:
-        description: "OAuth2 callback URL"
+        description: "OAuth2 callback URL (local: http://localhost:8081/callback  |  AWS: https://<ALB-DNS>/callback)"
         required: false
         type: string
-        default: https://localhost:8081/callback
+        default: http://localhost:8081/callback
+      logout_url:
+        description: "Sign-out redirect URL (local: http://localhost:8081/logout  |  AWS: https://<ALB-DNS>/logout)"
+        required: false
+        type: string
+        default: http://localhost:8081/logout
 
 permissions:
   id-token: write
@@ -52,13 +57,8 @@ jobs:
               Environment=${{ github.event.inputs.environment }} \
               ProjectName=claims-proc \
               CallbackURL=${{ github.event.inputs.callback_url }} \
-              LogoutURL=https://localhost:8081/logout \
+              LogoutURL=${{ github.event.inputs.logout_url }} \
             --capabilities CAPABILITY_NAMED_IAM \
-            --tags \
-              Project=claims-proc \
-              Environment=${{ github.event.inputs.environment }} \
-              ManagedBy=github-actions \
-              Component=auth-cognito \
             --no-fail-on-empty-changeset
 
           echo "Stack outputs:"

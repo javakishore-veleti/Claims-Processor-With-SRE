@@ -19,13 +19,13 @@ Parameters:
 
   CallbackURL:
     Type: String
-    Default: https://localhost:8081/callback
-    Description: OAuth2 callback URL for the web client
+    Default: http://localhost:8081/callback
+    Description: "OAuth2 callback URL. For AWS deployment use https://<ALB-DNS>/callback"
 
   LogoutURL:
     Type: String
-    Default: https://localhost:8081/logout
-    Description: Sign-out redirect URL for the web client
+    Default: http://localhost:8081/logout
+    Description: "Sign-out redirect URL. For AWS deployment use https://<ALB-DNS>/logout"
 
 # ---------------------------------------------------------------------------
 # Resources
@@ -76,6 +76,8 @@ Resources:
       UserPoolTags:
         Project: !Ref ProjectName
         Environment: !Ref Environment
+        ManagedBy: github-actions
+        Component: auth-cognito
 
   # =========================================================================
   # User Pool Domain (Hosted UI)
