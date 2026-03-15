@@ -23,7 +23,15 @@ env:
   PARAMS_FILE: DevOps/AWS/CloudFormation/Parameters/${{ github.event.inputs.environment }}.json
 
 jobs:
+  cost-before:
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "Before Deployment"
+    secrets: inherit
+
   deploy:
+    needs: cost-before
     name: "Create observability stack (${{ github.event.inputs.environment }})"
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
@@ -59,3 +67,13 @@ jobs:
             --query "Stacks[0].Outputs" \
             --output table
 
+
+
+  cost-after:
+    needs: deploy
+    if: always()
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "After Deployment"
+    secrets: inherit

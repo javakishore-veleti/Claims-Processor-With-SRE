@@ -70,6 +70,19 @@
         "sns:TagResource"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "CostExplorer",
+      "Effect": "Allow",
+      "Action": [
+        "ce:GetCostAndUsage",
+        "ce:GetCostForecast",
+        "ce:GetDimensionValues",
+        "ce:GetTags",
+        "budgets:DescribeBudgets",
+        "budgets:ViewBudget"
+      ],
+      "Resource": "*"
     }
   ]
 }

@@ -32,7 +32,15 @@ env:
   PARAMS_DIR: DevOps/AWS/CloudFormation/Parameters
 
 jobs:
+  cost-before:
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "Before Deployment"
+    secrets: inherit
+
   deploy-core-infrastructure:
+    needs: cost-before
     name: "Create core-infra (${{ inputs.environment }})"
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -171,3 +179,13 @@ jobs:
             --query "Stacks[0].Outputs[*].[OutputKey, OutputValue]" \
             --output table
 
+
+
+  cost-after:
+    needs: deploy-core-infrastructure
+    if: always()
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "After Deployment"
+    secrets: inherit

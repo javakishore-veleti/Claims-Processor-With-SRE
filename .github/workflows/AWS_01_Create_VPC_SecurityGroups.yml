@@ -36,7 +36,15 @@ env:
   PARAMETER_FILE: DevOps/AWS/CloudFormation/Parameters/${{ inputs.environment }}.json
 
 jobs:
+  cost-before:
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "Before Deployment"
+    secrets: inherit
+
   deploy-vpc-security-groups:
+    needs: cost-before
     name: Deploy VPC & Security Groups (${{ inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -138,3 +146,13 @@ jobs:
             --query 'Stacks[0].Outputs' \
             --output table
 
+
+
+  cost-after:
+    needs: deploy-vpc-security-groups
+    if: always()
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "After Deployment"
+    secrets: inherit

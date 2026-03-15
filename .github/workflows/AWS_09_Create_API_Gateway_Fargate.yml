@@ -30,7 +30,15 @@ env:
   TEMPLATE_FILE: DevOps/AWS/CloudFormation/api-gateway-fargate.yaml
 
 jobs:
+  cost-before:
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "Before Deployment"
+    secrets: inherit
+
   deploy-fargate:
+    needs: cost-before
     name: Deploy Fargate (${{ inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -224,3 +232,13 @@ jobs:
           echo "  /entitlement-mgmt/*   -> Portal-Entitlements   (8089)"
           echo "  /sre/*                -> Portal-SRE            (8090)"
 
+
+
+  cost-after:
+    needs: deploy-fargate
+    if: always()
+    uses: ./.github/workflows/AWS_00_Cost_Report.yml
+    with:
+      environment: ${{ inputs.environment }}
+      report_label: "After Deployment"
+    secrets: inherit

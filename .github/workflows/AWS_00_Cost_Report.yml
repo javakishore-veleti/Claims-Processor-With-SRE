@@ -1,0 +1,227 @@
+# =============================================================================
+# AWS_00 - Cost Report  (Reusable)
+# Reports current AWS billing: month-to-date total, per-service breakdown,
+# claims-proc tagged resource cost, and end-of-month forecast.
+#
+# Called automatically by every Create workflow (before + after deployment).
+# Can also be run manually at any time to check live cost.
+#
+# NOTE: AWS Cost Explorer data has a 24-hour lag. Costs from resources
+#       created in the last 24h may not appear in the "After" report yet,
+#       but the "Before" snapshot gives a reliable baseline for comparison.
+# =============================================================================
+name: "AWS_00 - Cost Report"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment to report costs for'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: 'dev'
+      report_label:
+        description: 'Report label (e.g. Current, Before Deployment, After Deployment)'
+        required: false
+        type: string
+        default: 'Current'
+
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+      report_label:
+        description: 'Report label (e.g. Before Deployment, After Deployment)'
+        required: false
+        type: string
+        default: 'Current'
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+
+jobs:
+  cost-report:
+    name: "💰 Cost Report — ${{ inputs.report_label }} (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Configure AWS credentials (environment-scoped secrets)
+      # ------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ------------------------------------------------------------------
+      # 2. Fetch cost data from AWS Cost Explorer
+      # ------------------------------------------------------------------
+      - name: Fetch cost data
+        id: costs
+        run: |
+          START=$(date -u +%Y-%m-01)
+          TODAY=$(date -u +%Y-%m-%d)
+          FORECAST_END=$(date -u -d "$(date -u +%Y-%m-01) +1 month" +%Y-%m-%d)
+          ENV="${{ inputs.environment }}"
+
+          echo "Billing period: ${START} → ${TODAY}"
+          echo "Forecast through: ${FORECAST_END}"
+
+          # ── Total account month-to-date cost ──────────────────────────
+          TOTAL=$(aws ce get-cost-and-usage \
+            --time-period Start=${START},End=${TODAY} \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --query "ResultsByTime[0].Total.BlendedCost.Amount" \
+            --output text 2>/dev/null || echo "0")
+
+          # ── Per-service breakdown (top 10 by cost) ────────────────────
+          aws ce get-cost-and-usage \
+            --time-period Start=${START},End=${TODAY} \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --query "ResultsByTime[0].Groups[?Metrics.BlendedCost.Amount > '0.001'] | sort_by(@, &Metrics.BlendedCost.Amount) | reverse(@) | [:10]" \
+            --output json 2>/dev/null > /tmp/services.json || echo "[]" > /tmp/services.json
+
+          # ── claims-proc + environment tagged cost ─────────────────────
+          PROJECT_COST=$(aws ce get-cost-and-usage \
+            --time-period Start=${START},End=${TODAY} \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --filter "{
+              \"And\": [
+                {\"Tags\": {\"Key\": \"Project\", \"Values\": [\"${PROJECT_NAME}\"], \"MatchOptions\": [\"EQUALS\"]}},
+                {\"Tags\": {\"Key\": \"Environment\", \"Values\": [\"${ENV}\"], \"MatchOptions\": [\"EQUALS\"]}}
+              ]
+            }" \
+            --query "ResultsByTime[0].Total.BlendedCost.Amount" \
+            --output text 2>/dev/null || echo "N/A")
+
+          # ── Per-service breakdown for project-tagged resources ─────────
+          aws ce get-cost-and-usage \
+            --time-period Start=${START},End=${TODAY} \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --filter "{
+              \"And\": [
+                {\"Tags\": {\"Key\": \"Project\", \"Values\": [\"${PROJECT_NAME}\"], \"MatchOptions\": [\"EQUALS\"]}},
+                {\"Tags\": {\"Key\": \"Environment\", \"Values\": [\"${ENV}\"], \"MatchOptions\": [\"EQUALS\"]}}
+              ]
+            }" \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --query "ResultsByTime[0].Groups[?Metrics.BlendedCost.Amount > '0.001'] | sort_by(@, &Metrics.BlendedCost.Amount) | reverse(@) | [:10]" \
+            --output json 2>/dev/null > /tmp/project-services.json || echo "[]" > /tmp/project-services.json
+
+          # ── End-of-month cost forecast ─────────────────────────────────
+          FORECAST=$(aws ce get-cost-forecast \
+            --time-period Start=${TODAY},End=${FORECAST_END} \
+            --granularity MONTHLY \
+            --metric BLENDED_COST \
+            --query "Total.Amount" \
+            --output text 2>/dev/null || echo "N/A")
+
+          echo "total=${TOTAL}"           >> "$GITHUB_OUTPUT"
+          echo "project_cost=${PROJECT_COST}" >> "$GITHUB_OUTPUT"
+          echo "forecast=${FORECAST}"     >> "$GITHUB_OUTPUT"
+          echo "start=${START}"           >> "$GITHUB_OUTPUT"
+          echo "today=${TODAY}"           >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------
+      # 3. Write formatted cost summary to GitHub Step Summary
+      # ------------------------------------------------------------------
+      - name: Write cost summary
+        env:
+          LABEL:        "${{ inputs.report_label }}"
+          ENV:          "${{ inputs.environment }}"
+          TOTAL:        "${{ steps.costs.outputs.total }}"
+          PROJECT_COST: "${{ steps.costs.outputs.project_cost }}"
+          FORECAST:     "${{ steps.costs.outputs.forecast }}"
+          START:        "${{ steps.costs.outputs.start }}"
+          TODAY:        "${{ steps.costs.outputs.today }}"
+        run: |
+          python3 - << 'PYEOF'
+          import json, os
+
+          label        = os.environ["LABEL"]
+          env          = os.environ["ENV"]
+          total        = os.environ["TOTAL"]
+          project_cost = os.environ["PROJECT_COST"]
+          forecast     = os.environ["FORECAST"]
+          start        = os.environ["START"]
+          today        = os.environ["TODAY"]
+
+          def fmt_usd(val):
+              try:   return f"**${float(val):,.4f}**"
+              except: return val
+
+          def load_services(path):
+              try:
+                  with open(path) as f: return json.load(f)
+              except: return []
+
+          all_services     = load_services("/tmp/services.json")
+          project_services = load_services("/tmp/project-services.json")
+
+          def svc_table(services):
+              if not services:
+                  return "| *No data yet (24h lag applies)* | — |\n"
+              rows = ""
+              for s in services:
+                  name   = s.get("Keys", ["Unknown"])[0]
+                  amount = s.get("Metrics", {}).get("BlendedCost", {}).get("Amount", "0")
+                  rows  += f"| {name} | ${float(amount):,.4f} |\n"
+              return rows
+
+          report = f"""
+          ## 💰 AWS Cost Report — {label}
+
+          | Metric | Value |
+          |---|---|
+          | **Report Label** | `{label}` |
+          | **Environment** | `{env}` |
+          | **Billing Period (MTD)** | `{start}` → `{today}` |
+          | **Total Account Cost (MTD)** | {fmt_usd(total)} |
+          | **claims-proc `{env}` Tagged Cost (MTD)** | {fmt_usd(project_cost)} |
+          | **Projected Month-End Total** | {fmt_usd(forecast)} |
+
+          > ⏱️ AWS Cost Explorer has a **24-hour data lag**. Resources created in the last 24h
+          > may not appear in this report yet. Use the **Before / After** labels to compare snapshots.
+
+          ---
+
+          ### 📊 Top Services — Full Account (MTD)
+
+          | Service | Cost |
+          |---|---|
+          {svc_table(all_services)}
+
+          ---
+
+          ### 🏷️ Top Services — `claims-proc / {env}` Tagged Resources Only (MTD)
+
+          | Service | Cost |
+          |---|---|
+          {svc_table(project_services)}
+          """
+
+          # Dedent and write
+          import textwrap
+          report = textwrap.dedent(report)
+
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
+          with open(summary_file, "a") as f:
+              f.write(report)
+
+          print(report)
+          PYEOF
