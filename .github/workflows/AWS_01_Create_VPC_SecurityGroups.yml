@@ -27,6 +27,7 @@ on:
         description: 'VPC ID override (optional — takes precedence over secret)'
         required: false
         type: string
+        default: ''
 
 env:
   AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}

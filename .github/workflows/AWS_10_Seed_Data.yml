@@ -25,6 +25,7 @@ on:
         description: 'Action to perform'
         required: true
         type: choice
+        default: 'seed'
         options:
           - seed
           - clear
