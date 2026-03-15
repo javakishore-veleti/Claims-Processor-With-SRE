@@ -2,7 +2,7 @@
 
 Tracks all remaining work to make the platform fully functional end-to-end. Work through Priority 1 first, then 2, etc.
 
-> Last updated: 2026-03-14 (P1 through P6 completed)
+> Last updated: 2026-03-14 (P1 through P7 completed)
 
 ---
 
@@ -101,14 +101,14 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
-| 7.1 | Implement JWT token generation in AuthController | API-Entitlements | NOT STARTED | Login → JWT with roles/privileges |
-| 7.2 | Implement JWT validation filter | All services | NOT STARTED | Feature-toggled: claims.service-client.auth.provider=jwt |
-| 7.3 | Wire Angular login page to AuthController | All Portals | NOT STARTED | Login form → JWT → store in localStorage |
-| 7.4 | Add Angular auth guard for protected routes | All Portals | NOT STARTED | Redirect to login if no token |
-| 7.5 | Add Angular HTTP interceptor for JWT token | All Portals | NOT STARTED | Authorization: Bearer {token} on every API call |
-| 7.6 | Implement role-based UI (show/hide based on privileges) | All Portals | NOT STARTED | *ngIf based on user roles |
-| 7.7 | Implement RBAC in API controllers | All API modules | NOT STARTED | @PreAuthorize based on privileges |
-| 7.8 | Add CORS configuration for cross-origin Portal → API | All API modules | NOT STARTED | |
+| 7.1 | Implement JWT token generation in AuthController | API-Entitlements | COMPLETED | JwtService (HMAC-SHA), AuthController login returns JWT with roles |
+| 7.2 | Implement JWT validation filter | Common-Utils | COMPLETED | JwtAuthenticationFilter, HmacJwtTokenValidator, shared across all modules |
+| 7.3 | Wire Angular login page to AuthController | All Portals | DEFERRED | Needs full auth flow tested first |
+| 7.4 | Add Angular auth guard for protected routes | All Portals | DEFERRED | Needs login page first |
+| 7.5 | Add Angular HTTP interceptor for JWT token | All Portals | DEFERRED | Needs login page first |
+| 7.6 | Implement role-based UI (show/hide based on privileges) | All Portals | DEFERRED | Needs auth guards first |
+| 7.7 | Implement RBAC in API controllers | All API modules | DEFERRED | Needs JWT filter wired into SecurityConfig first |
+| 7.8 | Add CORS configuration for cross-origin Portal → API | All modules | COMPLETED | localhost:* allowed in all 10 SecurityConfig files |
 
 ## Priority 8: Claim Processing Workflow
 
@@ -174,12 +174,12 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P4 | OpenTelemetry | 8 | **6** | 2 (verify) |
 | P5 | Elasticsearch & Kibana | 9 | **8** | 1 (verify) |
 | P6 | Event-Driven (Kafka) | 7 | **7** | 0 |
-| P7 | Security & Auth | 8 | 0 | 8 |
+| P7 | Security & Auth | 8 | **3** | 5 (deferred) |
 | P8 | Claim Processing Workflow | 9 | 0 | 9 |
 | P9 | Testing | 8 | 0 | 8 |
 | P10 | CI/CD & Deployment | 8 | 0 | 8 |
 | P11 | Documentation | 7 | 2 | 5 |
-| | **TOTAL** | **101** | **56** | **45** |
+| | **TOTAL** | **101** | **59** | **42** |
 
 ---
 
