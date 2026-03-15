@@ -1,0 +1,29 @@
+<div>
+  <h2>Import Templates</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Download pre-formatted templates for batch imports</p>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Template Name</th>
+          <th>Format</th>
+          <th>Columns</th>
+          <th>Last Updated</th>
+          <th>Downloads</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of templates">
+          <td style="font-weight: 500;">{{ t.name }}</td>
+          <td><span class="badge badge-gray">{{ t.format }}</span></td>
+          <td>{{ t.columns }}</td>
+          <td>{{ t.lastUpdated }}</td>
+          <td>{{ t.downloads }}</td>
+          <td><button class="btn btn-sm">Download</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

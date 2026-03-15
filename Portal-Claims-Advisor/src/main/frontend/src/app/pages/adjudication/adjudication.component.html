@@ -1,0 +1,39 @@
+<div class="data-table-container">
+  <div class="data-table-header">
+    <h3>Adjudication Queue</h3>
+    <span class="badge badge-warning" *ngIf="claims.length > 0">{{ claims.length }} pending review</span>
+  </div>
+  <div *ngIf="loading" style="padding: 2rem; text-align: center; color: var(--gray-500);">Loading adjudication queue...</div>
+  <table class="data-table" *ngIf="!loading">
+    <thead>
+      <tr>
+        <th>Claim #</th>
+        <th>Member</th>
+        <th>Amount</th>
+        <th>Confidence</th>
+        <th>AI Recommendation</th>
+        <th>Reason</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let claim of claims">
+        <td><strong>{{ claim.claimNumber }}</strong></td>
+        <td>{{ claim.memberName }}</td>
+        <td>{{ '$' + claim.amount.toFixed(2) }}</td>
+        <td><span class="badge" [ngClass]="getConfidenceClass(claim.confidence)">{{ claim.confidence }}%</span></td>
+        <td><span class="badge" [ngClass]="getRecommendationClass(claim.aiRecommendation)">{{ claim.aiRecommendation }}</span></td>
+        <td>{{ claim.reason }}</td>
+        <td>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary btn-sm" (click)="approve(claim)">Approve</button>
+            <button class="btn btn-danger btn-sm" (click)="deny(claim)">Deny</button>
+          </div>
+        </td>
+      </tr>
+      <tr *ngIf="claims.length === 0">
+        <td colspan="7" style="text-align: center; color: var(--gray-500); padding: 2rem;">No claims pending adjudication review</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

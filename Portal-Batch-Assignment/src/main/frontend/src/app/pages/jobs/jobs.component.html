@@ -1,0 +1,52 @@
+<div>
+  <h2>Batch Jobs</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Active and queued batch processing jobs</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Running</div>
+      <div class="stat-value">1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Queued</div>
+      <div class="stat-value">1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Validating</div>
+      <div class="stat-value">1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Records</div>
+      <div class="stat-value">2,445</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Job Name</th>
+          <th>Tenant</th>
+          <th>Format</th>
+          <th>Records</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th>Started</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let job of jobs">
+          <td style="font-weight: 500;">{{ job.jobId }}</td>
+          <td>{{ job.name }}</td>
+          <td>{{ job.tenant }}</td>
+          <td>{{ job.format }}</td>
+          <td>{{ job.records | number }}</td>
+          <td><span [class]="getBadgeClass(job.status)">{{ job.status }}</span></td>
+          <td>{{ job.progress }}</td>
+          <td>{{ job.startedAt }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

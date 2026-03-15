@@ -9,25 +9,25 @@
       <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
         <span class="icon">&#9633;</span> Dashboard
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'health'" (click)="setActiveNav('health')">
+      <a class="nav-item" routerLink="/service-health" routerLinkActive="active">
         <span class="icon">&#9829;</span> Service Health
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'incidents'" (click)="setActiveNav('incidents')">
+      <a class="nav-item" routerLink="/incidents" routerLinkActive="active">
         <span class="icon">&#9888;</span> Incidents
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'deployments'" (click)="setActiveNav('deployments')">
+      <a class="nav-item" routerLink="/deployments" routerLinkActive="active">
         <span class="icon">&#128640;</span> Deployments
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'cloud'" (click)="setActiveNav('cloud')">
+      <a class="nav-item" routerLink="/cloud-resources" routerLinkActive="active">
         <span class="icon">&#9729;</span> Cloud Resources
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'analytics'" (click)="setActiveNav('analytics')">
+      <a class="nav-item" routerLink="/tenant-analytics" routerLinkActive="active">
         <span class="icon">&#128200;</span> Tenant Analytics
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'slo'" (click)="setActiveNav('slo')">
+      <a class="nav-item" routerLink="/slo-compliance" routerLinkActive="active">
         <span class="icon">&#127919;</span> SLO Compliance
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'cost'" (click)="setActiveNav('cost')">
+      <a class="nav-item" routerLink="/cost-tracking" routerLinkActive="active">
         <span class="icon">&#128176;</span> Cost Tracking
       </a>
     </nav>

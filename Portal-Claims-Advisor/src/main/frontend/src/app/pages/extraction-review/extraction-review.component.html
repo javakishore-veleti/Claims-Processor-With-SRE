@@ -1,0 +1,36 @@
+<div class="data-table-container">
+  <div class="data-table-header">
+    <h3>Extraction Review</h3>
+    <span class="badge badge-warning" *ngIf="claims.length > 0">{{ claims.length }} awaiting review</span>
+  </div>
+  <div *ngIf="loading" style="padding: 2rem; text-align: center; color: var(--gray-500);">Loading extraction queue...</div>
+  <table class="data-table" *ngIf="!loading">
+    <thead>
+      <tr>
+        <th>Claim #</th>
+        <th>Documents</th>
+        <th>Document Types</th>
+        <th>Extraction Status</th>
+        <th>Confidence</th>
+        <th>Fields</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let claim of claims">
+        <td><strong>{{ claim.claimNumber }}</strong></td>
+        <td>{{ claim.documents }}</td>
+        <td>{{ claim.documentTypes }}</td>
+        <td><span class="badge" [ngClass]="getStatusClass(claim.extractionStatus)">{{ claim.extractionStatus }}</span></td>
+        <td><span class="badge" [ngClass]="getConfidenceClass(claim.confidence)">{{ claim.confidence }}%</span></td>
+        <td>{{ claim.fieldsExtracted }} extracted, <strong>{{ claim.fieldsNeedReview }} need review</strong></td>
+        <td>
+          <button class="btn btn-primary btn-sm">Review</button>
+        </td>
+      </tr>
+      <tr *ngIf="claims.length === 0">
+        <td colspan="7" style="text-align: center; color: var(--gray-500); padding: 2rem;">No claims pending extraction review</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

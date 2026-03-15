@@ -9,19 +9,19 @@
       <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
         <span class="icon">&#9633;</span> Dashboard
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'users'" (click)="setActiveNav('users')">
+      <a class="nav-item" routerLink="/users" routerLinkActive="active">
         <span class="icon">&#128101;</span> Users
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'groups'" (click)="setActiveNav('groups')">
+      <a class="nav-item" routerLink="/groups" routerLinkActive="active">
         <span class="icon">&#128106;</span> Groups
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'roles'" (click)="setActiveNav('roles')">
+      <a class="nav-item" routerLink="/roles" routerLinkActive="active">
         <span class="icon">&#128272;</span> Roles
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'privileges'" (click)="setActiveNav('privileges')">
+      <a class="nav-item" routerLink="/privileges" routerLinkActive="active">
         <span class="icon">&#128274;</span> Privileges
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'audit'" (click)="setActiveNav('audit')">
+      <a class="nav-item" routerLink="/audit" routerLinkActive="active">
         <span class="icon">&#128209;</span> Audit Log
       </a>
     </nav>

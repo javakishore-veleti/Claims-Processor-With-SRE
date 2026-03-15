@@ -1,0 +1,43 @@
+<div>
+  <h2>Import Members</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Upload a file to batch-create member records</p>
+
+  <div style="max-width: 600px;">
+    <div style="margin-bottom: 1.25rem;">
+      <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;">File Format</label>
+      <select class="search-input" style="width: 100%; padding: 0.625rem;">
+        <option value="">-- Select format --</option>
+        <option>Excel (.xlsx)</option>
+        <option>CSV (.csv)</option>
+        <option>EDI X12 834</option>
+        <option>JSON</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom: 1.25rem;">
+      <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;">Tenant</label>
+      <select class="search-input" style="width: 100%; padding: 0.625rem;">
+        <option value="">-- Select tenant --</option>
+        <option>Acme Health Insurance (TNT-001)</option>
+        <option>Blue Ridge Healthcare (TNT-002)</option>
+        <option>Pacific Wellness Group (TNT-003)</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom: 1.25rem;">
+      <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;">Upload File</label>
+      <div style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 2rem; text-align: center; background: #f8fafc;">
+        <p style="color: #64748b; margin-bottom: 0.75rem;">Drag and drop your file here, or click to browse</p>
+        <input type="file" accept=".xlsx,.csv,.json,.edi">
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.25rem;">
+      <label style="display: inline-flex; align-items: center; gap: 0.5rem; color: #334155;">
+        <input type="checkbox"> Validate records before import
+      </label>
+    </div>
+
+    <button class="btn" style="padding: 0.75rem 2rem;">Start Import</button>
+  </div>
+</div>

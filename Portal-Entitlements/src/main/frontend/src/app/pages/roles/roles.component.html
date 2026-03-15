@@ -1,0 +1,36 @@
+<div>
+  <h2>Roles</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Define roles that bundle privileges for user assignment</p>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search roles..." style="width: 100%; max-width: 400px;">
+    <button class="btn" style="margin-left: 1rem;">+ Create Role</button>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Role ID</th>
+          <th>Role Name</th>
+          <th>Description</th>
+          <th>Privileges</th>
+          <th>Assigned Users</th>
+          <th>Scope</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of roles">
+          <td style="font-weight: 500;">{{ r.roleId }}</td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.description }}</td>
+          <td>{{ r.privileges }}</td>
+          <td>{{ r.assignedUsers }}</td>
+          <td><span class="badge badge-gray">{{ r.scope }}</span></td>
+          <td><button class="btn btn-sm">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

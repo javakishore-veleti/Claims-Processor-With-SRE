@@ -1,0 +1,35 @@
+<div>
+  <h2>Documents</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">All uploaded claim documents and artifacts</p>
+
+  <div style="margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search documents..." style="width: 100%; max-width: 400px;">
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>File Name</th>
+          <th>Claim Number</th>
+          <th>Document Type</th>
+          <th>Upload Date</th>
+          <th>Size</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let doc of documents">
+          <td style="font-weight: 500;">{{ doc.name }}</td>
+          <td>{{ doc.claimNumber }}</td>
+          <td>{{ doc.type }}</td>
+          <td>{{ doc.uploadDate }}</td>
+          <td>{{ doc.size }}</td>
+          <td><span [class]="getBadgeClass(doc.status)">{{ doc.status }}</span></td>
+          <td><button class="btn btn-sm">Download</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

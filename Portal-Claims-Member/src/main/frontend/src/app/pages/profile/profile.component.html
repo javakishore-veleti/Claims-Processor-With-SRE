@@ -1,0 +1,49 @@
+<div>
+  <h2>Member Profile</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Your personal and plan information</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Deductible Met</div>
+      <div class="stat-value">{{ member.deductibleMet }} <span style="font-size: 0.875rem; color: #64748b;">/ {{ member.deductible }}</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Out-of-Pocket Used</div>
+      <div class="stat-value">{{ member.outOfPocketUsed }} <span style="font-size: 0.875rem; color: #64748b;">/ {{ member.outOfPocketMax }}</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Plan</div>
+      <div class="stat-value" style="font-size: 1.125rem;">{{ member.planName }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Effective Since</div>
+      <div class="stat-value">{{ member.effectiveDate }}</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top: 2rem;">Personal Information</h3>
+  <div class="data-table-container">
+    <table class="data-table">
+      <tbody>
+        <tr><td style="font-weight: 600; width: 200px;">Full Name</td><td>{{ member.name }}</td></tr>
+        <tr><td style="font-weight: 600;">Member ID</td><td>{{ member.memberId }}</td></tr>
+        <tr><td style="font-weight: 600;">Email</td><td>{{ member.email }}</td></tr>
+        <tr><td style="font-weight: 600;">Phone</td><td>{{ member.phone }}</td></tr>
+        <tr><td style="font-weight: 600;">Date of Birth</td><td>{{ member.dob }}</td></tr>
+        <tr><td style="font-weight: 600;">Address</td><td>{{ member.address }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top: 2rem;">Plan Details</h3>
+  <div class="data-table-container">
+    <table class="data-table">
+      <tbody>
+        <tr><td style="font-weight: 600; width: 200px;">Plan Name</td><td>{{ member.planName }}</td></tr>
+        <tr><td style="font-weight: 600;">Plan ID</td><td>{{ member.planId }}</td></tr>
+        <tr><td style="font-weight: 600;">Group Number</td><td>{{ member.groupNumber }}</td></tr>
+        <tr><td style="font-weight: 600;">Effective Date</td><td>{{ member.effectiveDate }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

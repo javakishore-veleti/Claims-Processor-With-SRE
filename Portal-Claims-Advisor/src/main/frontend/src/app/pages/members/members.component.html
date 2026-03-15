@@ -1,0 +1,30 @@
+<div class="data-table-container">
+  <div class="data-table-header">
+    <h3>Members</h3>
+    <input class="search-input" type="text" placeholder="Search members..." [(ngModel)]="searchQuery" />
+  </div>
+  <div *ngIf="loading" style="padding: 2rem; text-align: center; color: var(--gray-500);">Loading members...</div>
+  <table class="data-table" *ngIf="!loading">
+    <thead>
+      <tr>
+        <th>Member ID</th>
+        <th>Name</th>
+        <th>DOB</th>
+        <th>Policy #</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let member of filteredMembers">
+        <td><strong>{{ member.memberId }}</strong></td>
+        <td>{{ member.name }}</td>
+        <td>{{ member.dob }}</td>
+        <td>{{ member.policyNumber }}</td>
+        <td><span class="badge" [ngClass]="getStatusClass(member.status)">{{ member.status }}</span></td>
+      </tr>
+      <tr *ngIf="filteredMembers.length === 0">
+        <td colspan="5" style="text-align: center; color: var(--gray-500); padding: 2rem;">No members found</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

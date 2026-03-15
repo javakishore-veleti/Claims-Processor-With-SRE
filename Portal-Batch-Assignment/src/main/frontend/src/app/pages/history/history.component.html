@@ -1,0 +1,39 @@
+<div>
+  <h2>Job History</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Completed and failed batch job history</p>
+
+  <div style="margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search job history..." style="width: 100%; max-width: 400px;">
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Job Name</th>
+          <th>Tenant</th>
+          <th>Records</th>
+          <th>Succeeded</th>
+          <th>Failed</th>
+          <th>Status</th>
+          <th>Completed</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let h of history">
+          <td style="font-weight: 500;">{{ h.jobId }}</td>
+          <td>{{ h.name }}</td>
+          <td>{{ h.tenant }}</td>
+          <td>{{ h.records | number }}</td>
+          <td style="color: #16a34a;">{{ h.succeeded | number }}</td>
+          <td style="color: #dc2626;">{{ h.failed }}</td>
+          <td><span [class]="getBadgeClass(h.status)">{{ h.status }}</span></td>
+          <td>{{ h.completedAt }}</td>
+          <td>{{ h.duration }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

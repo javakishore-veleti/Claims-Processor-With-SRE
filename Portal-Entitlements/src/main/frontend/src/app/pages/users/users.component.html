@@ -1,0 +1,38 @@
+<div>
+  <h2>Users</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Manage platform user accounts and access</p>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search users by name, email, or role..." style="width: 100%; max-width: 400px;">
+    <button class="btn" style="margin-left: 1rem;">+ Add User</button>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Group</th>
+          <th>Status</th>
+          <th>Last Login</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of users">
+          <td style="font-weight: 500;">{{ u.userId }}</td>
+          <td>{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td><span class="badge badge-gray">{{ u.role }}</span></td>
+          <td>{{ u.group }}</td>
+          <td><span [class]="getBadgeClass(u.status)">{{ u.status }}</span></td>
+          <td>{{ u.lastLogin }}</td>
+          <td><button class="btn btn-sm">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

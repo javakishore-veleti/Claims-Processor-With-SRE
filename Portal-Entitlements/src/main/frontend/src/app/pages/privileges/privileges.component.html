@@ -1,0 +1,31 @@
+<div>
+  <h2>Privileges</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Granular permissions that control access to platform features</p>
+
+  <div style="margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search privileges by code, name, or module..." style="width: 100%; max-width: 400px;">
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Module</th>
+          <th>Description</th>
+          <th>Used by Roles</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of privileges">
+          <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.8125rem;">{{ p.code }}</code></td>
+          <td style="font-weight: 500;">{{ p.name }}</td>
+          <td><span class="badge badge-gray">{{ p.module }}</span></td>
+          <td>{{ p.description }}</td>
+          <td>{{ p.roles }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

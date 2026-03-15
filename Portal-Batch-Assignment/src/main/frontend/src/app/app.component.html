@@ -9,16 +9,16 @@
       <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
         <span class="icon">&#9633;</span> Dashboard
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'import'" (click)="setActiveNav('import')">
+      <a class="nav-item" routerLink="/import" routerLinkActive="active">
         <span class="icon">&#8679;</span> Import Members
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'jobs'" (click)="setActiveNav('jobs')">
+      <a class="nav-item" routerLink="/jobs" routerLinkActive="active">
         <span class="icon">&#9881;</span> Batch Jobs
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'history'" (click)="setActiveNav('history')">
+      <a class="nav-item" routerLink="/history" routerLinkActive="active">
         <span class="icon">&#128339;</span> Job History
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'templates'" (click)="setActiveNav('templates')">
+      <a class="nav-item" routerLink="/templates" routerLinkActive="active">
         <span class="icon">&#128196;</span> Templates
       </a>
     </nav>

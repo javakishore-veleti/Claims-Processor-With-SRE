@@ -1,0 +1,48 @@
+<div>
+  <h2>Tenant Plans</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Available subscription plans and their feature tiers</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Active Tenants</div>
+      <div class="stat-value">55</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Starter Tenants</div>
+      <div class="stat-value">12</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Professional Tenants</div>
+      <div class="stat-value">28</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Enterprise Tenants</div>
+      <div class="stat-value">15</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Plan ID</th>
+          <th>Plan Name</th>
+          <th>Max Members</th>
+          <th>Monthly Price</th>
+          <th>Active Tenants</th>
+          <th>Features</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of plans">
+          <td style="font-weight: 500;">{{ p.planId }}</td>
+          <td>{{ p.name }}</td>
+          <td>{{ p.maxMembers }}</td>
+          <td style="font-weight: 600;">{{ p.priceMonthly }}</td>
+          <td>{{ p.activeTenants }}</td>
+          <td>{{ p.features }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

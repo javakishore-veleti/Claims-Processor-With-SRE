@@ -1,0 +1,52 @@
+<div>
+  <h2>Deployments</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Track service deployments across all environments</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Deployments (7d)</div>
+      <div class="stat-value">5</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Success Rate</div>
+      <div class="stat-value" style="color: #16a34a;">80%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Rollbacks</div>
+      <div class="stat-value" style="color: #dc2626;">1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Deploy Time</div>
+      <div class="stat-value">4m 22s</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Deploy ID</th>
+          <th>Service</th>
+          <th>Version</th>
+          <th>Environment</th>
+          <th>Status</th>
+          <th>Deployer</th>
+          <th>Started</th>
+          <th>Strategy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let d of deployments">
+          <td style="font-weight: 500;">{{ d.deployId }}</td>
+          <td>{{ d.service }}</td>
+          <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">{{ d.version }}</code></td>
+          <td>{{ d.environment }}</td>
+          <td><span [class]="getBadgeClass(d.status)">{{ d.status }}</span></td>
+          <td>{{ d.deployer }}</td>
+          <td style="white-space: nowrap;">{{ d.startedAt }}</td>
+          <td><span class="badge badge-gray">{{ d.strategy }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

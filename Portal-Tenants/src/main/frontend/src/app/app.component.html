@@ -9,16 +9,16 @@
       <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
         <span class="icon">&#9633;</span> Dashboard
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'tenants'" (click)="setActiveNav('tenants')">
+      <a class="nav-item" routerLink="/tenants" routerLinkActive="active">
         <span class="icon">&#127970;</span> All Tenants
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'create'" (click)="setActiveNav('create')">
+      <a class="nav-item" routerLink="/create" routerLinkActive="active">
         <span class="icon">&#10010;</span> Create Tenant
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'plans'" (click)="setActiveNav('plans')">
+      <a class="nav-item" routerLink="/plans" routerLinkActive="active">
         <span class="icon">&#128179;</span> Tenant Plans
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'settings'" (click)="setActiveNav('settings')">
+      <a class="nav-item" routerLink="/settings" routerLinkActive="active">
         <span class="icon">&#9881;</span> Settings
       </a>
     </nav>

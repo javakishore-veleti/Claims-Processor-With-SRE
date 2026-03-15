@@ -1,0 +1,36 @@
+<div>
+  <h2>Groups</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Organize users into logical groups for access management</p>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search groups..." style="width: 100%; max-width: 400px;">
+    <button class="btn" style="margin-left: 1rem;">+ Create Group</button>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Group ID</th>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Members</th>
+          <th>Assigned Roles</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let g of groups">
+          <td style="font-weight: 500;">{{ g.groupId }}</td>
+          <td>{{ g.name }}</td>
+          <td>{{ g.description }}</td>
+          <td>{{ g.members }}</td>
+          <td>{{ g.roles }}</td>
+          <td>{{ g.createdDate }}</td>
+          <td><button class="btn btn-sm">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

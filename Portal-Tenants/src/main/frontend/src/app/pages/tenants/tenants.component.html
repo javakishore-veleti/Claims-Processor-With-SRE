@@ -1,0 +1,38 @@
+<div>
+  <h2>All Tenants</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Manage all registered healthcare organization tenants</p>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search tenants by name or ID..." style="width: 100%; max-width: 400px;">
+    <a routerLink="/create" class="btn" style="margin-left: 1rem;">+ New Tenant</a>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Tenant ID</th>
+          <th>Organization Name</th>
+          <th>Plan</th>
+          <th>Members</th>
+          <th>Status</th>
+          <th>Region</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of tenants">
+          <td style="font-weight: 500;">{{ t.tenantId }}</td>
+          <td>{{ t.name }}</td>
+          <td><span class="badge badge-gray">{{ t.plan }}</span></td>
+          <td>{{ t.members | number }}</td>
+          <td><span [class]="getBadgeClass(t.status)">{{ t.status }}</span></td>
+          <td>{{ t.region }}</td>
+          <td>{{ t.createdDate }}</td>
+          <td><button class="btn btn-sm">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

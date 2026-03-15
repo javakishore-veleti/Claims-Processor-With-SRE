@@ -1,0 +1,29 @@
+<div class="data-table-container">
+  <div class="data-table-header">
+    <h3>Audit Trail</h3>
+    <span class="badge badge-info">{{ auditEntries.length }} recent entries</span>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>User</th>
+        <th>Action</th>
+        <th>Entity</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let entry of auditEntries">
+        <td style="white-space: nowrap;">{{ entry.timestamp }}</td>
+        <td>{{ entry.user }}</td>
+        <td><span class="badge" [ngClass]="getActionClass(entry.action)">{{ entry.action }}</span></td>
+        <td><strong>{{ entry.entity }}</strong></td>
+        <td>{{ entry.details }}</td>
+      </tr>
+      <tr *ngIf="auditEntries.length === 0">
+        <td colspan="5" style="text-align: center; color: var(--gray-500); padding: 2rem;">No audit entries found</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,38 @@
+<div class="stats-grid">
+  <div class="stat-card" *ngFor="let stat of stats">
+    <div class="stat-label">{{ stat.label }}</div>
+    <div class="stat-value">{{ stat.value }}</div>
+    <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">{{ stat.trend }}</div>
+  </div>
+</div>
+
+<div class="data-table-container">
+  <div class="data-table-header">
+    <h3>Top Denial Reasons</h3>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Reason</th>
+        <th>Count</th>
+        <th>Percentage</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of topDenialReasons">
+        <td>{{ item.reason }}</td>
+        <td><strong>{{ item.count }}</strong></td>
+        <td>{{ item.percentage }}%</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="data-table-container" style="margin-top: 1.5rem;">
+  <div class="data-table-header">
+    <h3>Charts</h3>
+  </div>
+  <div style="padding: 3rem; text-align: center; color: var(--gray-500);">
+    Charts coming soon
+  </div>
+</div>

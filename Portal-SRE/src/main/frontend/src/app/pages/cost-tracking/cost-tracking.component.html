@@ -1,0 +1,46 @@
+<div>
+  <h2>Cost Tracking</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">AWS infrastructure cost monitoring and budget tracking</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Current Month (MTD)</div>
+      <div class="stat-value">$2,420.40</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Month Total</div>
+      <div class="stat-value">$2,332.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Monthly Budget</div>
+      <div class="stat-value">$2,810.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Budget Used</div>
+      <div class="stat-value" style="color: #f59e0b;">86.1%</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Last Month</th>
+          <th>Current Month</th>
+          <th>Trend</th>
+          <th>Budget</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let c of costBreakdown">
+          <td style="font-weight: 500;">{{ c.category }}</td>
+          <td>{{ c.lastMonth }}</td>
+          <td style="font-weight: 600;">{{ c.currentMonth }}</td>
+          <td [style.color]="c.trend === '0.0%' ? '#64748b' : '#f59e0b'">{{ c.trend }}</td>
+          <td>{{ c.budget }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

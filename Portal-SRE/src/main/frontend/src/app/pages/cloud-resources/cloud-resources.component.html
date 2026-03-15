@@ -1,0 +1,50 @@
+<div>
+  <h2>Cloud Resources</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Inventory of all provisioned cloud infrastructure</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Resources</div>
+      <div class="stat-value">8</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Monthly Cost</div>
+      <div class="stat-value">$1,361.40</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cloud Provider</div>
+      <div class="stat-value" style="font-size: 1.125rem;">AWS</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Primary Region</div>
+      <div class="stat-value" style="font-size: 1.125rem;">us-east-1</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Resource ID</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Provider</th>
+          <th>Region</th>
+          <th>Status</th>
+          <th>Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of resources">
+          <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.8125rem;">{{ r.resourceId }}</code></td>
+          <td style="font-weight: 500;">{{ r.name }}</td>
+          <td><span class="badge badge-gray">{{ r.type }}</span></td>
+          <td>{{ r.provider }}</td>
+          <td>{{ r.region }}</td>
+          <td><span [class]="getBadgeClass(r.status)">{{ r.status }}</span></td>
+          <td style="font-weight: 600;">{{ r.monthCost }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

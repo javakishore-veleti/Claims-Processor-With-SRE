@@ -1,0 +1,52 @@
+<div>
+  <h2>Explanation of Benefits (EOB)</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Review how your claims were processed and what you may owe</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Billed (YTD)</div>
+      <div class="stat-value">$1,097.50</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Plan Paid (YTD)</div>
+      <div class="stat-value">$878.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Your Total (YTD)</div>
+      <div class="stat-value">$219.50</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">EOB Statements</div>
+      <div class="stat-value">4</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>EOB ID</th>
+          <th>Claim Number</th>
+          <th>Provider</th>
+          <th>Service Date</th>
+          <th>Billed</th>
+          <th>Plan Paid</th>
+          <th>You Owe</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let s of statements">
+          <td style="font-weight: 500;">{{ s.eobId }}</td>
+          <td>{{ s.claimNumber }}</td>
+          <td>{{ s.provider }}</td>
+          <td>{{ s.serviceDate }}</td>
+          <td>{{ s.billedAmount }}</td>
+          <td style="color: #16a34a;">{{ s.planPaid }}</td>
+          <td style="color: #dc2626;">{{ s.youOwe }}</td>
+          <td><button class="btn btn-sm">View EOB</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

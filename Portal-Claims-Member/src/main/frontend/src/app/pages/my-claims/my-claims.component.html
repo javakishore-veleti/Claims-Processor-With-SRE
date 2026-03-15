@@ -1,0 +1,35 @@
+<div>
+  <h2>My Claims</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">View and track all your submitted claims</p>
+
+  <div style="margin-bottom: 1.5rem;">
+    <input type="text" class="search-input" placeholder="Search by claim number, provider, or type..." [(ngModel)]="searchTerm" style="width: 100%; max-width: 400px;">
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Claim Number</th>
+          <th>Date Submitted</th>
+          <th>Provider</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Stage</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let claim of claims">
+          <td><a [routerLink]="['/claim-detail']" style="color: #3b82f6; text-decoration: none; font-weight: 500;">{{ claim.claimNumber }}</a></td>
+          <td>{{ claim.dateSubmitted }}</td>
+          <td>{{ claim.provider }}</td>
+          <td>{{ claim.type }}</td>
+          <td>{{ claim.amount }}</td>
+          <td><span [class]="getBadgeClass(claim.stage)">{{ claim.stage }}</span></td>
+          <td><button class="btn btn-sm">View</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

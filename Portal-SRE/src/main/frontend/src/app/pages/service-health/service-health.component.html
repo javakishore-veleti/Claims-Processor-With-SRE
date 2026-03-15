@@ -1,0 +1,52 @@
+<div>
+  <h2>Service Health</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Real-time health status of all platform services</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Services Up</div>
+      <div class="stat-value" style="color: #16a34a;">8 / 9</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Degraded</div>
+      <div class="stat-value" style="color: #f59e0b;">1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Platform Uptime (30d)</div>
+      <div class="stat-value">99.96%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg P99 Latency</div>
+      <div class="stat-value">102ms</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Port</th>
+          <th>Status</th>
+          <th>Uptime (30d)</th>
+          <th>CPU</th>
+          <th>Memory</th>
+          <th>P99 Latency</th>
+          <th>Error Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let s of services">
+          <td style="font-weight: 500;">{{ s.name }}</td>
+          <td>{{ s.port }}</td>
+          <td><span [class]="getBadgeClass(s.status)">{{ s.status }}</span></td>
+          <td>{{ s.uptime }}</td>
+          <td>{{ s.cpu }}</td>
+          <td>{{ s.memory }}</td>
+          <td>{{ s.p99Latency }}</td>
+          <td>{{ s.errorRate }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

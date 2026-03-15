@@ -9,22 +9,22 @@
       <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
         <span class="icon">&#9633;</span> Dashboard
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'my-claims'" (click)="setActiveNav('my-claims')">
+      <a class="nav-item" routerLink="/my-claims" routerLinkActive="active">
         <span class="icon">&#9776;</span> My Claims
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'claim-status'" (click)="setActiveNav('claim-status')">
+      <a class="nav-item" routerLink="/claim-detail" routerLinkActive="active">
         <span class="icon">&#10003;</span> Claim Status
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'documents'" (click)="setActiveNav('documents')">
+      <a class="nav-item" routerLink="/documents" routerLinkActive="active">
         <span class="icon">&#128196;</span> Documents
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'eob'" (click)="setActiveNav('eob')">
+      <a class="nav-item" routerLink="/eob" routerLinkActive="active">
         <span class="icon">&#128203;</span> EOB / Statements
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'appeal'" (click)="setActiveNav('appeal')">
+      <a class="nav-item" routerLink="/appeal" routerLinkActive="active">
         <span class="icon">&#9888;</span> File Appeal
       </a>
-      <a class="nav-item" [class.active]="activeNav === 'profile'" (click)="setActiveNav('profile')">
+      <a class="nav-item" routerLink="/profile" routerLinkActive="active">
         <span class="icon">&#128100;</span> Profile
       </a>
     </nav>

@@ -1,0 +1,52 @@
+<div>
+  <h2>Tenant Analytics</h2>
+  <p style="color: #64748b; margin-bottom: 1.5rem;">Per-tenant usage metrics and resource consumption</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Claims (MTD)</div>
+      <div class="stat-value">12,824</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total API Calls (MTD)</div>
+      <div class="stat-value">374K</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Storage</div>
+      <div class="stat-value">67.4 GB</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Cost (MTD)</div>
+      <div class="stat-value">$2,418.50</div>
+    </div>
+  </div>
+
+  <div class="data-table-container" style="margin-top: 1.5rem;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Tenant ID</th>
+          <th>Organization</th>
+          <th>Claims (MTD)</th>
+          <th>Avg Latency</th>
+          <th>Error Rate</th>
+          <th>API Calls</th>
+          <th>Storage</th>
+          <th>Cost (MTD)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of tenants">
+          <td style="font-weight: 500;">{{ t.tenantId }}</td>
+          <td>{{ t.name }}</td>
+          <td>{{ t.claimsProcessed | number }}</td>
+          <td>{{ t.avgLatency }}</td>
+          <td>{{ t.errorRate }}</td>
+          <td>{{ t.apiCalls }}</td>
+          <td>{{ t.storageUsed }}</td>
+          <td style="font-weight: 600;">{{ t.costMTD }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
