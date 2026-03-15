@@ -228,6 +228,70 @@ jobs:
               exit 1
               ;;
           esac
+
+      # ------------------------------------------------------------------
+      # 6. Pre-flight: clean up orphaned security groups
+      #    Previous failed stack runs may leave security groups behind that
+      #    were not cleaned up during rollback. CloudFormation will fail with
+      #    "already exists" when trying to re-create them.
+      #    This step deletes them if they are orphaned (no active stack owns them).
+      # ------------------------------------------------------------------
+      - name: Pre-flight cleanup of orphaned security groups
+        run: |
+          ENV="${{ inputs.environment }}"
+          VPC_ID="${{ steps.vpc.outputs.vpc_id }}"
+          STACK_NAME="${STACK_NAME_PREFIX}-${ENV}-core-infra"
+
+          SG_NAMES="${PROJECT_NAME}-${ENV}-sg-rds ${PROJECT_NAME}-${ENV}-sg-redis"
+
+          for SG_NAME in ${SG_NAMES}; do
+            echo "──────────────────────────────────────────"
+            echo "Checking: ${SG_NAME}"
+
+            SG_ID=$(aws ec2 describe-security-groups \
+              --filters "Name=group-name,Values=${SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+              --query "SecurityGroups[0].GroupId" \
+              --output text 2>/dev/null)
+
+            if [ -z "${SG_ID}" ] || [ "${SG_ID}" = "None" ]; then
+              echo "  Not found — no cleanup needed."
+              continue
+            fi
+
+            echo "  Found: ${SG_ID}"
+
+            # Check if this SG is owned by an active CloudFormation stack
+            OWNER_STACK=$(aws ec2 describe-tags \
+              --filters \
+                "Name=resource-id,Values=${SG_ID}" \
+                "Name=key,Values=aws:cloudformation:stack-name" \
+              --query "Tags[0].Value" \
+              --output text 2>/dev/null)
+
+            if [ -n "${OWNER_STACK}" ] && [ "${OWNER_STACK}" != "None" ] && [ "${OWNER_STACK}" != "${STACK_NAME}" ]; then
+              echo "  Owned by a different stack: ${OWNER_STACK} — skipping deletion."
+              continue
+            fi
+
+            if [ "${OWNER_STACK}" = "${STACK_NAME}" ]; then
+              echo "  Owned by current stack — CloudFormation will handle it."
+              continue
+            fi
+
+            # Orphaned (no stack tag) — safe to delete
+            echo "  Orphaned (no active stack owner) — deleting ${SG_ID}..."
+            if aws ec2 delete-security-group --group-id "${SG_ID}"; then
+              echo "  Deleted ${SG_ID} successfully."
+            else
+              echo "  WARNING: Could not delete ${SG_ID}."
+              echo "  It may still be attached to a network interface."
+              echo "  Fix: go to EC2 → Security Groups → ${SG_ID} and delete it manually."
+              exit 1
+            fi
+          done
+          echo "──────────────────────────────────────────"
+          echo "Orphan cleanup complete."
+
       - name: Deploy CloudFormation stack
         run: |
           STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
