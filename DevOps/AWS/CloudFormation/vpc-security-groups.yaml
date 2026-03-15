@@ -35,6 +35,18 @@ Parameters:
       - 'false'
     Description: Whether to create a new VPC or use an existing one
 
+  CreateNatGateway:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: >
+      Whether to create a NAT Gateway for private subnet outbound internet access.
+      Set to 'false' for dev/test environments to save cost (~$32/month) and avoid
+      Elastic IP limits. Private subnets will have no outbound internet access when false.
+      Set to 'true' for staging/prod where services need outbound internet from private subnets.
+
   ExistingVpcId:
     Type: String
     Default: ''
@@ -42,11 +54,44 @@ Parameters:
       ID of an existing VPC to use (required when CreateNewVpc is false).
       Ignored when CreateNewVpc is true.
 
+  ExistingPrivateSubnet1Id:
+    Type: String
+    Default: ''
+    Description: >
+      ID of the first private subnet in your existing VPC.
+      Required when CreateNewVpc is false so downstream stacks can resolve networking.
+      Ignored when CreateNewVpc is true.
+
+  ExistingPrivateSubnet2Id:
+    Type: String
+    Default: ''
+    Description: >
+      ID of the second private subnet in your existing VPC.
+      Required when CreateNewVpc is false so downstream stacks can resolve networking.
+      Ignored when CreateNewVpc is true.
+
+  ExistingPublicSubnet1Id:
+    Type: String
+    Default: ''
+    Description: >
+      ID of the first public subnet in your existing VPC (optional).
+      Used when CreateNewVpc is false. Leave empty if not applicable.
+
+  ExistingPublicSubnet2Id:
+    Type: String
+    Default: ''
+    Description: >
+      ID of the second public subnet in your existing VPC (optional).
+      Used when CreateNewVpc is false. Leave empty if not applicable.
+
 # ===========================================================================
 # Conditions
 # ===========================================================================
 Conditions:
   ShouldCreateVpc: !Equals [ !Ref CreateNewVpc, 'true' ]
+  ShouldCreateNatGateway: !And
+    - !Condition ShouldCreateVpc
+    - !Equals [ !Ref CreateNatGateway, 'true' ]
 
 # ===========================================================================
 # Resources
@@ -176,11 +221,13 @@ Resources:
           Value: cloudformation
 
   # -------------------------------------------------------------------------
-  # NAT Gateway (conditional) — placed in PublicSubnet1
+  # NAT Gateway (optional) — placed in PublicSubnet1
+  # Only created when CreateNatGateway=true. Skipping saves ~$32/month and
+  # avoids consuming Elastic IP quota. Recommended: false for dev, true for prod.
   # -------------------------------------------------------------------------
   NatGatewayEIP:
     Type: AWS::EC2::EIP
-    Condition: ShouldCreateVpc
+    Condition: ShouldCreateNatGateway
     DependsOn: InternetGatewayAttachment
     Properties:
       Domain: vpc
@@ -196,7 +243,7 @@ Resources:
 
   NatGateway:
     Type: AWS::EC2::NatGateway
-    Condition: ShouldCreateVpc
+    Condition: ShouldCreateNatGateway
     Properties:
       AllocationId: !GetAtt NatGatewayEIP.AllocationId
       SubnetId: !Ref PublicSubnet1
@@ -268,7 +315,7 @@ Resources:
 
   PrivateRoute:
     Type: AWS::EC2::Route
-    Condition: ShouldCreateVpc
+    Condition: ShouldCreateNatGateway
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
@@ -447,44 +494,44 @@ Outputs:
       Name: !Sub '${ProjectName}-${Environment}-VpcId'
 
   PublicSubnet1Id:
-    Condition: ShouldCreateVpc
-    Description: Public Subnet 1 ID
-    Value: !Ref PublicSubnet1
+    Description: Public Subnet 1 ID (new or existing)
+    Value: !If [ ShouldCreateVpc, !Ref PublicSubnet1, !Ref ExistingPublicSubnet1Id ]
     Export:
       Name: !Sub '${ProjectName}-${Environment}-PublicSubnet1Id'
 
   PublicSubnet2Id:
-    Condition: ShouldCreateVpc
-    Description: Public Subnet 2 ID
-    Value: !Ref PublicSubnet2
+    Description: Public Subnet 2 ID (new or existing)
+    Value: !If [ ShouldCreateVpc, !Ref PublicSubnet2, !Ref ExistingPublicSubnet2Id ]
     Export:
       Name: !Sub '${ProjectName}-${Environment}-PublicSubnet2Id'
 
   PrivateSubnet1Id:
-    Condition: ShouldCreateVpc
-    Description: Private Subnet 1 ID
-    Value: !Ref PrivateSubnet1
+    Description: Private Subnet 1 ID (new or existing)
+    Value: !If [ ShouldCreateVpc, !Ref PrivateSubnet1, !Ref ExistingPrivateSubnet1Id ]
     Export:
       Name: !Sub '${ProjectName}-${Environment}-PrivateSubnet1Id'
 
   PrivateSubnet2Id:
-    Condition: ShouldCreateVpc
-    Description: Private Subnet 2 ID
-    Value: !Ref PrivateSubnet2
+    Description: Private Subnet 2 ID (new or existing)
+    Value: !If [ ShouldCreateVpc, !Ref PrivateSubnet2, !Ref ExistingPrivateSubnet2Id ]
     Export:
       Name: !Sub '${ProjectName}-${Environment}-PrivateSubnet2Id'
 
   PublicSubnetIds:
-    Condition: ShouldCreateVpc
-    Description: Comma-separated list of public subnet IDs
-    Value: !Sub '${PublicSubnet1},${PublicSubnet2}'
+    Description: Comma-separated public subnet IDs (new or existing)
+    Value: !If
+      - ShouldCreateVpc
+      - !Sub '${PublicSubnet1},${PublicSubnet2}'
+      - !Sub '${ExistingPublicSubnet1Id},${ExistingPublicSubnet2Id}'
     Export:
       Name: !Sub '${ProjectName}-${Environment}-PublicSubnetIds'
 
   PrivateSubnetIds:
-    Condition: ShouldCreateVpc
-    Description: Comma-separated list of private subnet IDs
-    Value: !Sub '${PrivateSubnet1},${PrivateSubnet2}'
+    Description: Comma-separated private subnet IDs (new or existing)
+    Value: !If
+      - ShouldCreateVpc
+      - !Sub '${PrivateSubnet1},${PrivateSubnet2}'
+      - !Sub '${ExistingPrivateSubnet1Id},${ExistingPrivateSubnet2Id}'
     Export:
       Name: !Sub '${ProjectName}-${Environment}-PrivateSubnetIds'
 

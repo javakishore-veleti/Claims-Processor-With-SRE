@@ -21,10 +21,40 @@ on:
         description: 'Use an existing VPC (true) or create a new one (false)'
         required: true
         type: boolean
-        default: true
+        default: false
+
+      create_nat_gateway:
+        description: 'Create a NAT Gateway for private subnet outbound internet (adds ~$32/month + EIP). Recommended: false for dev, true for prod.'
+        required: false
+        type: boolean
+        default: false
 
       vpc_id_override:
         description: 'VPC ID override (optional — takes precedence over secret)'
+        required: false
+        type: string
+        default: ''
+
+      existing_private_subnet_1:
+        description: 'Existing private subnet 1 ID (required when use_existing_vpc is true)'
+        required: false
+        type: string
+        default: ''
+
+      existing_private_subnet_2:
+        description: 'Existing private subnet 2 ID (required when use_existing_vpc is true)'
+        required: false
+        type: string
+        default: ''
+
+      existing_public_subnet_1:
+        description: 'Existing public subnet 1 ID (optional, used with existing VPC)'
+        required: false
+        type: string
+        default: ''
+
+      existing_public_subnet_2:
+        description: 'Existing public subnet 2 ID (optional, used with existing VPC)'
         required: false
         type: string
         default: ''
@@ -89,6 +119,14 @@ jobs:
               echo "::error::use_existing_vpc is true but no VPC ID was provided (neither vpc_id_override input nor CLAIMS_PROC_VPC_ID secret)"
               exit 1
             fi
+
+            # Validate that private subnets were provided — they are required
+            if [[ -z "${{ inputs.existing_private_subnet_1 }}" || -z "${{ inputs.existing_private_subnet_2 }}" ]]; then
+              echo "::error::use_existing_vpc is true but existing_private_subnet_1 and/or existing_private_subnet_2 were not provided."
+              echo "::error::These are required so that downstream stacks (AWS_02, AWS_07, AWS_09) can resolve networking."
+              exit 1
+            fi
+
             CREATE_NEW_VPC="false"
           else
             RESOLVED_VPC_ID=""
@@ -99,8 +137,10 @@ jobs:
           echo "vpc_id=$RESOLVED_VPC_ID" >> "$GITHUB_OUTPUT"
           echo "create_new_vpc=$CREATE_NEW_VPC" >> "$GITHUB_OUTPUT"
           echo "--- Resolved values ---"
-          echo "  CreateNewVpc : $CREATE_NEW_VPC"
-          echo "  VPC ID       : ${RESOLVED_VPC_ID:-'(new VPC will be created)'}"
+          echo "  CreateNewVpc        : $CREATE_NEW_VPC"
+          echo "  VPC ID              : ${RESOLVED_VPC_ID:-'(new VPC will be created)'}"
+          echo "  Private Subnet 1    : ${{ inputs.existing_private_subnet_1 }}"
+          echo "  Private Subnet 2    : ${{ inputs.existing_private_subnet_2 }}"
 
       # -------------------------------------------------------------------
       # 4. Validate CloudFormation template
@@ -125,6 +165,11 @@ jobs:
               $(cat "${{ env.PARAMETER_FILE }}" | jq -r '.[] | "\(.ParameterKey)=\(.ParameterValue)"') \
               "CreateNewVpc=${{ steps.resolve-vpc.outputs.create_new_vpc }}" \
               "ExistingVpcId=${{ steps.resolve-vpc.outputs.vpc_id }}" \
+              "CreateNatGateway=${{ inputs.create_nat_gateway }}" \
+              "ExistingPrivateSubnet1Id=${{ inputs.existing_private_subnet_1 }}" \
+              "ExistingPrivateSubnet2Id=${{ inputs.existing_private_subnet_2 }}" \
+              "ExistingPublicSubnet1Id=${{ inputs.existing_public_subnet_1 }}" \
+              "ExistingPublicSubnet2Id=${{ inputs.existing_public_subnet_2 }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --tags \
