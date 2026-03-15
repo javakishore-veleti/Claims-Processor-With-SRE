@@ -117,7 +117,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -133,7 +133,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   RDSInstance:
     Type: AWS::RDS::DBInstance
@@ -167,7 +167,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   # ==========================================================================
   # S3 Buckets
@@ -207,7 +207,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   S3StaticBucket:
     Type: AWS::S3::Bucket
@@ -232,7 +232,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   # ==========================================================================
   # ECR Repositories (10 modules)
@@ -265,7 +265,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRApiMembers:
     Type: AWS::ECR::Repository
@@ -295,7 +295,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRApiTenants:
     Type: AWS::ECR::Repository
@@ -325,7 +325,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRApiEntitlements:
     Type: AWS::ECR::Repository
@@ -355,7 +355,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRPortalClaimsAdvisor:
     Type: AWS::ECR::Repository
@@ -385,7 +385,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRPortalClaimsMember:
     Type: AWS::ECR::Repository
@@ -415,7 +415,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRPortalBatchAssignment:
     Type: AWS::ECR::Repository
@@ -445,7 +445,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRPortalTenants:
     Type: AWS::ECR::Repository
@@ -475,7 +475,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRPortalEntitlements:
     Type: AWS::ECR::Repository
@@ -505,7 +505,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   ECRPortalSRE:
     Type: AWS::ECR::Repository
@@ -535,7 +535,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   # ==========================================================================
   # ElastiCache Redis
@@ -560,7 +560,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
 
   RedisSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
@@ -570,6 +570,17 @@ Resources:
       SubnetIds:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-redis-subnet-group'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   RedisReplicationGroup:
     Type: AWS::ElastiCache::ReplicationGroup
@@ -589,12 +600,16 @@ Resources:
       AutomaticFailoverEnabled: false
       Port: 6379
       Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-redis'
         - Key: Project
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
         - Key: ManagedBy
-          Value: CloudFormation
+          Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
 # ---------------------------------------------------------------------------
 # Outputs
