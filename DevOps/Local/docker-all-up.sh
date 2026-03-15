@@ -21,11 +21,11 @@ fi
 # ── Ordered list of service folders (dependency order) ──────────────────────
 SERVICES=(
   "Postgres"
-  "Redis"
+  # "Redis"                    # Commented out to save laptop resources — using Caffeine cache
   "Kafka"
-  "Search/Elastic"
-  "Observability/Kibana"
-  "Search/Filebeat"
+  # "Search/Elastic"           # Commented out — using DB search by default
+  # "Observability/Kibana"     # Commented out — depends on Elastic
+  # "Search/Filebeat"          # Commented out — depends on Elastic
   "Observability/Prometheus"
   "Observability/Alertmanager"
   "Observability/Grafana"
@@ -56,16 +56,18 @@ for svc in "${SERVICES[@]}"; do
   echo "[OK]    ${svc} is up"
 
   # After Elasticsearch starts: initialize index templates and indices
-  if [[ "${svc}" == "Search/Elastic" ]]; then
-    echo "[INIT]  Running Elasticsearch index template initialization..."
-    bash "${SCRIPT_DIR}/Search/Elastic/init-indices.sh" || echo "[WARN]  ES init-indices.sh failed (ES may not be ready yet)"
-  fi
+  # Commented out — Elastic is disabled to save laptop resources (using DB search by default)
+  # if [[ "${svc}" == "Search/Elastic" ]]; then
+  #   echo "[INIT]  Running Elasticsearch index template initialization..."
+  #   bash "${SCRIPT_DIR}/Search/Elastic/init-indices.sh" || echo "[WARN]  ES init-indices.sh failed (ES may not be ready yet)"
+  # fi
 
   # After Kibana starts: initialize data views in the background (Kibana takes time)
-  if [[ "${svc}" == "Observability/Kibana" ]]; then
-    echo "[INIT]  Running Kibana data view initialization in background..."
-    bash "${SCRIPT_DIR}/Observability/Kibana/init-kibana.sh" &
-  fi
+  # Commented out — Kibana is disabled to save laptop resources (depends on Elastic)
+  # if [[ "${svc}" == "Observability/Kibana" ]]; then
+  #   echo "[INIT]  Running Kibana data view initialization in background..."
+  #   bash "${SCRIPT_DIR}/Observability/Kibana/init-kibana.sh" &
+  # fi
 done
 
 echo ""

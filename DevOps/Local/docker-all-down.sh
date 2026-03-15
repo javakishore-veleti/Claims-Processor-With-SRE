@@ -12,18 +12,18 @@ NETWORK_NAME="claims-processor-network"
 
 # Reverse order — tear down dependents before dependencies
 SERVICES=(
-  # "Ollama"         # Commented out to save laptop resources
-  # "Wiremock"       # Commented out to save laptop resources
+  # "Ollama"                   # Commented out to save laptop resources
+  # "Wiremock"                 # Commented out to save laptop resources
   "Tracing/Zipkin"
   "Tracing/Jaeger"
   "Observability/Grafana"
   "Observability/Alertmanager"
   "Observability/Prometheus"
-  "Observability/Kibana"
-  "Search/Filebeat"
-  "Search/Elastic"
+  # "Observability/Kibana"     # Commented out — depends on Elastic
+  # "Search/Filebeat"          # Commented out — depends on Elastic
+  # "Search/Elastic"           # Commented out — using DB search by default
   "Kafka"
-  "Redis"
+  # "Redis"                    # Commented out to save laptop resources — using Caffeine cache
   "Postgres"
 )
 

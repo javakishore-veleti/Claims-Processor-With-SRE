@@ -32,11 +32,11 @@ docker ps -a --filter "name=Claims-Processor-" --format "table {{.Names}}\t{{.St
 # ── Per-Service Status ──────────────────────────────────────────────────────
 SERVICES=(
   "Postgres"
-  "Redis"
+  # "Redis"                    # Commented out to save laptop resources — using Caffeine cache
   "Kafka"
-  "Search/Elastic"
-  "Observability/Kibana"
-  "Search/Filebeat"
+  # "Search/Elastic"           # Commented out — using DB search by default
+  # "Observability/Kibana"     # Commented out — depends on Elastic
+  # "Search/Filebeat"          # Commented out — depends on Elastic
   "Observability/Prometheus"
   "Observability/Alertmanager"
   "Observability/Grafana"

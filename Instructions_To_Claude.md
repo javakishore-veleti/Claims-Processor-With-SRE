@@ -153,5 +153,16 @@ Commit and push all code to git.
 Worked through README_PENDING_TASKS.md priorities P1 (fix & stabilize) through P11 (documentation). 71 of 101 tasks completed. Remaining 30 tasks are deferred (Testcontainers, Angular E2E, performance testing, CI/CD, cloud deployments, ADRs, runbooks).
 
 ## Instruction 40: GitHub Actions for AWS Deployment
-1. Prefix all workflows with AWS_01 etc for sequencing
+For now we will do only AWS setup later we will do Azure and GCP. Create GitHub Actions workflow for AWS deployment with stages: build, test, package, deploy to Elastic Beanstalk or Fargate. 
+Use AWS CLI or GitHub Actions AWS toolkit for deployment steps. 
+Ensure secrets are stored securely in GitHub Secrets. 
+Add manual approval step before production deployment.
+
+None of the Github workflow actions are automatic and all are manually triggered.
+
+AWS GitHub Actions Design:
+1. We will have multiple workflows for different environments: dev, staging, prod. 
+   1. Each workflow will have the same stages but different deployment targets and configurations.
+   2. Show deployment environments in a dropdown of Github Actions UI for manual trigger.
+2. Prefix all workflows with AWS_01 etc. for sequencing
 2. 

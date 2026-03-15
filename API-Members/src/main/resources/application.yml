@@ -29,6 +29,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  cache:
+    type: ${CACHE_TYPE:caffeine}
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
   flyway:
     enabled: ${FLYWAY_ENABLED:false}
     baseline-on-migrate: true
