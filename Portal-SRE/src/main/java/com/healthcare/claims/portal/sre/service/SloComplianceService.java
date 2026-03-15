@@ -99,10 +99,11 @@ public class SloComplianceService {
 
         Map<String, Object> summary = new LinkedHashMap<>();
 
-        Object[] globalCounts = sloComplianceRepository.getGlobalComplianceSummary();
-        if (globalCounts != null && globalCounts[0] != null) {
-            long total = (Long) globalCounts[0];
-            long compliant = globalCounts[1] != null ? (Long) globalCounts[1] : 0;
+        Object result = sloComplianceRepository.getGlobalComplianceSummary();
+        Object[] globalCounts = (result instanceof Object[]) ? (Object[]) result : null;
+        if (globalCounts != null && globalCounts.length >= 2 && globalCounts[0] != null) {
+            long total = ((Number) globalCounts[0]).longValue();
+            long compliant = globalCounts[1] != null ? ((Number) globalCounts[1]).longValue() : 0;
             double complianceRate = total > 0 ? (double) compliant / total * 100 : 0;
 
             summary.put("totalSloChecks", total);
