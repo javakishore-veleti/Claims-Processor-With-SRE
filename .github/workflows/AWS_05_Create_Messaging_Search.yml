@@ -117,7 +117,8 @@ jobs:
             --tags \
               Key=Project,Value="${PROJECT_NAME}" \
               Key=Environment,Value="${ENV}" \
-              Key=ManagedBy,Value=CloudFormation \
+              Key=ManagedBy,Value=github-actions \
+              Key=Component,Value=messaging-search \
             --no-fail-on-empty-changeset
 
           echo "::notice::Stack ${STACK_NAME} deployed successfully"

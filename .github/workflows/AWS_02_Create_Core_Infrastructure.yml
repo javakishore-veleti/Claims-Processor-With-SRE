@@ -152,7 +152,8 @@ jobs:
             --tags \
               Key=Project,Value="${PROJECT_NAME}" \
               Key=Environment,Value="${ENV}" \
-              Key=ManagedBy,Value=GitHubActions \
+              Key=ManagedBy,Value=github-actions \
+              Key=Component,Value=core-infrastructure \
             --no-fail-on-empty-changeset
 
           echo "Stack deployed successfully."

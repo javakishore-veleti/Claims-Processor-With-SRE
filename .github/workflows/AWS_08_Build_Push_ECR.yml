@@ -202,7 +202,8 @@ jobs:
               --image-scanning-configuration scanOnPush=true \
               --tags Key=Project,Value=${PROJECT_NAME} \
                      Key=Environment,Value=${ENV} \
-                     Key=ManagedBy,Value=github-actions
+                     Key=ManagedBy,Value=github-actions \
+                     Key=Component,Value=ecr-build
 
             # Check if Dockerfile exists in module directory
             if [ ! -f "${MODULE_DIR}/Dockerfile" ]; then

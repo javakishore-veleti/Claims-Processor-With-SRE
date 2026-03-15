@@ -50,6 +50,7 @@ jobs:
               Project=claims-proc \
               Environment=${{ github.event.inputs.environment }} \
               ManagedBy=github-actions \
+              Component=observability \
             --no-fail-on-empty-changeset
 
           echo "Stack outputs:"

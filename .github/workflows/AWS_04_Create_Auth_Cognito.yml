@@ -58,6 +58,7 @@ jobs:
               Project=claims-proc \
               Environment=${{ github.event.inputs.environment }} \
               ManagedBy=github-actions \
+              Component=auth-cognito \
             --no-fail-on-empty-changeset
 
           echo "Stack outputs:"

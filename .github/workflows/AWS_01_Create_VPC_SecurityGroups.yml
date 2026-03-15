@@ -122,7 +122,8 @@ jobs:
             --tags \
               "Key=Project,Value=claims-proc" \
               "Key=Environment,Value=${{ inputs.environment }}" \
-              "Key=ManagedBy,Value=github-actions"
+              "Key=ManagedBy,Value=github-actions" \
+              "Key=Component,Value=vpc-security-groups"
 
           echo "Stack deployment completed."
 

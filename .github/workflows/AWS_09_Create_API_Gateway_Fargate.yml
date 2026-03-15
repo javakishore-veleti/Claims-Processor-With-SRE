@@ -186,7 +186,8 @@ jobs:
             --tags \
               "Key=Project,Value=${{ env.PROJECT_NAME }}" \
               "Key=Environment,Value=${{ inputs.environment }}" \
-              "Key=ManagedBy,Value=github-actions"
+              "Key=ManagedBy,Value=github-actions" \
+              "Key=Component,Value=api-gateway-fargate"
 
           echo "Stack deployment completed."
 

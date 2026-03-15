@@ -128,7 +128,8 @@ jobs:
             --tags \
               Project=${{ env.PROJECT_NAME }} \
               Environment="${ENV}" \
-              ManagedBy=cloudformation \
+              ManagedBy=github-actions \
+              Component=eks-cluster \
             --no-fail-on-empty-changeset
 
           echo "EKS cluster stack deployed successfully."

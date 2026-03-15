@@ -17,6 +17,36 @@ Transform healthcare claims processing from a manual, error-prone workflow into 
 
 ---
 
+## Table of Contents
+
+- [Vision](#vision)
+- [Who Is This For?](#who-is-this-for)
+- [1. Business Architecture](#1-business-architecture)
+  - [Business Context](#business-context)
+  - [Business Capabilities](#business-capabilities)
+  - [Claim Processing Lifecycle](#claim-processing-lifecycle)
+  - [Claim Processing Stages](#claim-processing-stages)
+- [2. Data Architecture](#2-data-architecture)
+  - [Data Domains](#data-domains)
+  - [Data Storage Strategy](#data-storage-strategy)
+- [3. Application Architecture](#3-application-architecture)
+  - [Service Landscape](#service-landscape)
+  - [Inter-Service Communication](#inter-service-communication)
+  - [Event-Driven Architecture](#event-driven-architecture)
+- [4. Technology Architecture](#4-technology-architecture)
+  - [Multi-Cloud Strategy](#multi-cloud-strategy)
+  - [Observability Architecture](#observability-architecture)
+  - [Reliability and Resilience](#reliability-and-resilience)
+- [5. GitHub Actions Deployment](#5-github-actions-deployment)
+  - [Environment Setup](#environment-setup)
+  - [Required Secrets](#required-secrets)
+  - [Optional Variables](#optional-variables)
+  - [IAM Permissions](#iam-permissions)
+- [Getting Started](#getting-started)
+- [License](#license)
+
+---
+
 ## 1. Business Architecture
 
 ### Business Context
@@ -392,6 +422,69 @@ The platform implements multiple resilience patterns to ensure reliable operatio
 | SLOs / SLIs | CloudWatch App Signals + Prometheus | Define and continuously track reliability targets |
 | Error Budgets | Prometheus recording rules | Balance reliability investment against feature development velocity |
 | Feature Toggles | Spring ConfigurationProperties | Safe, incremental rollout of new integrations and capabilities |
+
+---
+
+## 5. GitHub Actions Deployment
+
+The GitHub Actions workflows (`AWS_01` through `AWS_11`) deploy all infrastructure and services to AWS via CloudFormation. Before running any workflow you must configure GitHub Environments and their secrets.
+
+### Environment Setup
+
+Go to your repository → **Settings → Environments** and create three environments:
+
+| Environment | Purpose |
+|---|---|
+| `dev` | Development — shared team environment |
+| `staging` | Pre-production validation |
+| `prod` | Live production workloads |
+
+Each environment scopes its own secrets, so you can use different AWS accounts or credentials per tier.
+
+### Required Secrets
+
+Add the following secrets to **each** environment (`dev`, `staging`, `prod`):
+
+| Secret Name | Description |
+|---|---|
+| `CLAIMS_PROC_AWS_ACCESS_KEY_ID` | AWS IAM Access Key ID (e.g. `AKIA...`) |
+| `CLAIMS_PROC_AWS_SECRET_ACCESS_KEY` | AWS IAM Secret Access Key |
+| `CLAIMS_PROC_RDS_MASTER_PASSWORD` | PostgreSQL master password — min 8 chars, no `/ @ "` characters |
+| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token — min 16 chars |
+| `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 app encryption key — 32-byte base64 string |
+
+> You may use the same IAM credentials across all environments or separate AWS accounts per environment for stricter isolation.
+
+### Optional Variables
+
+These **Variables** (not secrets) can be set per environment to override defaults:
+
+| Variable Name | Default | Description |
+|---|---|---|
+| `CLAIMS_PROC_AWS_REGION` | `us-east-1` | AWS region for all resources |
+| `CLAIMS_PROC_PROJECT_NAME` | `claims-proc` | Project name prefix used in stack names and tags |
+| `CLAIMS_PROC_RDS_INSTANCE_CLASS` | `db.t3.medium` | RDS instance class override |
+
+### IAM Permissions
+
+The IAM user behind the access keys must have permissions for the services deployed by each workflow:
+
+| Workflow | AWS Services Required |
+|---|---|
+| AWS_01 — VPC & Security Groups | `EC2:*` |
+| AWS_02 — Core Infrastructure | `RDS:*`, `ElastiCache:*`, `EC2:*` |
+| AWS_03 — Observability | `CloudWatch:*`, `SNS:*` |
+| AWS_04 — Auth (Cognito) | `Cognito-IDP:*`, `Cognito-Identity:*` |
+| AWS_05 — Messaging & Search | `Kinesis:*`, `MSK:*`, `ES:*` (OpenSearch) |
+| AWS_06 — Secrets Manager | `SecretsManager:*` |
+| AWS_07 — EKS Cluster | `EKS:*`, `EC2:*`, `IAM:*` |
+| AWS_08 — Build & Push ECR | `ECR:*` |
+| AWS_09 — API Gateway & Fargate | `ECS:*`, `ElasticLoadBalancing:*`, `EC2:*` |
+| AWS_10 — Data Seed | `Lambda:*`, `RDS:*` |
+
+All workflows also require `CloudFormation:*` and `IAM:*` (for `CAPABILITY_NAMED_IAM` stacks).
+
+> **Tip:** For initial setup, attaching `AdministratorAccess` to the IAM user is the fastest way to get started. Tighten to least-privilege policies before promoting to `prod`.
 
 ---
 
