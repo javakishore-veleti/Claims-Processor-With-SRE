@@ -118,6 +118,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -134,6 +136,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   RDSInstance:
     Type: AWS::RDS::DBInstance
@@ -168,6 +172,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   # ==========================================================================
   # S3 Buckets
@@ -208,6 +214,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   S3StaticBucket:
     Type: AWS::S3::Bucket
@@ -233,6 +241,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   # ==========================================================================
   # ECR Repositories (10 modules)
@@ -266,6 +276,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRApiMembers:
     Type: AWS::ECR::Repository
@@ -296,6 +308,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRApiTenants:
     Type: AWS::ECR::Repository
@@ -326,6 +340,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRApiEntitlements:
     Type: AWS::ECR::Repository
@@ -356,6 +372,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRPortalClaimsAdvisor:
     Type: AWS::ECR::Repository
@@ -386,6 +404,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRPortalClaimsMember:
     Type: AWS::ECR::Repository
@@ -416,6 +436,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRPortalBatchAssignment:
     Type: AWS::ECR::Repository
@@ -446,6 +468,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRPortalTenants:
     Type: AWS::ECR::Repository
@@ -476,6 +500,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRPortalEntitlements:
     Type: AWS::ECR::Repository
@@ -506,6 +532,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   ECRPortalSRE:
     Type: AWS::ECR::Repository
@@ -536,6 +564,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   # ==========================================================================
   # ElastiCache Redis
@@ -561,6 +591,8 @@ Resources:
           Value: !Ref Environment
         - Key: ManagedBy
           Value: github-actions
+        - Key: Component
+          Value: core-infrastructure
 
   RedisSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
