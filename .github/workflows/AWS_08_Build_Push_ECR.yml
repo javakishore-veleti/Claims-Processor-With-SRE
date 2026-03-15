@@ -46,15 +46,7 @@ env:
   JAVA_VERSION: '17'
 
 jobs:
-  cost-before:
-    uses: ./.github/workflows/AWS_00_Cost_Report.yml
-    with:
-      environment: ${{ inputs.environment }}
-      report_label: "Before Deployment"
-    secrets: inherit
-
   build-and-push:
-    needs: cost-before
     name: Build & Push (${{ github.event.inputs.modules }}) to ECR
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
@@ -311,12 +303,3 @@ jobs:
               --output table 2>/dev/null || echo "  (no images found or repository does not exist)"
           done
 
-
-  cost-after:
-    needs: build-and-push
-    if: always()
-    uses: ./.github/workflows/AWS_00_Cost_Report.yml
-    with:
-      environment: ${{ inputs.environment }}
-      report_label: "After Deployment"
-    secrets: inherit

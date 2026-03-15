@@ -27,15 +27,7 @@ env:
   TEMPLATE_FILE: DevOps/AWS/CloudFormation/auth-cognito.yaml
 
 jobs:
-  cost-before:
-    uses: ./.github/workflows/AWS_00_Cost_Report.yml
-    with:
-      environment: ${{ inputs.environment }}
-      report_label: "Before Deployment"
-    secrets: inherit
-
   deploy:
-    needs: cost-before
     name: "Create auth stack (${{ github.event.inputs.environment }})"
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
@@ -76,12 +68,3 @@ jobs:
             --output table
 
 
-
-  cost-after:
-    needs: deploy
-    if: always()
-    uses: ./.github/workflows/AWS_00_Cost_Report.yml
-    with:
-      environment: ${{ inputs.environment }}
-      report_label: "After Deployment"
-    secrets: inherit

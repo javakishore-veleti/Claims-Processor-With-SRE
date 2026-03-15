@@ -37,15 +37,7 @@ env:
   TEMPLATE_FILE: DevOps/AWS/CloudFormation/data-seed-lambda.yaml
 
 jobs:
-  cost-before:
-    uses: ./.github/workflows/AWS_00_Cost_Report.yml
-    with:
-      environment: ${{ inputs.environment }}
-      report_label: "Before Deployment"
-    secrets: inherit
-
   data-seed:
-    needs: cost-before
     name: ${{ inputs.action == 'seed' && 'Seed' || 'Clear' }} Database (${{ inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -303,12 +295,3 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-
-  cost-after:
-    needs: data-seed
-    if: always()
-    uses: ./.github/workflows/AWS_00_Cost_Report.yml
-    with:
-      environment: ${{ inputs.environment }}
-      report_label: "After Deployment"
-    secrets: inherit
