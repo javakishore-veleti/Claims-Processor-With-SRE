@@ -53,7 +53,7 @@ management:
       type: w3c
   otlp:
     tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 # OpenTelemetry
 otel:
@@ -61,8 +61,7 @@ otel:
     name: ${spring.application.name}
   exporter:
     otlp:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
-      protocol: grpc
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 springdoc:
   api-docs:

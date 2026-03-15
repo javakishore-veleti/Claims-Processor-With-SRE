@@ -10,7 +10,7 @@ Severity:    {{ .Labels.severity }}
 Service:     {{ .Labels.service }}
 Summary:     {{ .Annotations.summary }}
 Description: {{ .Annotations.description }}
-Runbook:     {{ .Annotations.runbook_url | default "N/A" }}
+Runbook:     {{ if .Annotations.runbook_url }}{{ .Annotations.runbook_url }}{{ else }}N/A{{ end }}
 Started:     {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
 {{ if .EndsAt -}}
 Resolved:    {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}

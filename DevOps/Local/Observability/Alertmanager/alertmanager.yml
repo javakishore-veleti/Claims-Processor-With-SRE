@@ -42,20 +42,20 @@ route:
 
   routes:
     # Critical alerts — short repeat interval, escalate immediately
-    - match:
-        severity: critical
+    - matchers:
+        - severity = critical
       receiver: 'critical-receiver'
       repeat_interval: 1h
 
     # SLO alerts — tighter repeat to ensure SLO breaches are addressed quickly
-    - match:
-        type: slo
+    - matchers:
+        - type = slo
       receiver: 'slo-receiver'
       repeat_interval: 30m
 
     # Warning alerts — default receiver with standard repeat
-    - match:
-        severity: warning
+    - matchers:
+        - severity = warning
       receiver: 'default-receiver'
 
 # ---- Receivers ---------------------------------------------------------------
@@ -88,8 +88,8 @@ receivers:
 # When a critical alert fires, suppress the corresponding warning alert
 # for the same alertname and service to reduce noise.
 inhibit_rules:
-  - source_match:
-      severity: 'critical'
-    target_match:
-      severity: 'warning'
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
     equal: ['alertname', 'service']
