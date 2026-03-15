@@ -120,7 +120,7 @@ jobs:
             "${PREFIX}-eks"
             "${PREFIX}-secrets"
             "${PREFIX}-messaging-search"
-            "${PREFIX}-auth"
+            # "${PREFIX}-auth"  # COGNITO COMMENTED OUT
             "${PREFIX}-observability"
             "${PREFIX}-core-infra"
             "${PREFIX}-vpc-sg"
@@ -280,29 +280,34 @@ jobs:
           echo "Deleted: ${STACK}"
 
       # -------------------------------------------------------------------
+      # -------------------------------------------------------------------
+      # ---- COGNITO COMMENTED OUT — uncomment to re-enable ----
       # 8. Delete: auth (Cognito)
       # -------------------------------------------------------------------
-      - name: "Delete stack: auth"
-        continue-on-error: true
-        run: |
-          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-auth"
-          echo "--- Deleting: ${STACK} ---"
+      # - name: "Delete stack: auth"
+      # continue-on-error: true
+      # run: |
+      # STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-auth"
+      # echo "--- Deleting: ${STACK} ---"
 
-          STATUS=$(aws cloudformation describe-stacks \
-            --stack-name "$STACK" \
-            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+      # STATUS=$(aws cloudformation describe-stacks \
+      # --stack-name "$STACK" \
+      # --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
 
-          if [[ "$STATUS" == "NOT_FOUND" ]]; then
-            echo "Stack does not exist. Skipping."
-            exit 0
-          fi
+      # if [[ "$STATUS" == "NOT_FOUND" ]]; then
+      # echo "Stack does not exist. Skipping."
+      # exit 0
+      # fi
 
-          aws cloudformation delete-stack --stack-name "$STACK"
-          echo "Waiting for deletion to complete..."
-          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
-          echo "Deleted: ${STACK}"
+      # aws cloudformation delete-stack --stack-name "$STACK"
+      # echo "Waiting for deletion to complete..."
+      # aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+      # echo "Deleted: ${STACK}"
 
       # -------------------------------------------------------------------
+      - name: "Delete auth (Cognito) skipped"
+        run: echo "::notice::Cognito disabled — uncomment step 8 to re-enable."
+
       # 9. Delete: observability (CloudWatch dashboards, alarms, log groups)
       # -------------------------------------------------------------------
       - name: "Delete stack: observability"
@@ -514,7 +519,7 @@ jobs:
             "${PREFIX}-eks"
             "${PREFIX}-secrets"
             "${PREFIX}-messaging-search"
-            "${PREFIX}-auth"
+            # "${PREFIX}-auth"  # COGNITO COMMENTED OUT
             "${PREFIX}-observability"
             "${PREFIX}-core-infra"
             "${PREFIX}-vpc-sg"

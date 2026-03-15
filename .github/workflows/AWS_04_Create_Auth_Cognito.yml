@@ -47,24 +47,26 @@ jobs:
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy CloudFormation stack
-        run: |
-          echo "Deploying stack: ${{ env.STACK_NAME }}"
-          aws cloudformation deploy \
-            --template-file "${{ env.TEMPLATE_FILE }}" \
-            --stack-name "${{ env.STACK_NAME }}" \
-            --parameter-overrides \
-              Environment=${{ github.event.inputs.environment }} \
-              ProjectName=claims-proc \
-              CallbackURL=${{ github.event.inputs.callback_url }} \
-              LogoutURL=${{ github.event.inputs.logout_url }} \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset
-
-          echo "Stack outputs:"
-          aws cloudformation describe-stacks \
-            --stack-name "${{ env.STACK_NAME }}" \
-            --query "Stacks[0].Outputs" \
-            --output table
+      # ---- COGNITO COMMENTED OUT — uncomment to re-enable ----
+      # - name: Deploy CloudFormation stack
+      #   run: |
+      #     echo "Deploying stack: ${{ env.STACK_NAME }}"
+      #     aws cloudformation deploy \
+      #       --template-file "${{ env.TEMPLATE_FILE }}" \
+      #       --stack-name "${{ env.STACK_NAME }}" \
+      #       --parameter-overrides \
+      #         Environment=${{ github.event.inputs.environment }} \
+      #         ProjectName=claims-proc \
+      #         CallbackURL=${{ github.event.inputs.callback_url }} \
+      #         LogoutURL=${{ github.event.inputs.logout_url }} \
+      #       --capabilities CAPABILITY_NAMED_IAM \
+      #       --no-fail-on-empty-changeset
+      #     echo "Stack outputs:"
+      #     aws cloudformation describe-stacks \
+      #       --stack-name "${{ env.STACK_NAME }}" \
+      #       --query "Stacks[0].Outputs" \
+      #       --output table
+      - name: Cognito skipped
+        run: echo "::notice::Cognito stack is disabled. Uncomment the deploy step in AWS_04_Create_Auth_Cognito.yml to re-enable." 
 
 

@@ -87,16 +87,18 @@ jobs:
             echo "Stack ${STACK} found with status: ${STATUS}"
           fi
 
-      - name: Delete stack
-        if: steps.check.outputs.stack_status != 'NOT_FOUND'
-        run: |
-          STACK="${{ steps.check.outputs.stack_name }}"
-          echo "--- Deleting: ${STACK} ---"
-
-          aws cloudformation delete-stack --stack-name "$STACK"
-          echo "Waiting for deletion to complete..."
-          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
-          echo "Deleted: ${STACK}"
+      # ---- COGNITO COMMENTED OUT — uncomment to re-enable ----
+      # - name: Delete stack
+      #   if: steps.check.outputs.stack_status != 'NOT_FOUND'
+      #   run: |
+      #     STACK="${{ steps.check.outputs.stack_name }}"
+      #     echo "--- Deleting: ${STACK} ---"
+      #     aws cloudformation delete-stack --stack-name "$STACK"
+      #     echo "Waiting for deletion to complete..."
+      #     aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+      #     echo "Deleted: ${STACK}"
+      - name: Cognito skipped
+        run: echo "::notice::Cognito destroy is disabled. Uncomment the delete step to re-enable."
 
       - name: Destruction Summary
         if: always()

@@ -28,17 +28,17 @@ on:
         type: string
         default: ''
 
-      callback_url:
-        description: 'Cognito OAuth2 callback URL | local: http://localhost:8081/callback | post-deploy: https://<ALB-DNS>/callback'
-        required: false
-        type: string
-        default: 'http://localhost:8081/callback'
-
-      logout_url:
-        description: 'Cognito OAuth2 logout URL | local: http://localhost:8081/logout | post-deploy: https://<ALB-DNS>/logout'
-        required: false
-        type: string
-        default: 'http://localhost:8081/logout'
+      # ---- COGNITO COMMENTED OUT — uncomment to re-enable ----
+      # callback_url:
+      #   description: 'Cognito OAuth2 callback URL'
+      #   required: false
+      #   type: string
+      #   default: 'http://localhost:8081/callback'
+      # logout_url:
+      #   description: 'Cognito OAuth2 logout URL'
+      #   required: false
+      #   type: string
+      #   default: 'http://localhost:8081/logout'
 
       image_tag:
         description: 'Docker image tag for Fargate services'
@@ -111,7 +111,7 @@ jobs:
           echo "s01=$(check_stack "${PRJ}-${ENV}-vpc-sg")"            >> "$GITHUB_OUTPUT"
           echo "s02=$(check_stack "${PRJ}-${ENV}-core-infra")"        >> "$GITHUB_OUTPUT"
           echo "s03=$(check_stack "${PRJ}-${ENV}-observability")"     >> "$GITHUB_OUTPUT"
-          echo "s04=$(check_stack "${PRJ}-${ENV}-auth")"              >> "$GITHUB_OUTPUT"
+          # echo "s04=$(check_stack "${PRJ}-${ENV}-auth")"  # COGNITO COMMENTED OUT
           echo "s05=$(check_stack "${PRJ}-${ENV}-messaging-search")"  >> "$GITHUB_OUTPUT"
           echo "s06=$(check_stack "${PRJ}-${ENV}-secrets")"           >> "$GITHUB_OUTPUT"
           echo "s07=$(check_stack "${PRJ}-${ENV}-eks")"               >> "$GITHUB_OUTPUT"
@@ -123,7 +123,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Stack | Current Status | Action |" >> "$GITHUB_STEP_SUMMARY"
           echo "|-------|---------------|--------|" >> "$GITHUB_STEP_SUMMARY"
-          for stack in vpc-sg core-infra observability auth messaging-search secrets eks fargate data-seed; do
+          for stack in vpc-sg core-infra observability messaging-search secrets eks fargate data-seed; do  # auth(cognito) excluded
             raw=$(aws cloudformation describe-stacks \
               --stack-name "${PRJ}-${ENV}-${stack}" \
               --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
@@ -259,45 +259,45 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   # 4  AUTH (Cognito)
   # ───────────────────────────────────────────────────────────────────────────
-  deploy-04-auth:
-    name: "4 — Auth (Cognito)"
-    needs: [check, deploy-03-obs]
-    if: always() && !failure() && needs.check.outputs.s04 == 'deploy'
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Deploy Cognito Auth Stack
-        env:
-          ENV: ${{ inputs.environment }}
-          PRJ: ${{ env.PROJECT_NAME }}
-          CALLBACK_URL: ${{ inputs.callback_url }}
-          LOGOUT_URL: ${{ inputs.logout_url }}
-        run: |
-          aws cloudformation deploy \
-            --template-file DevOps/AWS/CloudFormation/auth-cognito.yaml \
-            --stack-name "${PRJ}-${ENV}-auth" \
-            --parameter-overrides \
-              Environment="${ENV}" \
-              ProjectName="${PRJ}" \
-              CallbackURL="${CALLBACK_URL}" \
-              LogoutURL="${LOGOUT_URL}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset
+  # deploy-04-auth:
+  #   name: "4 — Auth (Cognito)"
+  #   needs: [check, deploy-03-obs]
+  #   if: always() && !failure() && needs.check.outputs.s04 == 'deploy'
+  #   runs-on: ubuntu-latest
+  #   environment: ${{ inputs.environment }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: ${{ env.AWS_REGION }}
+  #     - name: Deploy Cognito Auth Stack
+  #       env:
+  #         ENV: ${{ inputs.environment }}
+  #         PRJ: ${{ env.PROJECT_NAME }}
+  #         CALLBACK_URL: ${{ inputs.callback_url }}
+  #         LOGOUT_URL: ${{ inputs.logout_url }}
+  #       run: |
+  #         aws cloudformation deploy \
+  #           --template-file DevOps/AWS/CloudFormation/auth-cognito.yaml \
+  #           --stack-name "${PRJ}-${ENV}-auth" \
+  #           --parameter-overrides \
+  #             Environment="${ENV}" \
+  #             ProjectName="${PRJ}" \
+  #             CallbackURL="${CALLBACK_URL}" \
+  #             LogoutURL="${LOGOUT_URL}" \
+  #           --capabilities CAPABILITY_NAMED_IAM \
+  #           --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-auth\`" >> "$GITHUB_STEP_SUMMARY"
+  #         echo "### ✅ Stack: \`${PRJ}-${ENV}-auth\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 5  MESSAGING & SEARCH (MSK + OpenSearch)  ── OPTIONAL (skip_messaging)
   # ───────────────────────────────────────────────────────────────────────────
   deploy-05-messaging:
     name: "5 — Messaging & Search (MSK/OpenSearch)"
-    needs: [check, deploy-04-auth]
+    needs: [check, deploy-03-obs]  # deploy-04-auth(cognito) removed
     if: always() && !failure() && needs.check.outputs.s05 == 'deploy' && inputs.skip_messaging == false
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -343,7 +343,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   deploy-06-secrets:
     name: "6 — Secrets Manager"
-    needs: [check, deploy-04-auth, deploy-05-messaging]
+    needs: [check, deploy-03-obs, deploy-05-messaging]  # deploy-04-auth(cognito) removed
     if: always() && !failure() && needs.check.outputs.s06 == 'deploy'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -385,18 +385,18 @@ jobs:
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
           CORE="${PRJ}-${ENV}-core-infra"
-          AUTH="${PRJ}-${ENV}-auth"
+          # AUTH="${PRJ}-${ENV}-auth"  # COGNITO COMMENTED OUT
           SEC="${PRJ}-${ENV}-secrets"
 
           RDS_HOST=$(get_out "$CORE" "RDSEndpoint")
           RDS_PORT=$(get_out "$CORE" "RDSPort")
-          POOL_ID=$(get_out "$AUTH" "UserPoolId")
-          CLIENT_ID=$(get_out "$AUTH" "UserPoolClientId")
-          DOMAIN=$(get_out "$AUTH" "UserPoolDomain")
+          # POOL_ID=$(get_out "$AUTH" "UserPoolId")      # COGNITO COMMENTED OUT
+          # CLIENT_ID=$(get_out "$AUTH" "UserPoolClientId")  # COGNITO COMMENTED OUT
+          # DOMAIN=$(get_out "$AUTH" "UserPoolDomain")    # COGNITO COMMENTED OUT
           RDS_ARN=$(get_out "$SEC" "RDSCredentialsSecretArn")
           JWT_ARN=$(get_out "$SEC" "JWTSigningKeySecretArn")
           ENC_ARN=$(get_out "$SEC" "EncryptionKeysSecretArn")
-          COG_ARN=$(get_out "$SEC" "CognitoConfigSecretArn")
+          # COG_ARN=$(get_out "$SEC" "CognitoConfigSecretArn")  # COGNITO COMMENTED OUT
           REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
 
           [[ -n "$RDS_ARN" && -n "$DB_PASS" ]] && \
@@ -415,9 +415,8 @@ jobs:
             aws secretsmanager put-secret-value --secret-id "$ENC_ARN" \
               --secret-string "{\"aes-key\":\"${AES_KEY}\"}"
 
-          [[ -n "$COG_ARN" ]] && \
-            aws secretsmanager put-secret-value --secret-id "$COG_ARN" \
-              --secret-string "{\"userPoolId\":\"${POOL_ID}\",\"clientId\":\"${CLIENT_ID}\",\"domain\":\"${DOMAIN}\"}"
+                    # COGNITO COMMENTED OUT — COG_ARN block removed
+
 
           echo "::notice::Secrets populated for ${ENV}"
 
@@ -558,7 +557,7 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           VPC="${PRJ}-${ENV}-vpc-sg"
           SEC="${PRJ}-${ENV}-secrets"
-          AUTH="${PRJ}-${ENV}-auth"
+          # AUTH="${PRJ}-${ENV}-auth"  # COGNITO COMMENTED OUT
 
           VPC_ID=$(get_out "$VPC" "VpcId")
           PUB1=$(get_out "$VPC" "PublicSubnet1Id")
@@ -569,7 +568,7 @@ jobs:
           ALB_SG=$(get_out "$VPC" "ALBSecurityGroupId")
           RDS_ARN=$(get_out "$SEC" "RDSCredentialsSecretArn")
           REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
-          POOL_ID=$(get_out "$AUTH" "UserPoolId")
+          # POOL_ID=$(get_out "$AUTH" "UserPoolId")  # COGNITO COMMENTED OUT
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
@@ -589,7 +588,7 @@ jobs:
               AWSRegion="${AWS_REGION}" \
               RDSSecretArn="${RDS_ARN}" \
               RedisSecretArn="${REDIS_ARN}" \
-              CognitoUserPoolId="${POOL_ID}" \
+              # CognitoUserPoolId="${POOL_ID}" \  # COGNITO COMMENTED OUT
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
@@ -659,7 +658,7 @@ jobs:
       - deploy-01-vpc
       - deploy-02-core
       - deploy-03-obs
-      - deploy-04-auth
+      # - deploy-04-auth  # COGNITO COMMENTED OUT
       - deploy-05-messaging
       - deploy-06-secrets
       - deploy-07-eks
