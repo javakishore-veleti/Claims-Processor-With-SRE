@@ -1,0 +1,60 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormationAndIAM",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:*",
+        "iam:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NetworkingAndContainers",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:*",
+        "eks:*",
+        "ecr:*",
+        "ecs:*",
+        "elasticloadbalancing:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DataAndSecrets",
+      "Effect": "Allow",
+      "Action": [
+        "rds:*",
+        "elasticache:*",
+        "secretsmanager:*",
+        "s3:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AuthAndObservability",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:*",
+        "cognito-identity:*",
+        "cloudwatch:*",
+        "logs:*",
+        "sns:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MessagingAndLambda",
+      "Effect": "Allow",
+      "Action": [
+        "kinesis:*",
+        "kafka:*",
+        "es:*",
+        "lambda:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

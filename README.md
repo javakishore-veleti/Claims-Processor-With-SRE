@@ -546,7 +546,339 @@ The IAM user behind the access keys must have permissions for the services deplo
 
 All workflows also require `CloudFormation:*` and `IAM:*` (for `CAPABILITY_NAMED_IAM` stacks).
 
-> **Tip:** For initial setup, attaching `AdministratorAccess` to the IAM user is the fastest way to get started. Tighten to least-privilege policies before promoting to `prod`.
+#### How to Set Up the IAM User and Policies
+
+> **Note:** IAM policies cannot be set up inside GitHub Actions workflows themselves — you need AWS credentials to create IAM policies, creating a chicken-and-egg problem. The one-time setup below must be done manually in the AWS Console or CLI before any workflow can run.
+
+**Step 1 — Create an IAM User**
+
+1. Go to **AWS Console → IAM → Users → Create user**
+2. Name it `claims-proc-github-actions`
+3. Select **"Attach policies directly"** (not via group for now)
+4. Skip adding policies — you'll attach them next
+5. After creation, go to the user → **Security credentials → Create access key**
+6. Choose **"Other"** as the use case → copy the Access Key ID and Secret — these go into GitHub Secrets
+
+**Step 2 — Create and Attach Policies**
+
+Policy JSON files are provided in [`DevOps/AWS/IAM/`](DevOps/AWS/IAM/).
+
+For each policy: **AWS Console → IAM → Policies → Create policy → JSON tab** → paste the JSON → name it → Create.
+Then attach to the `claims-proc-github-actions` user.
+
+---
+
+##### Option A — Dev / Quick Start (1 policy, all permissions)
+
+Use **`claims-proc-policy-dev-all-in-one.json`** — one policy covering everything. Fastest to set up for `dev`.
+
+Policy name to use: `claims-proc-dev-all-in-one`
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormationAndIAM",
+      "Effect": "Allow",
+      "Action": [ "cloudformation:*", "iam:*" ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NetworkingAndContainers",
+      "Effect": "Allow",
+      "Action": [ "ec2:*", "eks:*", "ecr:*", "ecs:*", "elasticloadbalancing:*" ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DataAndSecrets",
+      "Effect": "Allow",
+      "Action": [ "rds:*", "elasticache:*", "secretsmanager:*", "s3:*" ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AuthAndObservability",
+      "Effect": "Allow",
+      "Action": [ "cognito-idp:*", "cognito-identity:*", "cloudwatch:*", "logs:*", "sns:*" ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MessagingAndLambda",
+      "Effect": "Allow",
+      "Action": [ "kinesis:*", "kafka:*", "es:*", "lambda:*" ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+---
+
+##### Option B — Staging / Prod (5 least-privilege policies)
+
+Split across 5 policies for tighter control. AWS allows up to 10 managed policies per user/role.
+
+**Policy 1 — `claims-proc-policy-1-cfn-iam`** (required by all workflows)
+
+File: [`DevOps/AWS/IAM/claims-proc-policy-1-cfn-iam.json`](DevOps/AWS/IAM/claims-proc-policy-1-cfn-iam.json)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormationFull",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:CreateStack", "cloudformation:UpdateStack",
+        "cloudformation:DeleteStack", "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents", "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate", "cloudformation:ListStacks",
+        "cloudformation:ValidateTemplate", "cloudformation:CreateChangeSet",
+        "cloudformation:ExecuteChangeSet", "cloudformation:DescribeChangeSet"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IAMFull",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PassRole",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile",
+        "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
+        "iam:TagRole", "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Policy 2 — `claims-proc-policy-2-network-containers`** (AWS_01, AWS_07, AWS_08, AWS_09)
+
+File: [`DevOps/AWS/IAM/claims-proc-policy-2-network-containers.json`](DevOps/AWS/IAM/claims-proc-policy-2-network-containers.json)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EC2Networking",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateVpc", "ec2:DeleteVpc", "ec2:DescribeVpcs",
+        "ec2:CreateSubnet", "ec2:DeleteSubnet", "ec2:DescribeSubnets",
+        "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup", "ec2:DescribeSecurityGroups",
+        "ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:CreateInternetGateway", "ec2:AttachInternetGateway",
+        "ec2:CreateRouteTable", "ec2:CreateRoute", "ec2:AssociateRouteTable",
+        "ec2:AllocateAddress", "ec2:CreateNatGateway", "ec2:DescribeNatGateways",
+        "ec2:DescribeAvailabilityZones", "ec2:CreateTags", "ec2:DescribeTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EKS",
+      "Effect": "Allow",
+      "Action": [
+        "eks:CreateCluster", "eks:DeleteCluster", "eks:DescribeCluster",
+        "eks:ListClusters", "eks:UpdateClusterConfig",
+        "eks:CreateNodegroup", "eks:DeleteNodegroup", "eks:DescribeNodegroup",
+        "eks:TagResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository", "ecr:DeleteRepository", "ecr:DescribeRepositories",
+        "ecr:GetAuthorizationToken", "ecr:BatchCheckLayerAvailability",
+        "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload", "ecr:BatchGetImage", "ecr:TagResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECSAndALB",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:CreateCluster", "ecs:DeleteCluster", "ecs:DescribeClusters",
+        "ecs:CreateService", "ecs:UpdateService", "ecs:DeleteService",
+        "ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition",
+        "elasticloadbalancing:CreateLoadBalancer", "elasticloadbalancing:DeleteLoadBalancer",
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:CreateTargetGroup", "elasticloadbalancing:DeleteTargetGroup",
+        "elasticloadbalancing:CreateListener", "elasticloadbalancing:CreateRule",
+        "elasticloadbalancing:RegisterTargets", "elasticloadbalancing:AddTags"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Policy 3 — `claims-proc-policy-3-data-secrets`** (AWS_02, AWS_06, AWS_10)
+
+File: [`DevOps/AWS/IAM/claims-proc-policy-3-data-secrets.json`](DevOps/AWS/IAM/claims-proc-policy-3-data-secrets.json)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RDS",
+      "Effect": "Allow",
+      "Action": [
+        "rds:CreateDBInstance", "rds:DeleteDBInstance", "rds:DescribeDBInstances",
+        "rds:ModifyDBInstance", "rds:CreateDBSubnetGroup", "rds:DeleteDBSubnetGroup",
+        "rds:DescribeDBSubnetGroups", "rds:CreateDBSnapshot",
+        "rds:RestoreDBInstanceFromDBSnapshot", "rds:AddTagsToResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ElastiCache",
+      "Effect": "Allow",
+      "Action": [
+        "elasticache:CreateReplicationGroup", "elasticache:DeleteReplicationGroup",
+        "elasticache:DescribeReplicationGroups", "elasticache:ModifyReplicationGroup",
+        "elasticache:CreateCacheSubnetGroup", "elasticache:DeleteCacheSubnetGroup",
+        "elasticache:DescribeCacheSubnetGroups", "elasticache:AddTagsToResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SecretsManager",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret", "secretsmanager:DeleteSecret",
+        "secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue", "secretsmanager:UpdateSecret",
+        "secretsmanager:ListSecrets", "secretsmanager:TagResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3ForLambdaPackages",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket", "s3:DeleteBucket", "s3:PutObject",
+        "s3:GetObject", "s3:DeleteObject", "s3:ListBucket"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Policy 4 — `claims-proc-policy-4-auth-observability`** (AWS_03, AWS_04)
+
+File: [`DevOps/AWS/IAM/claims-proc-policy-4-auth-observability.json`](DevOps/AWS/IAM/claims-proc-policy-4-auth-observability.json)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Cognito",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPool", "cognito-idp:DeleteUserPool",
+        "cognito-idp:DescribeUserPool", "cognito-idp:UpdateUserPool",
+        "cognito-idp:CreateUserPoolClient", "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:CreateUserPoolDomain", "cognito-idp:DeleteUserPoolDomain",
+        "cognito-idp:TagResource",
+        "cognito-identity:CreateIdentityPool", "cognito-identity:DeleteIdentityPool",
+        "cognito-identity:UpdateIdentityPool", "cognito-identity:SetIdentityPoolRoles"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchAndLogs",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms", "cloudwatch:PutDashboard",
+        "cloudwatch:GetDashboard", "cloudwatch:ListDashboards",
+        "cloudwatch:PutMetricData", "cloudwatch:TagResource",
+        "logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:DescribeLogGroups",
+        "logs:CreateLogStream", "logs:PutLogEvents", "logs:PutRetentionPolicy",
+        "logs:TagLogGroup"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SNS",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic", "sns:DeleteTopic", "sns:GetTopicAttributes",
+        "sns:SetTopicAttributes", "sns:ListTopics",
+        "sns:Subscribe", "sns:Unsubscribe", "sns:Publish", "sns:TagResource"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Policy 5 — `claims-proc-policy-5-messaging-lambda`** (AWS_05, AWS_10)
+
+File: [`DevOps/AWS/IAM/claims-proc-policy-5-messaging-lambda.json`](DevOps/AWS/IAM/claims-proc-policy-5-messaging-lambda.json)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Kinesis",
+      "Effect": "Allow",
+      "Action": [
+        "kinesis:CreateStream", "kinesis:DeleteStream", "kinesis:DescribeStream",
+        "kinesis:ListStreams", "kinesis:PutRecord", "kinesis:PutRecords",
+        "kinesis:GetRecords", "kinesis:GetShardIterator", "kinesis:AddTagsToStream"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MSKManagedKafka",
+      "Effect": "Allow",
+      "Action": [
+        "kafka:CreateCluster", "kafka:DeleteCluster", "kafka:DescribeCluster",
+        "kafka:ListClusters", "kafka:UpdateBrokerCount",
+        "kafka:CreateConfiguration", "kafka:DescribeConfiguration",
+        "kafka:TagResource", "kafka:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "OpenSearch",
+      "Effect": "Allow",
+      "Action": [
+        "es:CreateDomain", "es:DeleteDomain", "es:DescribeDomain",
+        "es:DescribeDomains", "es:ListDomainNames",
+        "es:UpdateDomainConfig", "es:AddTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Lambda",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction", "lambda:DeleteFunction", "lambda:GetFunction",
+        "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
+        "lambda:InvokeFunction", "lambda:ListFunctions",
+        "lambda:CreateEventSourceMapping", "lambda:TagResource", "lambda:AddPermission"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+> **Tip:** For initial setup, attaching `AdministratorAccess` to the IAM user is the fastest way to get started. Tighten to the least-privilege policies above before promoting to `prod`.
 
 ---
 

@@ -1,0 +1,84 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Kinesis",
+      "Effect": "Allow",
+      "Action": [
+        "kinesis:CreateStream",
+        "kinesis:DeleteStream",
+        "kinesis:DescribeStream",
+        "kinesis:DescribeStreamSummary",
+        "kinesis:ListStreams",
+        "kinesis:PutRecord",
+        "kinesis:PutRecords",
+        "kinesis:GetRecords",
+        "kinesis:GetShardIterator",
+        "kinesis:MergeShards",
+        "kinesis:SplitShard",
+        "kinesis:AddTagsToStream",
+        "kinesis:ListTagsForStream"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MSKManagedKafka",
+      "Effect": "Allow",
+      "Action": [
+        "kafka:CreateCluster",
+        "kafka:DeleteCluster",
+        "kafka:DescribeCluster",
+        "kafka:ListClusters",
+        "kafka:UpdateBrokerCount",
+        "kafka:UpdateBrokerStorage",
+        "kafka:UpdateClusterConfiguration",
+        "kafka:CreateConfiguration",
+        "kafka:DeleteConfiguration",
+        "kafka:DescribeConfiguration",
+        "kafka:ListConfigurations",
+        "kafka:TagResource",
+        "kafka:UntagResource",
+        "kafka:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "OpenSearch",
+      "Effect": "Allow",
+      "Action": [
+        "es:CreateDomain",
+        "es:DeleteDomain",
+        "es:DescribeDomain",
+        "es:DescribeDomains",
+        "es:ListDomainNames",
+        "es:UpdateDomainConfig",
+        "es:DescribeDomainConfig",
+        "es:AddTags",
+        "es:RemoveTags",
+        "es:ListTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Lambda",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:InvokeFunction",
+        "lambda:ListFunctions",
+        "lambda:CreateEventSourceMapping",
+        "lambda:DeleteEventSourceMapping",
+        "lambda:GetEventSourceMapping",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:AddPermission",
+        "lambda:RemovePermission"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
