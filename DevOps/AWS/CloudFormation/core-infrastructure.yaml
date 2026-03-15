@@ -140,8 +140,8 @@ Resources:
 
   RDSInstance:
     Type: AWS::RDS::DBInstance
-    DeletionPolicy: Snapshot
-    UpdateReplacePolicy: Snapshot
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       DBInstanceIdentifier: !Sub '${ProjectName}-${Environment}-postgres'
       DBInstanceClass: !Ref RDSInstanceClass
@@ -157,8 +157,8 @@ Resources:
       DBSubnetGroupName: !Ref DBSubnetGroup
       VPCSecurityGroups:
         - !Ref RDSSecurityGroup
-      BackupRetentionPeriod: 7
-      PreferredBackupWindow: '03:00-04:00'
+      BackupRetentionPeriod: 0
+      # BackupRetentionPeriod: 7  # re-enable for prod
       PreferredMaintenanceWindow: 'sun:05:00-sun:06:00'
       AutoMinorVersionUpgrade: true
       CopyTagsToSnapshot: true
@@ -179,8 +179,8 @@ Resources:
   # ==========================================================================
   S3DocumentsBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       BucketName: !Sub '${ProjectName}-${Environment}-${AWS::AccountId}-documents'
       VersioningConfiguration:
@@ -218,8 +218,8 @@ Resources:
 
   S3StaticBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       BucketName: !Sub '${ProjectName}-${Environment}-${AWS::AccountId}-static'
       VersioningConfiguration:
@@ -249,6 +249,7 @@ Resources:
   ECRApiClaims:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/api-claims'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -281,6 +282,7 @@ Resources:
   ECRApiMembers:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/api-members'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -313,6 +315,7 @@ Resources:
   ECRApiTenants:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/api-tenants'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -345,6 +348,7 @@ Resources:
   ECRApiEntitlements:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/api-entitlements'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -377,6 +381,7 @@ Resources:
   ECRPortalClaimsAdvisor:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/portal-claims-advisor'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -409,6 +414,7 @@ Resources:
   ECRPortalClaimsMember:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/portal-claims-member'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -441,6 +447,7 @@ Resources:
   ECRPortalBatchAssignment:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/portal-batch-assignment'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -473,6 +480,7 @@ Resources:
   ECRPortalTenants:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/portal-tenants'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -505,6 +513,7 @@ Resources:
   ECRPortalEntitlements:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/portal-entitlements'
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -537,6 +546,7 @@ Resources:
   ECRPortalSRE:
     Type: AWS::ECR::Repository
     Properties:
+      EmptyOnDelete: true
       RepositoryName: !Sub '${ProjectName}/portal-sre'
       ImageScanningConfiguration:
         ScanOnPush: true

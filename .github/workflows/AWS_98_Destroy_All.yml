@@ -35,16 +35,16 @@ on:
         type: string
 
       retain_rds_snapshot:
-        description: 'Create a final RDS snapshot before deletion'
+        description: 'Create a final RDS snapshot before deletion (set true only for prod)'
         required: false
         type: boolean
-        default: true
+        default: false
 
       retain_s3_data:
-        description: 'Retain S3 bucket data (skip bucket emptying/deletion)'
+        description: 'Retain S3 bucket data — set true only to preserve data intentionally'
         required: false
         type: boolean
-        default: true
+        default: false
 
 env:
   AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
@@ -234,6 +234,23 @@ jobs:
           echo "Deleted: ${STACK}"
 
       # -------------------------------------------------------------------
+      # -------------------------------------------------------------------
+      # 5b. Force-delete all Secrets Manager secrets (no recovery window)
+      # -------------------------------------------------------------------
+      - name: "Force-delete Secrets Manager secrets"
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          echo "Force-deleting all secrets for ${PRJ}/${ENV} (no recovery window)..."
+          SECRETS=$(aws secretsmanager list-secrets             --query "SecretList[?contains(Name, '${PRJ}/${ENV}') || contains(Name, '${PRJ}-${ENV}')].ARN"             --output text)
+          for ARN in $SECRETS; do
+            echo "  Deleting secret: $ARN"
+            aws secretsmanager delete-secret               --secret-id "$ARN"               --force-delete-without-recovery 2>/dev/null || true
+          done
+          echo "Secrets force-deleted."
+
       # 6. Delete: secrets (Secrets Manager)
       # -------------------------------------------------------------------
       - name: "Delete stack: secrets"
@@ -307,6 +324,24 @@ jobs:
       # -------------------------------------------------------------------
       - name: "Delete auth (Cognito) skipped"
         run: echo "::notice::Cognito disabled — uncomment step 8 to re-enable."
+
+      # -------------------------------------------------------------------
+      # 8b. Empty CloudTrail S3 bucket before observability stack deletion
+      # -------------------------------------------------------------------
+      - name: "Empty CloudTrail S3 bucket"
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          BUCKET=$(aws cloudformation describe-stack-resource             --stack-name "${PRJ}-${ENV}-observability"             --logical-resource-id TrailLogsBucket             --query "StackResourceDetail.PhysicalResourceId"             --output text 2>/dev/null || echo "")
+          if [[ -z "$BUCKET" || "$BUCKET" == "None" ]]; then
+            echo "CloudTrail bucket not found in stack — skipping"
+            exit 0
+          fi
+          echo "Emptying CloudTrail bucket: $BUCKET"
+          aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+          echo "Emptied: $BUCKET"
 
       # 9. Delete: observability (CloudWatch dashboards, alarms, log groups)
       # -------------------------------------------------------------------
@@ -457,6 +492,27 @@ jobs:
           done
 
       # -------------------------------------------------------------------
+      # -------------------------------------------------------------------
+      # 11b. Delete all ECR images (belt + suspenders alongside EmptyOnDelete)
+      # -------------------------------------------------------------------
+      - name: "Delete ECR images"
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          REPOS=$(aws ecr describe-repositories             --query "repositories[?starts_with(repositoryName, '${PRJ}/')].repositoryName"             --output text 2>/dev/null || echo "")
+          for REPO in $REPOS; do
+            echo "  Deleting all images in: $REPO"
+            IMAGES=$(aws ecr list-images --repository-name "$REPO"               --query 'imageIds[*]' --output json 2>/dev/null || echo "[]")
+            COUNT=$(echo "$IMAGES" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+            if [[ "$COUNT" -gt 0 ]]; then
+              aws ecr batch-delete-image --repository-name "$REPO"                 --image-ids "$IMAGES" 2>/dev/null || true
+              echo "    Deleted $COUNT images from $REPO"
+            fi
+          done
+          echo "ECR images deleted."
+
       # 12. Delete: core-infra (RDS, S3, ElastiCache, ECR)
       # -------------------------------------------------------------------
       - name: "Delete stack: core-infra"
@@ -505,6 +561,46 @@ jobs:
       # -------------------------------------------------------------------
       # 14. Verify all stacks are deleted
       # -------------------------------------------------------------------
+      # -------------------------------------------------------------------
+      # 14. Post-destroy cleanup — resources auto-created outside CloudFormation
+      # -------------------------------------------------------------------
+      - name: "Delete auto-created CloudWatch log groups"
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          echo "Deleting ECS and Lambda log groups for ${PRJ}-${ENV}..."
+          # ECS Fargate auto-creates /ecs/<task-family> log groups
+          # Lambda auto-creates /aws/lambda/<function-name> log groups
+          PREFIXES=(
+            "/ecs/${PRJ}-${ENV}"
+            "/aws/lambda/${PRJ}-${ENV}"
+            "/claims-proc/${ENV}"
+          )
+          for PREFIX in "${PREFIXES[@]}"; do
+            GROUPS=$(aws logs describe-log-groups               --log-group-name-prefix "$PREFIX"               --query 'logGroups[*].logGroupName'               --output text 2>/dev/null || echo "")
+            for GROUP in $GROUPS; do
+              echo "  Deleting log group: $GROUP"
+              aws logs delete-log-group --log-group-name "$GROUP" 2>/dev/null || true
+            done
+          done
+          echo "CloudWatch log groups cleaned up."
+
+      - name: "Delete lingering RDS snapshots"
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          echo "Deleting any RDS snapshots for ${PRJ}-${ENV}..."
+          SNAPSHOTS=$(aws rds describe-db-snapshots             --query "DBSnapshots[?contains(DBInstanceIdentifier, '${PRJ}-${ENV}')].DBSnapshotIdentifier"             --output text 2>/dev/null || echo "")
+          for SNAP in $SNAPSHOTS; do
+            echo "  Deleting snapshot: $SNAP"
+            aws rds delete-db-snapshot --db-snapshot-identifier "$SNAP" 2>/dev/null || true
+          done
+          [[ -z "$SNAPSHOTS" ]] && echo "No RDS snapshots found." || echo "RDS snapshots deleted."
+
       - name: Verify destruction
         id: verify
         run: |
