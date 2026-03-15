@@ -5,6 +5,7 @@ import com.healthcare.claims.common.claims.dto.ClaimRespDTO;
 import com.healthcare.claims.api.claims.model.Claim;
 import com.healthcare.claims.api.claims.model.ClaimStage;
 import com.healthcare.claims.api.claims.repository.ClaimRepository;
+import com.healthcare.claims.api.claims.search.SearchIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -23,6 +26,9 @@ import java.util.UUID;
 public class ClaimServiceImpl implements ClaimService {
 
     private final ClaimRepository claimRepository;
+    private final SearchIndexService searchIndexService;
+
+    private static final String INDEX_NAME = "claims-data";
 
     @Override
     public ClaimRespDTO createClaim(ClaimReqDTO request) {
@@ -41,6 +47,13 @@ public class ClaimServiceImpl implements ClaimService {
                 .build();
 
         Claim saved = claimRepository.save(claim);
+
+        try {
+            searchIndexService.indexDocument(INDEX_NAME, saved.getId().toString(), claimToMap(saved));
+        } catch (Exception e) {
+            log.warn("Failed to index claim {} in search: {}", saved.getId(), e.getMessage());
+        }
+
         return toResponse(saved);
     }
 
@@ -82,6 +95,13 @@ public class ClaimServiceImpl implements ClaimService {
                 ? request.getExtractedData().toString() : null);
 
         Claim updated = claimRepository.save(claim);
+
+        try {
+            searchIndexService.updateDocument(INDEX_NAME, updated.getId().toString(), claimToMap(updated));
+        } catch (Exception e) {
+            log.warn("Failed to update claim {} in search: {}", updated.getId(), e.getMessage());
+        }
+
         return toResponse(updated);
     }
 
@@ -94,7 +114,29 @@ public class ClaimServiceImpl implements ClaimService {
 
         claim.setStage(stage);
         Claim updated = claimRepository.save(claim);
+
+        try {
+            searchIndexService.updateDocument(INDEX_NAME, updated.getId().toString(), claimToMap(updated));
+        } catch (Exception e) {
+            log.warn("Failed to update claim stage {} in search: {}", updated.getId(), e.getMessage());
+        }
+
         return toResponse(updated);
+    }
+
+    private Map<String, Object> claimToMap(Claim claim) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", claim.getId() != null ? claim.getId().toString() : null);
+        map.put("customerId", claim.getCustomerId());
+        map.put("claimNumber", claim.getClaimNumber());
+        map.put("stage", claim.getStage() != null ? claim.getStage().name() : null);
+        map.put("submittedDate", claim.getSubmittedDate() != null ? claim.getSubmittedDate().toString() : null);
+        map.put("extractedData", claim.getExtractedData());
+        map.put("adjudicationResult", claim.getAdjudicationResult());
+        map.put("confidenceScore", claim.getConfidenceScore() != null ? claim.getConfidenceScore().doubleValue() : null);
+        map.put("createdAt", claim.getCreatedAt() != null ? claim.getCreatedAt().toString() : null);
+        map.put("updatedAt", claim.getUpdatedAt() != null ? claim.getUpdatedAt().toString() : null);
+        return map;
     }
 
     private ClaimRespDTO toResponse(Claim claim) {

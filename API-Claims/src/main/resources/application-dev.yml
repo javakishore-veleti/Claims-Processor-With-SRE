@@ -28,6 +28,7 @@ claims:
   features:
     search:
       enabled: true
+      elasticsearch-url: http://localhost:9200
     event-stream:
       enabled: true
     log-shipping:

@@ -4,6 +4,7 @@ import com.healthcare.claims.common.members.dto.MemberReqDTO;
 import com.healthcare.claims.common.members.dto.MemberRespDTO;
 import com.healthcare.claims.api.members.model.Member;
 import com.healthcare.claims.api.members.repository.MemberRepository;
+import com.healthcare.claims.api.members.search.SearchIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,6 +24,9 @@ import java.util.UUID;
 public class MemberServiceImpl implements MemberService {
 
     private final MemberRepository memberRepository;
+    private final SearchIndexService searchIndexService;
+
+    private static final String INDEX_NAME = "members-data";
 
     @Override
     public MemberRespDTO createMember(MemberReqDTO request) {
@@ -31,6 +37,13 @@ public class MemberServiceImpl implements MemberService {
         Member member = mapToEntity(request);
         Member saved = memberRepository.save(member);
         log.info("Created member with ID: {}", saved.getId());
+
+        try {
+            searchIndexService.indexDocument(INDEX_NAME, saved.getId().toString(), memberToMap(saved));
+        } catch (Exception e) {
+            log.warn("Failed to index member {} in search: {}", saved.getId(), e.getMessage());
+        }
+
         return mapToResponse(saved);
     }
 
@@ -69,6 +82,13 @@ public class MemberServiceImpl implements MemberService {
 
         Member updated = memberRepository.save(existing);
         log.info("Updated member with ID: {}", updated.getId());
+
+        try {
+            searchIndexService.updateDocument(INDEX_NAME, updated.getId().toString(), memberToMap(updated));
+        } catch (Exception e) {
+            log.warn("Failed to update member {} in search: {}", updated.getId(), e.getMessage());
+        }
+
         return mapToResponse(updated);
     }
 
@@ -94,6 +114,23 @@ public class MemberServiceImpl implements MemberService {
         }
 
         return mapToResponse(member);
+    }
+
+    private Map<String, Object> memberToMap(Member member) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", member.getId() != null ? member.getId().toString() : null);
+        map.put("memberId", member.getMemberId());
+        map.put("firstName", member.getFirstName());
+        map.put("lastName", member.getLastName());
+        map.put("dateOfBirth", member.getDateOfBirth() != null ? member.getDateOfBirth().toString() : null);
+        map.put("email", member.getEmail());
+        map.put("phone", member.getPhone());
+        map.put("address", member.getAddress());
+        map.put("policyNumber", member.getPolicyNumber());
+        map.put("policyStatus", member.getPolicyStatus());
+        map.put("createdAt", member.getCreatedAt() != null ? member.getCreatedAt().toString() : null);
+        map.put("updatedAt", member.getUpdatedAt() != null ? member.getUpdatedAt().toString() : null);
+        return map;
     }
 
     private Member mapToEntity(MemberReqDTO request) {

@@ -48,3 +48,51 @@ curl -sf -X POST "$KIBANA_HOST/api/data_views/data_view" \
 
 echo ""
 echo "All Kibana data views created successfully."
+echo ""
+
+# --- Saved Searches ---
+
+# Create saved search: Claims by Stage
+curl -sf -X POST "$KIBANA_HOST/api/saved_objects/search/claims-by-stage" \
+  -H 'kbn-xsrf: true' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "attributes": {
+      "title": "Claims by Stage",
+      "description": "All claims grouped by processing stage",
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"claims-*\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+      }
+    }
+  }' && echo "" && echo "Created saved search: Claims by Stage"
+
+# Create saved search: Recent Application Errors
+curl -sf -X POST "$KIBANA_HOST/api/saved_objects/search/app-errors" \
+  -H 'kbn-xsrf: true' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "attributes": {
+      "title": "Application Errors (Last 24h)",
+      "description": "All ERROR level log entries across services",
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"claims-app-logs-*\",\"query\":{\"query\":\"level: ERROR\",\"language\":\"kuery\"},\"filter\":[]}"
+      }
+    }
+  }' && echo "" && echo "Created saved search: Application Errors"
+
+# Create saved search: Slow Requests
+curl -sf -X POST "$KIBANA_HOST/api/saved_objects/search/slow-requests" \
+  -H 'kbn-xsrf: true' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "attributes": {
+      "title": "Slow Requests (>1s)",
+      "description": "Requests taking more than 1 second",
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"claims-app-logs-*\",\"query\":{\"query\":\"elapsed_time > 1000\",\"language\":\"kuery\"},\"filter\":[]}"
+      }
+    }
+  }' && echo "" && echo "Created saved search: Slow Requests"
+
+echo ""
+echo "All Kibana saved searches created successfully."

@@ -101,6 +101,7 @@ claims:
     search:
       enabled: false
       provider: elasticsearch  # elasticsearch | opensearch | azure-cognitive | gcp-search
+      elasticsearch-url: ${ELASTICSEARCH_URL:http://localhost:9200}
       index-on-create: true
       index-on-update: true
       index-on-delete: true

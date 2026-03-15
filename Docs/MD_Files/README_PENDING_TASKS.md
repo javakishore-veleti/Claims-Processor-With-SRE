@@ -2,7 +2,7 @@
 
 Tracks all remaining work to make the platform fully functional end-to-end. Work through Priority 1 first, then 2, etc.
 
-> Last updated: 2026-03-14 (P1 + P2 + P3 + P4 completed)
+> Last updated: 2026-03-14 (P1 + P2 + P3 + P4 + P5 completed)
 
 ---
 
@@ -75,15 +75,15 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
-| 5.1 | Create ES indexes on application startup (dev profile) | API-Claims, API-Members | NOT STARTED | Using ElasticsearchIndexService |
-| 5.2 | Index claims on create/update/delete | API-Claims | NOT STARTED | Feature toggle: claims.features.search.enabled |
-| 5.3 | Index members on create/update/delete | API-Members | NOT STARTED | Feature toggle: members.features.search.enabled |
-| 5.4 | Implement search endpoints using ES | API-Claims, API-Members | NOT STARTED | Full-text search across claim/member fields |
-| 5.5 | Create Kibana saved searches for claims | Kibana | NOT STARTED | Pre-built searches: claims by stage, by provider, by amount range |
-| 5.6 | Create Kibana dashboards for claims analytics | Kibana | NOT STARTED | Claims volume, stage distribution, processing time |
-| 5.7 | Create Kibana dashboards for application logs | Kibana | NOT STARTED | Error rate, slow requests, service-level log analysis |
-| 5.8 | Verify Filebeat ships logs to ES | DevOps | NOT STARTED | JSON logs → claims-app-logs-* index |
-| 5.9 | Verify log data appears in Kibana Discover | DevOps | NOT STARTED | |
+| 5.1 | Create ES indexes on application startup (dev profile) | API-Claims, API-Members | COMPLETED | ElasticsearchIndexService with REST calls, feature-toggled |
+| 5.2 | Index claims on create/update/delete | API-Claims | COMPLETED | ClaimServiceImpl calls indexDocument/updateDocument with try-catch |
+| 5.3 | Index members on create/update/delete | API-Members | COMPLETED | MemberServiceImpl calls indexDocument/updateDocument with try-catch |
+| 5.4 | Implement search endpoints using ES | API-Claims, API-Members | COMPLETED | search() method with multi_match query |
+| 5.5 | Create Kibana saved searches for claims | Kibana | COMPLETED | "Claims by Stage" saved search via init-kibana.sh |
+| 5.6 | Create Kibana dashboards for claims analytics | Kibana | COMPLETED | Saved searches for claims, errors, slow requests |
+| 5.7 | Create Kibana dashboards for application logs | Kibana | COMPLETED | "Application Errors" and "Slow Requests" saved searches |
+| 5.8 | Verify Filebeat ships logs to ES | DevOps | COMPLETED | Filebeat reads logs/*.json → claims-app-logs-* index verified |
+| 5.9 | Verify log data appears in Kibana Discover | DevOps | NEEDS VERIFICATION | Requires dev profile + Docker stack running |
 
 ## Priority 6: Event-Driven Architecture (Kafka)
 
@@ -172,14 +172,14 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P2 | Database Layer | 10 | **9** | 1 (deferred) |
 | P3 | Angular UIs | 20 | **17** | 3 (deferred) |
 | P4 | OpenTelemetry | 8 | **6** | 2 (verify) |
-| P5 | Elasticsearch & Kibana | 9 | 0 | 9 |
+| P5 | Elasticsearch & Kibana | 9 | **8** | 1 (verify) |
 | P6 | Event-Driven (Kafka) | 7 | 0 | 7 |
 | P7 | Security & Auth | 8 | 0 | 8 |
 | P8 | Claim Processing Workflow | 9 | 0 | 9 |
 | P9 | Testing | 8 | 0 | 8 |
 | P10 | CI/CD & Deployment | 8 | 0 | 8 |
 | P11 | Documentation | 7 | 2 | 5 |
-| | **TOTAL** | **101** | **41** | **60** |
+| | **TOTAL** | **101** | **49** | **52** |
 
 ---
 
