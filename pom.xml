@@ -201,11 +201,11 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- Caffeine Cache (in-memory, no Docker needed) -->
-            <dependency>
-                <groupId>com.github.ben-manes.caffeine</groupId>
-                <artifactId>caffeine</artifactId>
-            </dependency>
+            <!--
+                Caffeine is managed by spring-boot-starter-parent BOM.
+                Do NOT declare it here without a version — it overrides the BOM.
+                Child modules can use it directly without version.
+            -->
 
             <!-- Flyway Database Migrations -->
             <dependency>
