@@ -65,7 +65,6 @@
         "ce:GetCostForecast",
         "ce:GetDimensionValues",
         "ce:GetTags",
-        "budgets:DescribeBudgets",
         "budgets:ViewBudget"
       ],
       "Resource": "*"

@@ -611,7 +611,7 @@ Policy name to use: `claims-proc-dev-all-in-one`
     {
       "Sid": "CostExplorer",
       "Effect": "Allow",
-      "Action": [ "ce:GetCostAndUsage", "ce:GetCostForecast", "ce:GetDimensionValues", "ce:GetTags", "budgets:DescribeBudgets", "budgets:ViewBudget" ],
+      "Action": [ "ce:GetCostAndUsage", "ce:GetCostForecast", "ce:GetDimensionValues", "ce:GetTags", "budgets:ViewBudget" ],
       "Resource": "*"
     }
   ]
@@ -844,7 +844,7 @@ File: [`DevOps/AWS/IAM/claims-proc-policy-4-auth-observability.json`](DevOps/AWS
       "Action": [
         "ce:GetCostAndUsage", "ce:GetCostForecast",
         "ce:GetDimensionValues", "ce:GetTags",
-        "budgets:DescribeBudgets", "budgets:ViewBudget"
+        "budgets:ViewBudget"
       ],
       "Resource": "*"
     }
