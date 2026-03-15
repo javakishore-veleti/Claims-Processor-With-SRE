@@ -150,11 +150,46 @@ public class ClaimsOrchestrationController {
     }
 
     /**
+     * List claims with optional filters. Used by the Angular Claims page.
+     */
+    @GetMapping("/claims")
+    public ApiResponse<?> listClaims(
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String stage,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        log.info("Listing claims - customerId={}, stage={}, page={}, size={}", customerId, stage, page, size);
+        try {
+            return claimsClient.searchClaims(customerId, stage, page, size);
+        } catch (Exception e) {
+            log.warn("Failed to fetch claims from API-Claims: {}", e.getMessage());
+            return ApiResponse.success(java.util.Collections.emptyList(), "API-Claims unavailable");
+        }
+    }
+
+    /**
      * Search claims with optional query parameter.
      */
     @GetMapping("/claims/search")
-    public ApiResponse<?> searchClaims(@RequestParam String query) {
+    public ApiResponse<?> searchClaims(@RequestParam(required = false) String query) {
         log.info("Searching claims with query: {}", query);
         return claimsClient.searchClaims(query, null, 0, 20);
+    }
+
+    /**
+     * List members with optional filters. Used by the Angular Members page.
+     */
+    @GetMapping("/members")
+    public ApiResponse<?> listMembers(
+            @RequestParam(required = false) String firstName,
+            @RequestParam(required = false) String lastName,
+            @RequestParam(required = false) String memberId) {
+        log.info("Listing members - firstName={}, lastName={}, memberId={}", firstName, lastName, memberId);
+        try {
+            return membersClient.searchMembers(firstName, lastName, memberId);
+        } catch (Exception e) {
+            log.warn("Failed to fetch members from API-Members: {}", e.getMessage());
+            return ApiResponse.success(java.util.Collections.emptyList(), "API-Members unavailable");
+        }
     }
 }

@@ -72,7 +72,7 @@ export class ApiService {
   }
 
   checkServiceActuator(port: number): Observable<any> {
-    return this.http.get(`http://localhost:${port}/actuator/health`).pipe(
+    return this.http.get(`${this.baseUrl}/service-health/check/${port}`).pipe(
       catchError(() => of({ status: 'DOWN' }))
     );
   }

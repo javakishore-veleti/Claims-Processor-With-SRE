@@ -9,24 +9,39 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "api-entitlements", url = "${claims.service-client.services.api-entitlements.url:http://localhost:8086}")
+@FeignClient(name = "api-entitlements", url = "${claims.service-client.services.api-entitlements.url:http://localhost:8087}")
 public interface EntitlementsFeignClient {
 
-    @PostMapping("/api/v1/users")
+    // Users
+    @PostMapping("/api/v1/entitlements/users")
     ApiResponse<UserRespDTO> createUser(@RequestBody UserReqDTO request);
 
-    @GetMapping("/api/v1/users/{id}")
+    @GetMapping("/api/v1/entitlements/users/{id}")
     ApiResponse<UserRespDTO> getUser(@PathVariable String id);
 
-    @GetMapping("/api/v1/users")
+    @GetMapping("/api/v1/entitlements/users")
     ApiResponse<List<UserRespDTO>> searchUsers(@RequestParam(required = false) String username,
                                                 @RequestParam(required = false) String email,
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "20") int size);
 
-    @PutMapping("/api/v1/users/{id}")
+    @PutMapping("/api/v1/entitlements/users/{id}")
     ApiResponse<UserRespDTO> updateUser(@PathVariable String id, @RequestBody UserReqDTO request);
 
-    @GetMapping("/api/v1/users/{id}/entitlements")
+    @GetMapping("/api/v1/entitlements/users/{id}/entitlements")
     ApiResponse<UserEntitlementRespDTO> getUserEntitlements(@PathVariable String id);
+
+    // Roles
+    @GetMapping("/api/v1/entitlements/roles")
+    ApiResponse<?> listRoles();
+
+    @GetMapping("/api/v1/entitlements/roles/{id}")
+    ApiResponse<?> getRole(@PathVariable String id);
+
+    // Privileges
+    @GetMapping("/api/v1/entitlements/privileges")
+    ApiResponse<?> listPrivileges();
+
+    @GetMapping("/api/v1/entitlements/privileges/{id}")
+    ApiResponse<?> getPrivilege(@PathVariable String id);
 }

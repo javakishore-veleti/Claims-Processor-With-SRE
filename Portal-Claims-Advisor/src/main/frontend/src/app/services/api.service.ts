@@ -15,10 +15,16 @@ export class ApiService {
     });
   }
 
-  // Claims
+  // Claims - via Portal BFF
   getClaims(page = 0, size = 20): Observable<any> {
-    return this.http.get(`${this.baseUrl}/claims/search`, {
+    return this.http.get(`${this.baseUrl}/claims`, {
       params: new HttpParams().set('page', page).set('size', size)
+    });
+  }
+
+  searchClaims(query: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/claims/search`, {
+      params: new HttpParams().set('query', query)
     });
   }
 
@@ -30,25 +36,14 @@ export class ApiService {
     return this.http.post(`${this.baseUrl}/claims/intake`, data);
   }
 
-  // Members
+  // Members - via Portal BFF
+  getMembers(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/members`);
+  }
+
   searchMembers(query: string): Observable<any> {
-    return this.http.get('/api/v1/members', {
+    return this.http.get(`${this.baseUrl}/members`, {
       params: new HttpParams().set('firstName', query)
     });
-  }
-
-  // Direct API calls (for when orchestration endpoints aren't available yet)
-  getClaimsDirect(page = 0, size = 20): Observable<any> {
-    return this.http.get('http://localhost:8083/api/v1/claims', {
-      params: new HttpParams().set('page', page).set('size', size)
-    });
-  }
-
-  getMembersDirect(): Observable<any> {
-    return this.http.get('http://localhost:8084/api/v1/members');
-  }
-
-  getTenantsDirect(): Observable<any> {
-    return this.http.get('http://localhost:8086/api/v1/tenants/active');
   }
 }

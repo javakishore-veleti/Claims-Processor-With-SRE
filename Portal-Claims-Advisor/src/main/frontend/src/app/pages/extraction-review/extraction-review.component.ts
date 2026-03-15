@@ -20,19 +20,14 @@ export class ExtractionReviewComponent implements OnInit {
 
   loadExtractionQueue() {
     this.loading = true;
-    this.api.getClaimsDirect().subscribe({
+    this.api.getClaims().subscribe({
       next: (res) => {
         const all = res?.data || [];
         this.claims = all.filter((c: any) => c.stage === 'EXTRACTION_REVIEW' || c.stage === 'DATA_EXTRACTION');
         this.loading = false;
       },
       error: () => {
-        this.claims = [
-          { claimNumber: 'CLM-2026-0142', documents: 2, documentTypes: 'CMS-1500, Itemized Bill', extractionStatus: 'COMPLETE', confidence: 96.8, fieldsExtracted: 24, fieldsNeedReview: 1 },
-          { claimNumber: 'CLM-2026-0136', documents: 1, documentTypes: 'UB-04', extractionStatus: 'COMPLETE', confidence: 88.3, fieldsExtracted: 18, fieldsNeedReview: 3 },
-          { claimNumber: 'CLM-2026-0134', documents: 3, documentTypes: 'CMS-1500, Lab Report, Rx', extractionStatus: 'PARTIAL', confidence: 72.1, fieldsExtracted: 31, fieldsNeedReview: 8 },
-          { claimNumber: 'CLM-2026-0132', documents: 1, documentTypes: 'EOB (Scanned)', extractionStatus: 'COMPLETE', confidence: 91.5, fieldsExtracted: 15, fieldsNeedReview: 2 },
-        ];
+        this.claims = [];
         this.loading = false;
       }
     });

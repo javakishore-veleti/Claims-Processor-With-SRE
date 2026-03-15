@@ -35,18 +35,13 @@ export class DashboardComponent implements OnInit {
   }
 
   loadClaims() {
-    this.api.getClaimsDirect().subscribe({
+    this.api.getClaims().subscribe({
       next: (res) => {
         this.recentClaims = res?.data || [];
         this.loading = false;
       },
       error: () => {
-        // Fallback to mock data if API not available
-        this.recentClaims = [
-          { claimNumber: 'CLM-2026-0142', memberName: 'John Smith', provider: 'Pacific Wellness', stage: 'EXTRACTION_REVIEW', amount: 1245.00, confidence: 96.8, submittedDate: '2026-03-14' },
-          { claimNumber: 'CLM-2026-0141', memberName: 'Jane Doe', provider: 'Summit Care', stage: 'ADJUDICATION', amount: 3780.00, confidence: 82.1, submittedDate: '2026-03-14' },
-          { claimNumber: 'CLM-2026-0140', memberName: 'Robert Johnson', provider: 'Horizon Health', stage: 'APPROVED', amount: 892.50, confidence: 99.1, submittedDate: '2026-03-14' },
-        ];
+        this.recentClaims = [];
         this.loading = false;
       }
     });

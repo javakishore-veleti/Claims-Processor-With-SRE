@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.client.RestTemplate;
+
 import java.util.List;
 import java.util.Map;
 
@@ -25,5 +28,23 @@ public class ServiceHealthController {
     @GetMapping("/overview")
     public ResponseEntity<Map<String, Object>> getOverview() {
         return ResponseEntity.ok(serviceHealthAggregator.getOverview());
+    }
+
+    /**
+     * Proxy actuator health check for a specific service port.
+     * This allows the Angular UI to check service health through the BFF
+     * instead of making cross-origin calls directly.
+     */
+    @GetMapping("/check/{port}")
+    public ResponseEntity<Map<String, Object>> checkServiceHealth(@PathVariable int port) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> health = restTemplate.getForObject(
+                    "http://localhost:" + port + "/actuator/health", Map.class);
+            return ResponseEntity.ok(health != null ? health : Map.of("status", "UNKNOWN"));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("status", "DOWN"));
+        }
     }
 }

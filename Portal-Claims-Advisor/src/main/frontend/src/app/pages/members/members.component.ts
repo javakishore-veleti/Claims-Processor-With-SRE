@@ -22,20 +22,13 @@ export class MembersComponent implements OnInit {
 
   loadMembers() {
     this.loading = true;
-    this.api.getMembersDirect().subscribe({
+    this.api.getMembers().subscribe({
       next: (res) => {
         this.members = res?.data || [];
         this.loading = false;
       },
       error: () => {
-        this.members = [
-          { memberId: 'MBR-100001', name: 'John Smith', dob: '1985-04-12', policyNumber: 'POL-2025-4421', status: 'ACTIVE' },
-          { memberId: 'MBR-100002', name: 'Jane Doe', dob: '1990-08-23', policyNumber: 'POL-2025-4422', status: 'ACTIVE' },
-          { memberId: 'MBR-100003', name: 'Robert Johnson', dob: '1978-01-15', policyNumber: 'POL-2025-4423', status: 'ACTIVE' },
-          { memberId: 'MBR-100004', name: 'Maria Garcia', dob: '1995-11-30', policyNumber: 'POL-2025-4424', status: 'INACTIVE' },
-          { memberId: 'MBR-100005', name: 'David Wilson', dob: '1982-06-07', policyNumber: 'POL-2025-4425', status: 'ACTIVE' },
-          { memberId: 'MBR-100006', name: 'Sarah Brown', dob: '1988-09-19', policyNumber: 'POL-2025-4426', status: 'PENDING' },
-        ];
+        this.members = [];
         this.loading = false;
       }
     });

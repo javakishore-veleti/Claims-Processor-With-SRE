@@ -22,20 +22,13 @@ export class ClaimsComponent implements OnInit {
 
   loadClaims() {
     this.loading = true;
-    this.api.getClaimsDirect().subscribe({
+    this.api.getClaims().subscribe({
       next: (res) => {
         this.claims = res?.data || [];
         this.loading = false;
       },
       error: () => {
-        this.claims = [
-          { claimNumber: 'CLM-2026-0142', memberName: 'John Smith', stage: 'EXTRACTION_REVIEW', amount: 1245.00, submittedDate: '2026-03-14' },
-          { claimNumber: 'CLM-2026-0141', memberName: 'Jane Doe', stage: 'ADJUDICATION', amount: 3780.00, submittedDate: '2026-03-14' },
-          { claimNumber: 'CLM-2026-0140', memberName: 'Robert Johnson', stage: 'APPROVED', amount: 892.50, submittedDate: '2026-03-13' },
-          { claimNumber: 'CLM-2026-0139', memberName: 'Maria Garcia', stage: 'DENIED', amount: 2150.00, submittedDate: '2026-03-13' },
-          { claimNumber: 'CLM-2026-0138', memberName: 'David Wilson', stage: 'SETTLEMENT', amount: 567.25, submittedDate: '2026-03-12' },
-          { claimNumber: 'CLM-2026-0137', memberName: 'Sarah Brown', stage: 'INTAKE_RECEIVED', amount: 4320.00, submittedDate: '2026-03-12' },
-        ];
+        this.claims = [];
         this.loading = false;
       }
     });

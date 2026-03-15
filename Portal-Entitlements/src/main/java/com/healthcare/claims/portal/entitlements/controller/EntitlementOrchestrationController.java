@@ -83,8 +83,42 @@ public class EntitlementOrchestrationController {
      * List all users.
      */
     @GetMapping("/users")
-    public ApiResponse<List<UserRespDTO>> listUsers(@RequestHeader("X-Tenant-Id") String tenantId) {
+    public ApiResponse<?> listUsers(
+            @RequestHeader(value = "X-Tenant-Id", defaultValue = "default-tenant") String tenantId) {
         log.info("Listing users for tenant {}", tenantId);
-        return entitlementsClient.searchUsers(null, null, 0, 100);
+        try {
+            return entitlementsClient.searchUsers(null, null, 0, 100);
+        } catch (Exception e) {
+            log.warn("Failed to fetch users from API-Entitlements: {}", e.getMessage());
+            return ApiResponse.success(java.util.Collections.emptyList(), "API-Entitlements unavailable");
+        }
+    }
+
+    /**
+     * List all roles.
+     */
+    @GetMapping("/roles")
+    public ApiResponse<?> listRoles() {
+        log.info("Listing all roles");
+        try {
+            return entitlementsClient.listRoles();
+        } catch (Exception e) {
+            log.warn("Failed to fetch roles from API-Entitlements: {}", e.getMessage());
+            return ApiResponse.success(java.util.Collections.emptyList(), "API-Entitlements unavailable");
+        }
+    }
+
+    /**
+     * List all privileges.
+     */
+    @GetMapping("/privileges")
+    public ApiResponse<?> listPrivileges() {
+        log.info("Listing all privileges");
+        try {
+            return entitlementsClient.listPrivileges();
+        } catch (Exception e) {
+            log.warn("Failed to fetch privileges from API-Entitlements: {}", e.getMessage());
+            return ApiResponse.success(java.util.Collections.emptyList(), "API-Entitlements unavailable");
+        }
     }
 }
