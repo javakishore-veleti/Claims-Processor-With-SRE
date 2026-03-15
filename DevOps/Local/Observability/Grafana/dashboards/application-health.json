@@ -49,7 +49,7 @@
       "id": 2,
       "type": "stat",
       "title": "Portal-Advisor (:8081)",
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -63,7 +63,8 @@
               { "color": "red", "value": null },
               { "color": "green", "value": 1 }
             ]
-          }
+          },
+          "noValue": "OFF"
         },
         "overrides": []
       },
@@ -77,7 +78,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "up{application=\"Portal-Advisor\", instance=~\".*:8081\"}",
+          "expr": "up{job=\"portal-claims-advisor\"}",
           "legendFormat": "Portal-Advisor"
         }
       ]
@@ -86,7 +87,7 @@
       "id": 3,
       "type": "stat",
       "title": "Portal-Member (:8082)",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -100,7 +101,8 @@
               { "color": "red", "value": null },
               { "color": "green", "value": 1 }
             ]
-          }
+          },
+          "noValue": "OFF"
         },
         "overrides": []
       },
@@ -114,7 +116,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "up{application=\"Portal-Member\", instance=~\".*:8082\"}",
+          "expr": "up{job=\"portal-claims-member\"}",
           "legendFormat": "Portal-Member"
         }
       ]
@@ -123,7 +125,7 @@
       "id": 4,
       "type": "stat",
       "title": "API-Claims (:8083)",
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -137,7 +139,8 @@
               { "color": "red", "value": null },
               { "color": "green", "value": 1 }
             ]
-          }
+          },
+          "noValue": "OFF"
         },
         "overrides": []
       },
@@ -151,7 +154,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "up{application=\"API-Claims\", instance=~\".*:8083\"}",
+          "expr": "up{job=\"api-claims\"}",
           "legendFormat": "API-Claims"
         }
       ]
@@ -160,7 +163,7 @@
       "id": 5,
       "type": "stat",
       "title": "API-Members (:8084)",
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -174,7 +177,8 @@
               { "color": "red", "value": null },
               { "color": "green", "value": 1 }
             ]
-          }
+          },
+          "noValue": "OFF"
         },
         "overrides": []
       },
@@ -188,7 +192,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "up{application=\"API-Members\", instance=~\".*:8084\"}",
+          "expr": "up{job=\"api-members\"}",
           "legendFormat": "API-Members"
         }
       ]
@@ -197,7 +201,7 @@
       "id": 6,
       "type": "stat",
       "title": "Portal-Batch (:8085)",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "gridPos": { "h": 3, "w": 4, "x": 16, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -211,7 +215,8 @@
               { "color": "red", "value": null },
               { "color": "green", "value": 1 }
             ]
-          }
+          },
+          "noValue": "OFF"
         },
         "overrides": []
       },
@@ -225,15 +230,205 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "up{application=\"Portal-Batch\", instance=~\".*:8085\"}",
+          "expr": "up{job=\"portal-batch-assignment\"}",
           "legendFormat": "Portal-Batch"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "stat",
+      "title": "API-Tenants (:8086)",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "noValue": "OFF"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "up{job=\"api-tenants\"}",
+          "legendFormat": "API-Tenants"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "API-Entitlements (:8087)",
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "noValue": "OFF"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "up{job=\"api-entitlements\"}",
+          "legendFormat": "API-Entitlements"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Portal-Tenants (:8088)",
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "noValue": "OFF"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "up{job=\"portal-tenants\"}",
+          "legendFormat": "Portal-Tenants"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Portal-Entitlements (:8089)",
+      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "noValue": "OFF"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "up{job=\"portal-entitlements\"}",
+          "legendFormat": "Portal-Entitlements"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Portal-SRE (:8090)",
+      "gridPos": { "h": 3, "w": 4, "x": 16, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "noValue": "OFF"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "up{job=\"portal-sre\"}",
+          "legendFormat": "Portal-SRE"
         }
       ]
     },
     {
       "type": "row",
       "title": "HTTP Metrics",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
       "collapsed": false,
       "id": 7
     },
@@ -241,7 +436,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Request Rate per Service",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -275,7 +470,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Error Rate per Service (4xx & 5xx)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -315,7 +510,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Response Time Percentiles (p50, p95, p99)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -361,7 +556,7 @@
       "id": 11,
       "type": "barchart",
       "title": "Requests by Endpoint (Top 15)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -408,7 +603,7 @@
     {
       "type": "row",
       "title": "JVM Metrics",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
       "collapsed": false,
       "id": 12
     },
@@ -416,7 +611,7 @@
       "id": 13,
       "type": "timeseries",
       "title": "JVM Heap Memory (Used / Committed / Max)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -461,7 +656,7 @@
       "id": 14,
       "type": "timeseries",
       "title": "GC Pause Duration",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -494,7 +689,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "JVM Threads (Live, Daemon, Peak)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -539,7 +734,7 @@
       "id": 16,
       "type": "timeseries",
       "title": "CPU Usage per Service",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -580,7 +775,7 @@
     {
       "type": "row",
       "title": "Connection Pools",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
       "collapsed": false,
       "id": 17
     },
@@ -588,7 +783,7 @@
       "id": 18,
       "type": "timeseries",
       "title": "HikariCP Active Connections",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 40 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 42 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -627,7 +822,7 @@
       "id": 19,
       "type": "timeseries",
       "title": "HikariCP Pending Connections",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 40 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 42 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
@@ -668,7 +863,7 @@
       "id": 20,
       "type": "timeseries",
       "title": "HikariCP Connection Timeout Count",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 40 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 42 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
