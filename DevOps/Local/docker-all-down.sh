@@ -12,8 +12,8 @@ NETWORK_NAME="claims-processor-network"
 
 # Reverse order — tear down dependents before dependencies
 SERVICES=(
-  "Ollama"
-  "Wiremock"
+  # "Ollama"         # Commented out to save laptop resources
+  # "Wiremock"       # Commented out to save laptop resources
   "Tracing/Zipkin"
   "Tracing/Jaeger"
   "Observability/Grafana"

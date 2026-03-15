@@ -42,8 +42,8 @@ SERVICES=(
   "Observability/Grafana"
   "Tracing/Jaeger"
   "Tracing/Zipkin"
-  "Wiremock"
-  "Ollama"
+  # "Wiremock"       # Commented out to save laptop resources
+  # "Ollama"         # Commented out to save laptop resources
 )
 
 echo ""
