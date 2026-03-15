@@ -83,18 +83,35 @@ jobs:
 
           PRIVATE_SUBNET_1=$(aws cloudformation describe-stacks \
             --stack-name "${VPC_SG_STACK}" \
-            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1'].OutputValue" \
+            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1Id'].OutputValue" \
             --output text)
 
           PRIVATE_SUBNET_2=$(aws cloudformation describe-stacks \
             --stack-name "${VPC_SG_STACK}" \
-            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2'].OutputValue" \
+            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2Id'].OutputValue" \
             --output text)
 
           APP_SG_ID=$(aws cloudformation describe-stacks \
             --stack-name "${VPC_SG_STACK}" \
             --query "Stacks[0].Outputs[?OutputKey=='AppSecurityGroupId'].OutputValue" \
             --output text)
+
+          # Fail early with a clear message if required values could not be resolved
+          if [ -z "${PRIVATE_SUBNET_1}" ] || [ "${PRIVATE_SUBNET_1}" == "None" ]; then
+            echo "ERROR: Could not resolve PrivateSubnet1Id from stack ${VPC_SG_STACK}."
+            echo "       Ensure AWS_01 - Create VPC & Security Groups has been run successfully for the '${ENV}' environment first."
+            exit 1
+          fi
+          if [ -z "${PRIVATE_SUBNET_2}" ] || [ "${PRIVATE_SUBNET_2}" == "None" ]; then
+            echo "ERROR: Could not resolve PrivateSubnet2Id from stack ${VPC_SG_STACK}."
+            echo "       Ensure AWS_01 - Create VPC & Security Groups has been run successfully for the '${ENV}' environment first."
+            exit 1
+          fi
+          if [ -z "${APP_SG_ID}" ] || [ "${APP_SG_ID}" == "None" ]; then
+            echo "ERROR: Could not resolve AppSecurityGroupId from stack ${VPC_SG_STACK}."
+            echo "       Ensure AWS_01 - Create VPC & Security Groups has been run successfully for the '${ENV}' environment first."
+            exit 1
+          fi
 
           echo "vpc_id=${VPC_ID}" >> "$GITHUB_OUTPUT"
           echo "private_subnet_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
