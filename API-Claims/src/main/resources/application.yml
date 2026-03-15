@@ -97,6 +97,8 @@ logging:
 
 # Feature Toggles
 claims:
+  storage:
+    local-path: ${CLAIMS_STORAGE_PATH:./claim-documents}
   features:
     search:
       enabled: false

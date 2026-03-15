@@ -74,5 +74,8 @@ DevOps/Local/Observability/*/data/
 DevOps/Local/Search/*/data/
 DevOps/Local/Tracing/*/data/
 
+# Claim document storage
+claim-documents/
+
 # Reference docs (not source)
 /Skip to Main Content.docx
