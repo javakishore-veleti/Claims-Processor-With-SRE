@@ -260,7 +260,7 @@ jobs:
 
             echo "  Found: ${SG_ID}"
 
-            # Check if this SG is owned by an active CloudFormation stack
+            # Check if this SG is tagged to any CloudFormation stack
             OWNER_STACK=$(aws ec2 describe-tags \
               --filters \
                 "Name=resource-id,Values=${SG_ID}" \
@@ -268,18 +268,33 @@ jobs:
               --query "Tags[0].Value" \
               --output text 2>/dev/null)
 
-            if [ -n "${OWNER_STACK}" ] && [ "${OWNER_STACK}" != "None" ] && [ "${OWNER_STACK}" != "${STACK_NAME}" ]; then
-              echo "  Owned by a different stack: ${OWNER_STACK} — skipping deletion."
-              continue
+            if [ -n "${OWNER_STACK}" ] && [ "${OWNER_STACK}" != "None" ]; then
+              # The tag persists even after stack deletion — verify the stack is actually alive
+              OWNER_STATUS=$(aws cloudformation describe-stacks \
+                --stack-name "${OWNER_STACK}" \
+                --query "Stacks[0].StackStatus" \
+                --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+              echo "  Stack tag: ${OWNER_STACK} (status: ${OWNER_STATUS})"
+
+              case "${OWNER_STATUS}" in
+                CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+                  if [ "${OWNER_STACK}" != "${STACK_NAME}" ]; then
+                    echo "  Owned by a different active stack — skipping deletion."
+                    continue
+                  fi
+                  echo "  Owned by current active stack — CloudFormation will handle it in-place."
+                  continue
+                  ;;
+                *)
+                  # Stack is deleted, failed, or does not exist — SG is orphaned despite the tag
+                  echo "  Tagged stack is not active (${OWNER_STATUS}) — treating as orphaned."
+                  ;;
+              esac
             fi
 
-            if [ "${OWNER_STACK}" = "${STACK_NAME}" ]; then
-              echo "  Owned by current stack — CloudFormation will handle it."
-              continue
-            fi
-
-            # Orphaned (no stack tag) — safe to delete
-            echo "  Orphaned (no active stack owner) — deleting ${SG_ID}..."
+            # Orphaned — safe to delete
+            echo "  Orphaned — deleting ${SG_ID}..."
             if aws ec2 delete-security-group --group-id "${SG_ID}"; then
               echo "  Deleted ${SG_ID} successfully."
             else
