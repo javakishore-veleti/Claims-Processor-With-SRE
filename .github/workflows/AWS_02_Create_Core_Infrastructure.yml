@@ -18,6 +18,24 @@ on:
         type: string
         default: ''
 
+      private_subnet_1:
+        description: 'Private Subnet 1 ID override (required if not using AWS_01 vpc-sg stack)'
+        required: false
+        type: string
+        default: ''
+
+      private_subnet_2:
+        description: 'Private Subnet 2 ID override (required if not using AWS_01 vpc-sg stack)'
+        required: false
+        type: string
+        default: ''
+
+      app_sg_id:
+        description: 'App Security Group ID override (required if not using AWS_01 vpc-sg stack)'
+        required: false
+        type: string
+        default: ''
+
       rds_instance_class:
         description: 'RDS instance class'
         required: false
@@ -63,53 +81,81 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # ------------------------------------------------------------------
-      # 3. Resolve VPC and subnet details from vpc-sg stack exports
+      # 3. Resolve VPC and subnet details
+      # Priority: workflow input overrides → vpc-sg CloudFormation stack
+      # Use overrides when you have an existing VPC not managed by AWS_01.
       # ------------------------------------------------------------------
-      - name: Resolve VPC and networking from vpc-sg stack
+      - name: Resolve VPC and networking
         id: vpc
         run: |
           VPC_SG_STACK="${STACK_NAME_PREFIX}-${{ inputs.environment }}-vpc-sg"
+          ENV="${{ inputs.environment }}"
 
+          # ── VPC ID ──────────────────────────────────────────────────────
           if [ -n "${{ inputs.vpc_id_override }}" ]; then
-            echo "Using VPC ID override: ${{ inputs.vpc_id_override }}"
+            echo "VPC ID: using input override"
             VPC_ID="${{ inputs.vpc_id_override }}"
           else
-            echo "Looking up VPC ID from stack: ${VPC_SG_STACK}"
+            echo "VPC ID: looking up from stack ${VPC_SG_STACK}"
             VPC_ID=$(aws cloudformation describe-stacks \
               --stack-name "${VPC_SG_STACK}" \
               --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" \
-              --output text)
+              --output text 2>/dev/null || true)
           fi
 
-          PRIVATE_SUBNET_1=$(aws cloudformation describe-stacks \
-            --stack-name "${VPC_SG_STACK}" \
-            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1Id'].OutputValue" \
-            --output text)
-
-          PRIVATE_SUBNET_2=$(aws cloudformation describe-stacks \
-            --stack-name "${VPC_SG_STACK}" \
-            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2Id'].OutputValue" \
-            --output text)
-
-          APP_SG_ID=$(aws cloudformation describe-stacks \
-            --stack-name "${VPC_SG_STACK}" \
-            --query "Stacks[0].Outputs[?OutputKey=='AppSecurityGroupId'].OutputValue" \
-            --output text)
-
-          # Fail early with a clear message if required values could not be resolved
-          if [ -z "${PRIVATE_SUBNET_1}" ] || [ "${PRIVATE_SUBNET_1}" == "None" ]; then
-            echo "ERROR: Could not resolve PrivateSubnet1Id from stack ${VPC_SG_STACK}."
-            echo "       Ensure AWS_01 - Create VPC & Security Groups has been run successfully for the '${ENV}' environment first."
-            exit 1
+          # ── Private Subnet 1 ────────────────────────────────────────────
+          if [ -n "${{ inputs.private_subnet_1 }}" ]; then
+            echo "Private Subnet 1: using input override"
+            PRIVATE_SUBNET_1="${{ inputs.private_subnet_1 }}"
+          else
+            echo "Private Subnet 1: looking up from stack ${VPC_SG_STACK}"
+            PRIVATE_SUBNET_1=$(aws cloudformation describe-stacks \
+              --stack-name "${VPC_SG_STACK}" \
+              --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1Id'].OutputValue" \
+              --output text 2>/dev/null || true)
           fi
-          if [ -z "${PRIVATE_SUBNET_2}" ] || [ "${PRIVATE_SUBNET_2}" == "None" ]; then
-            echo "ERROR: Could not resolve PrivateSubnet2Id from stack ${VPC_SG_STACK}."
-            echo "       Ensure AWS_01 - Create VPC & Security Groups has been run successfully for the '${ENV}' environment first."
-            exit 1
+
+          # ── Private Subnet 2 ────────────────────────────────────────────
+          if [ -n "${{ inputs.private_subnet_2 }}" ]; then
+            echo "Private Subnet 2: using input override"
+            PRIVATE_SUBNET_2="${{ inputs.private_subnet_2 }}"
+          else
+            echo "Private Subnet 2: looking up from stack ${VPC_SG_STACK}"
+            PRIVATE_SUBNET_2=$(aws cloudformation describe-stacks \
+              --stack-name "${VPC_SG_STACK}" \
+              --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2Id'].OutputValue" \
+              --output text 2>/dev/null || true)
           fi
-          if [ -z "${APP_SG_ID}" ] || [ "${APP_SG_ID}" == "None" ]; then
-            echo "ERROR: Could not resolve AppSecurityGroupId from stack ${VPC_SG_STACK}."
-            echo "       Ensure AWS_01 - Create VPC & Security Groups has been run successfully for the '${ENV}' environment first."
+
+          # ── App Security Group ───────────────────────────────────────────
+          if [ -n "${{ inputs.app_sg_id }}" ]; then
+            echo "App Security Group: using input override"
+            APP_SG_ID="${{ inputs.app_sg_id }}"
+          else
+            echo "App Security Group: looking up from stack ${VPC_SG_STACK}"
+            APP_SG_ID=$(aws cloudformation describe-stacks \
+              --stack-name "${VPC_SG_STACK}" \
+              --query "Stacks[0].Outputs[?OutputKey=='AppSecurityGroupId'].OutputValue" \
+              --output text 2>/dev/null || true)
+          fi
+
+          # ── Validation ───────────────────────────────────────────────────
+          FAILED=0
+          for VAR_NAME in VPC_ID PRIVATE_SUBNET_1 PRIVATE_SUBNET_2 APP_SG_ID; do
+            VAL="${!VAR_NAME}"
+            if [ -z "${VAL}" ] || [ "${VAL}" == "None" ]; then
+              echo "ERROR: ${VAR_NAME} could not be resolved."
+              FAILED=1
+            fi
+          done
+
+          if [ "${FAILED}" == "1" ]; then
+            echo ""
+            echo "One or more required networking values are missing."
+            echo "You have two options:"
+            echo "  Option A — Run AWS_01 first to create the vpc-sg stack for '${ENV}'"
+            echo "  Option B — Provide the values directly as workflow inputs:"
+            echo "             vpc_id_override, private_subnet_1, private_subnet_2, app_sg_id"
             exit 1
           fi
 
