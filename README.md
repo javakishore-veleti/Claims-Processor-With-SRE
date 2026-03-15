@@ -599,13 +599,19 @@ Policy name to use: `claims-proc-dev-all-in-one`
     {
       "Sid": "AuthAndObservability",
       "Effect": "Allow",
-      "Action": [ "cognito-idp:*", "cognito-identity:*", "cloudwatch:*", "logs:*", "sns:*" ],
+      "Action": [ "cognito-idp:*", "cognito-identity:*", "cloudwatch:*", "logs:*", "sns:*", "cloudtrail:*" ],
       "Resource": "*"
     },
     {
       "Sid": "MessagingAndLambda",
       "Effect": "Allow",
       "Action": [ "kinesis:*", "kafka:*", "es:*", "lambda:*" ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CostExplorer",
+      "Effect": "Allow",
+      "Action": [ "ce:GetCostAndUsage", "ce:GetCostForecast", "ce:GetDimensionValues", "ce:GetTags", "budgets:DescribeBudgets", "budgets:ViewBudget" ],
       "Resource": "*"
     }
   ]
