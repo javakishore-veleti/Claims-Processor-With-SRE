@@ -17,12 +17,22 @@ export class DashboardComponent implements OnInit {
   constructor(private apiService: ApiService) {}
 
   ngOnInit(): void {
-    this.apiService.getStats().subscribe(stats => {
-      this.stats = stats;
+    this.apiService.getStats().subscribe({
+      next: (response: any) => {
+        this.stats = response?.data || response || this.stats;
+      },
+      error: () => {}
     });
-    this.apiService.getJobs().subscribe(jobs => {
-      this.jobs = jobs;
-      this.loading = false;
+    this.apiService.getJobs().subscribe({
+      next: (response: any) => {
+        const jobs = Array.isArray(response) ? response : (response?.data || response?.content || []);
+        this.jobs = Array.isArray(jobs) ? jobs : [];
+        this.loading = false;
+      },
+      error: () => {
+        this.jobs = [];
+        this.loading = false;
+      }
     });
   }
 
@@ -38,7 +48,15 @@ export class DashboardComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       this.apiService.importMembers(input.files[0]).subscribe(() => {
-        this.apiService.getJobs().subscribe(jobs => this.jobs = jobs);
+        this.apiService.getJobs().subscribe({
+          next: (response: any) => {
+            const jobs = Array.isArray(response) ? response : (response?.data || response?.content || []);
+            this.jobs = Array.isArray(jobs) ? jobs : [];
+          },
+          error: () => {
+            this.jobs = [];
+          }
+        });
       });
     }
   }

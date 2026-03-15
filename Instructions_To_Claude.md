@@ -166,4 +166,14 @@ AWS GitHub Actions Design:
    2. Show deployment environments in a dropdown of Github Actions UI for manual trigger.
 2. Prefix all workflows with AWS_01 etc. for sequencing
 3. We will have so man Github actions for AWS deployment.
-   1. By default we will use the existing VPC_ID and its subnets and security groups for deployment but we can have option to override them through workflow dispatch inputs.
+   1. By default, we will use the existing VPC_ID and its subnets and security groups for deployment but we can have option to override them through workflow dispatch inputs.
+   2. The existing VPC_ID info is stored in Github secrets only and not in index.html page.
+   3. We will have different workflows based on tech stack
+      1. We will have different cloud formation tempaltes
+      2. VPC and Security Groups template if we are creating new. If we are using existing then we will skip this step in the workflow and use the existing VPC_ID and security groups.
+      3. AWS CloudWatch, AWS Cloudtrail, AWS Cognito Pool, RDS Postgres DB, AWS S3 Bucket, AWS EKS, AWS ECR for Docker images, AWS OpenSearch, AWS Kinesis
+      4. Infrastructure AWs API Gateway, AWS Fargate, AWS ECR
+      5. AWS Secrets Manager for managing the secrets in non-local environments and also for inter-service communication authentication secrets management.
+      
+            
+

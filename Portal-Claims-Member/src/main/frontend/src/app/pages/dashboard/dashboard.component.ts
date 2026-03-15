@@ -20,15 +20,23 @@ export class DashboardComponent implements OnInit {
   constructor(private apiService: ApiService) {}
 
   ngOnInit(): void {
-    this.apiService.getMyClaims().subscribe(claims => {
-      this.claims = claims;
-      this.activeClaims = claims.filter(c => c.stage !== 'Approved' && c.stage !== 'Denied').length;
-      if (claims.length > 0) {
-        this.latestStatus = claims[0].stage;
-        this.latestClaimNumber = claims[0].claimNumber;
+    this.apiService.getMyClaims().subscribe({
+      next: (response: any) => {
+        const data = Array.isArray(response) ? response : (response?.data || response?.content || []);
+        const claims = Array.isArray(data) ? data : [];
+        this.claims = claims;
+        this.activeClaims = claims.filter((c: any) => c.stage !== 'Approved' && c.stage !== 'Denied').length;
+        if (claims.length > 0) {
+          this.latestStatus = claims[0].stage;
+          this.latestClaimNumber = claims[0].claimNumber;
+        }
+        this.pendingActions = claims.filter((c: any) => c.stage === 'Pending Info').length;
+        this.loading = false;
+      },
+      error: () => {
+        this.claims = [];
+        this.loading = false;
       }
-      this.pendingActions = claims.filter(c => c.stage === 'Pending Info').length;
-      this.loading = false;
     });
   }
 
