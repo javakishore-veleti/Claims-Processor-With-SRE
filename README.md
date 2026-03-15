@@ -445,13 +445,13 @@ Each environment scopes its own secrets, so you can use different AWS accounts o
 
 Add the following secrets to **each** environment (`dev`, `staging`, `prod`):
 
-| Secret Name | Description |
-|---|---|
-| `CLAIMS_PROC_AWS_ACCESS_KEY_ID` | AWS IAM Access Key ID (e.g. `AKIA...`) |
-| `CLAIMS_PROC_AWS_SECRET_ACCESS_KEY` | AWS IAM Secret Access Key |
-| `CLAIMS_PROC_RDS_MASTER_PASSWORD` | PostgreSQL master password — see guidance below |
-| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token — see guidance below |
-| `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 app encryption key — see guidance below |
+| Secret Name | Description | Example Value (dev) |
+|---|---|---|
+| `CLAIMS_PROC_AWS_ACCESS_KEY_ID` | AWS IAM Access Key ID | `AKIAIOSFODNN7EXAMPLE` |
+| `CLAIMS_PROC_AWS_SECRET_ACCESS_KEY` | AWS IAM Secret Access Key | *(from AWS IAM console)* |
+| `CLAIMS_PROC_RDS_MASTER_PASSWORD` | PostgreSQL master password | `BH6KuVN27f2aMVQWG7XC` — [how to generate](#claims_proc_rds_master_password) |
+| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token | `4knQn7k0PNbTCx1V9qc15r6EfFh7sDgS` — [how to generate](#claims_proc_redis_auth_token) |
+| `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 app encryption key | `bWbimbvUejwdlV0TQRFt0Qz9yKpsnLYmhQ4sot090u0=` — [how to generate](#claims_proc_encryption_key) |
 
 > You may use the same IAM credentials across all environments or separate AWS accounts per environment for stricter isolation.
 
