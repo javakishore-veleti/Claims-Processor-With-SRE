@@ -1,0 +1,129 @@
+# =============================================================================
+# AWS_07 - Destroy EKS Cluster
+# Deletes the CloudFormation stack for the EKS cluster and node groups.
+#
+# NOTE: EKS deletion may take 10-15 minutes.
+# =============================================================================
+name: "AWS_07 - Destroy EKS Cluster"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      confirm_destroy:
+        description: 'Type the environment name to confirm destruction'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  # ===========================================================================
+  # Job 1: Validate the destruction request
+  # ===========================================================================
+  validate:
+    name: Validate destruction request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm environment matches
+        run: |
+          REQUESTED="${{ inputs.confirm_destroy }}"
+          EXPECTED="${{ inputs.environment }}"
+
+          if [[ "$REQUESTED" != "$EXPECTED" ]]; then
+            echo "::error::Confirmation failed. You typed '${REQUESTED}' but environment is '${EXPECTED}'. They must match exactly."
+            echo ""
+            echo "This is a safety check to prevent accidental destruction of resources."
+            echo "Re-run the workflow and type '${EXPECTED}' in the confirm_destroy field."
+            exit 1
+          fi
+
+          echo "============================================"
+          echo "  DESTRUCTION CONFIRMED: ${EXPECTED}"
+          echo "============================================"
+          echo ""
+          echo "::warning::EKS cluster stack for '${EXPECTED}' will be deleted. EKS deletion may take 10-15 minutes."
+
+  # ===========================================================================
+  # Job 2: Destroy the EKS Cluster stack
+  # ===========================================================================
+  destroy:
+    name: Destroy EKS Cluster (${{ inputs.environment }})
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if stack exists
+        id: check
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-eks"
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "stack_name=${STACK}" >> "$GITHUB_OUTPUT"
+          echo "stack_status=${STATUS}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack ${STACK} does not exist. Nothing to delete."
+          else
+            echo "Stack ${STACK} found with status: ${STATUS}"
+          fi
+
+      - name: Delete stack
+        if: steps.check.outputs.stack_status != 'NOT_FOUND'
+        run: |
+          STACK="${{ steps.check.outputs.stack_name }}"
+          echo "--- Deleting: ${STACK} ---"
+          echo "Note: EKS deletion may take 10-15 minutes."
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete (EKS may take 10-15 minutes)..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      - name: Destruction Summary
+        if: always()
+        run: |
+          STACK="${{ steps.check.outputs.stack_name }}"
+          STATUS="${{ steps.check.outputs.stack_status }}"
+
+          echo "## Destroy EKS Cluster" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Setting | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **AWS Region** | \`${{ env.AWS_REGION }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Stack Name** | \`${STACK}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "| **Result** | Stack did not exist — nothing deleted |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            FINAL=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>/dev/null || echo "DELETE_COMPLETE")
+            echo "| **Result** | \`${FINAL}\` |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Resources deleted:** EKS cluster, managed node groups, IAM roles" >> "$GITHUB_STEP_SUMMARY"

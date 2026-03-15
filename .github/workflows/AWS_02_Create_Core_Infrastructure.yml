@@ -1,4 +1,4 @@
-name: "AWS_02 - Core Infrastructure (RDS, S3, ECR, Redis)"
+name: "AWS_02 - Create Core Infrastructure"
 
 on:
   workflow_dispatch:
@@ -11,14 +11,6 @@ on:
           - dev
           - staging
           - prod
-
-      action:
-        description: 'Stack action'
-        required: true
-        type: choice
-        options:
-          - create
-          - delete
 
       vpc_id_override:
         description: 'VPC ID override (leave empty to resolve from vpc-sg stack)'
@@ -41,7 +33,7 @@ env:
 
 jobs:
   deploy-core-infrastructure:
-    name: "${{ inputs.action }} core-infra (${{ inputs.environment }})"
+    name: "Create core-infra (${{ inputs.environment }})"
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
 
@@ -126,7 +118,6 @@ jobs:
       # 5. Deploy stack (create/update)
       # ------------------------------------------------------------------
       - name: Deploy CloudFormation stack
-        if: inputs.action == 'create'
         run: |
           STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
           ENV="${{ inputs.environment }}"
@@ -170,7 +161,6 @@ jobs:
       # 6. Print stack outputs
       # ------------------------------------------------------------------
       - name: Print stack outputs
-        if: inputs.action == 'create'
         run: |
           STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
 
@@ -180,18 +170,3 @@ jobs:
             --query "Stacks[0].Outputs[*].[OutputKey, OutputValue]" \
             --output table
 
-      # ------------------------------------------------------------------
-      # 7. Delete stack
-      # ------------------------------------------------------------------
-      - name: Delete CloudFormation stack
-        if: inputs.action == 'delete'
-        run: |
-          STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
-
-          echo "Deleting stack: ${STACK_NAME}"
-          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
-
-          echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
-
-          echo "Stack deleted successfully."

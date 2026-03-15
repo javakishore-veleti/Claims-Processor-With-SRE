@@ -1,0 +1,193 @@
+# =============================================================================
+# AWS_03 - Destroy Observability
+# Deletes the CloudFormation stack for observability resources (CloudWatch
+# dashboards, alarms, log groups, CloudTrail). Empties the CloudTrail S3
+# bucket before deletion.
+# =============================================================================
+name: "AWS_03 - Destroy Observability"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      confirm_destroy:
+        description: 'Type the environment name to confirm destruction'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  # ===========================================================================
+  # Job 1: Validate the destruction request
+  # ===========================================================================
+  validate:
+    name: Validate destruction request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm environment matches
+        run: |
+          REQUESTED="${{ inputs.confirm_destroy }}"
+          EXPECTED="${{ inputs.environment }}"
+
+          if [[ "$REQUESTED" != "$EXPECTED" ]]; then
+            echo "::error::Confirmation failed. You typed '${REQUESTED}' but environment is '${EXPECTED}'. They must match exactly."
+            echo ""
+            echo "This is a safety check to prevent accidental destruction of resources."
+            echo "Re-run the workflow and type '${EXPECTED}' in the confirm_destroy field."
+            exit 1
+          fi
+
+          echo "============================================"
+          echo "  DESTRUCTION CONFIRMED: ${EXPECTED}"
+          echo "============================================"
+          echo ""
+          echo "::warning::Observability stack for '${EXPECTED}' will be deleted (CloudWatch dashboards, alarms, log groups, CloudTrail)."
+
+  # ===========================================================================
+  # Job 2: Destroy the Observability stack
+  # ===========================================================================
+  destroy:
+    name: Destroy Observability (${{ inputs.environment }})
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if stack exists
+        id: check
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-observability"
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "stack_name=${STACK}" >> "$GITHUB_OUTPUT"
+          echo "stack_status=${STATUS}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack ${STACK} does not exist. Nothing to delete."
+          else
+            echo "Stack ${STACK} found with status: ${STATUS}"
+          fi
+
+      - name: Empty CloudTrail S3 bucket
+        if: steps.check.outputs.stack_status != 'NOT_FOUND'
+        continue-on-error: true
+        run: |
+          PROJECT="${{ env.PROJECT_NAME }}"
+          ENV="${{ inputs.environment }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="${PROJECT}-${ENV}-${ACCOUNT_ID}-cloudtrail"
+
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "CloudTrail bucket not found: ${BUCKET} (skipping)"
+            exit 0
+          fi
+
+          echo "Emptying CloudTrail S3 bucket: ${BUCKET}"
+
+          VERSIONING=$(aws s3api get-bucket-versioning \
+            --bucket "$BUCKET" \
+            --query 'Status' --output text 2>/dev/null || echo "Disabled")
+
+          if [[ "$VERSIONING" == "Enabled" ]]; then
+            echo "  Bucket has versioning enabled. Deleting all object versions..."
+            aws s3api list-object-versions \
+              --bucket "$BUCKET" \
+              --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
+              --output json > /tmp/versions.json 2>/dev/null || echo '{"Objects":[]}' > /tmp/versions.json
+
+            OBJECT_COUNT=$(python3 -c "
+          import json
+          with open('/tmp/versions.json') as f:
+              data = json.load(f)
+          objects = data.get('Objects') or []
+          print(len(objects))
+          ")
+
+            if [[ "$OBJECT_COUNT" -gt 0 ]]; then
+              aws s3api delete-objects \
+                --bucket "$BUCKET" \
+                --delete "file:///tmp/versions.json" 2>/dev/null || true
+            fi
+
+            aws s3api list-object-versions \
+              --bucket "$BUCKET" \
+              --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
+              --output json > /tmp/markers.json 2>/dev/null || echo '{"Objects":[]}' > /tmp/markers.json
+
+            MARKER_COUNT=$(python3 -c "
+          import json
+          with open('/tmp/markers.json') as f:
+              data = json.load(f)
+          objects = data.get('Objects') or []
+          print(len(objects))
+          ")
+
+            if [[ "$MARKER_COUNT" -gt 0 ]]; then
+              aws s3api delete-objects \
+                --bucket "$BUCKET" \
+                --delete "file:///tmp/markers.json" 2>/dev/null || true
+            fi
+          else
+            aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+          fi
+
+          echo "Emptied: ${BUCKET}"
+
+      - name: Delete stack
+        if: steps.check.outputs.stack_status != 'NOT_FOUND'
+        run: |
+          STACK="${{ steps.check.outputs.stack_name }}"
+          echo "--- Deleting: ${STACK} ---"
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      - name: Destruction Summary
+        if: always()
+        run: |
+          STACK="${{ steps.check.outputs.stack_name }}"
+          STATUS="${{ steps.check.outputs.stack_status }}"
+
+          echo "## Destroy Observability" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Setting | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **AWS Region** | \`${{ env.AWS_REGION }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Stack Name** | \`${STACK}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "| **Result** | Stack did not exist — nothing deleted |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            FINAL=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>/dev/null || echo "DELETE_COMPLETE")
+            echo "| **Result** | \`${FINAL}\` |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Resources deleted:** CloudWatch dashboards, alarms, log groups, CloudTrail, CloudTrail S3 bucket" >> "$GITHUB_STEP_SUMMARY"

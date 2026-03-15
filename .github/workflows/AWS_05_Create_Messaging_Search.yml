@@ -1,11 +1,11 @@
 # ============================================================
-# AWS_05 - Messaging & Search (Kinesis/MSK, OpenSearch)
+# AWS_05 - Create Messaging & Search
 # ============================================================
-# Deploys or deletes the messaging (Kinesis Data Streams or MSK)
+# Deploys the messaging (Kinesis Data Streams or MSK)
 # and search (OpenSearch) infrastructure stack.
 # ============================================================
 
-name: "AWS_05 - Messaging & Search (Kinesis/MSK, OpenSearch)"
+name: "AWS_05 - Create Messaging & Search"
 
 on:
   workflow_dispatch:
@@ -18,13 +18,6 @@ on:
           - dev
           - staging
           - prod
-      action:
-        description: 'Action to perform'
-        required: true
-        type: choice
-        options:
-          - create
-          - delete
       use_msk:
         description: 'Use MSK (Managed Kafka) instead of Kinesis'
         required: false
@@ -44,7 +37,7 @@ permissions:
 
 jobs:
   deploy-messaging-search:
-    name: "${{ github.event.inputs.action }} Messaging & Search (${{ github.event.inputs.environment }})"
+    name: "Create Messaging & Search (${{ github.event.inputs.environment }})"
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
 
@@ -69,7 +62,6 @@ jobs:
       # Resolve VPC exports from the networking stack
       # -------------------------------------------------------
       - name: Resolve VPC and subnet IDs from CloudFormation exports
-        if: github.event.inputs.action == 'create'
         id: vpc
         run: |
           ENV="${{ github.event.inputs.environment }}"
@@ -100,7 +92,6 @@ jobs:
       # Deploy Stack
       # -------------------------------------------------------
       - name: Deploy CloudFormation stack
-        if: github.event.inputs.action == 'create'
         run: |
           ENV="${{ github.event.inputs.environment }}"
           USE_MSK="${{ github.event.inputs.use_msk }}"
@@ -132,25 +123,9 @@ jobs:
           echo "::notice::Stack ${STACK_NAME} deployed successfully"
 
       # -------------------------------------------------------
-      # Delete Stack
-      # -------------------------------------------------------
-      - name: Delete CloudFormation stack
-        if: github.event.inputs.action == 'delete'
-        run: |
-          echo "Deleting stack: ${STACK_NAME}"
-
-          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
-
-          echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
-
-          echo "::notice::Stack ${STACK_NAME} deleted successfully"
-
-      # -------------------------------------------------------
       # Print Outputs
       # -------------------------------------------------------
       - name: Print stack outputs
-        if: github.event.inputs.action == 'create'
         run: |
           echo "=== Stack Outputs ==="
           aws cloudformation describe-stacks \

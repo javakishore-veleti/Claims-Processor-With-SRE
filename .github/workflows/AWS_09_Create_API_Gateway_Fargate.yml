@@ -1,9 +1,9 @@
 # =============================================================================
-# AWS_09 - API Gateway & Fargate Deployment
-# Deploys or deletes the CloudFormation stack for ALB + ECS Fargate services
+# AWS_09 - Create API Gateway & Fargate
+# Deploys the CloudFormation stack for ALB + ECS Fargate services
 # that host all 10 microservice modules behind path-based routing.
 # =============================================================================
-name: "AWS_09 - API Gateway & Fargate Deployment"
+name: "AWS_09 - Create API Gateway & Fargate"
 
 on:
   workflow_dispatch:
@@ -16,14 +16,6 @@ on:
           - dev
           - staging
           - prod
-
-      action:
-        description: 'Action to perform'
-        required: true
-        type: choice
-        options:
-          - deploy
-          - delete
 
       image_tag:
         description: 'Docker image tag to deploy'
@@ -39,7 +31,7 @@ env:
 
 jobs:
   deploy-fargate:
-    name: ${{ inputs.action == 'deploy' && 'Deploy' || 'Delete' }} Fargate (${{ inputs.environment }})
+    name: Deploy Fargate (${{ inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
 
@@ -108,7 +100,6 @@ jobs:
       # 4. Resolve ECR repository prefix and Secrets Manager ARNs
       # -------------------------------------------------------------------
       - name: Resolve ECR and secrets parameters
-        if: inputs.action == 'deploy'
         id: app-params
         run: |
           ENV="${{ inputs.environment }}"
@@ -157,7 +148,6 @@ jobs:
       # 5. Validate CloudFormation template
       # -------------------------------------------------------------------
       - name: Validate CloudFormation template
-        if: inputs.action == 'deploy'
         run: |
           aws cloudformation validate-template \
             --template-body "file://${{ env.TEMPLATE_FILE }}"
@@ -167,7 +157,6 @@ jobs:
       # 6. Deploy CloudFormation stack
       # -------------------------------------------------------------------
       - name: Deploy CloudFormation stack
-        if: inputs.action == 'deploy'
         run: |
           echo "Deploying stack: ${{ env.STACK_NAME }}"
           echo "Image tag: ${{ inputs.image_tag }}"
@@ -205,7 +194,6 @@ jobs:
       # 7. Display stack outputs and ALB DNS name
       # -------------------------------------------------------------------
       - name: Display stack outputs
-        if: inputs.action == 'deploy'
         run: |
           echo "=== Stack Outputs ==="
           aws cloudformation describe-stacks \
@@ -235,19 +223,3 @@ jobs:
           echo "  /entitlement-mgmt/*   -> Portal-Entitlements   (8089)"
           echo "  /sre/*                -> Portal-SRE            (8090)"
 
-      # -------------------------------------------------------------------
-      # 8. Delete CloudFormation stack
-      # -------------------------------------------------------------------
-      - name: Delete CloudFormation stack
-        if: inputs.action == 'delete'
-        run: |
-          echo "Deleting stack: ${{ env.STACK_NAME }}"
-
-          aws cloudformation delete-stack \
-            --stack-name "${{ env.STACK_NAME }}"
-
-          echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete \
-            --stack-name "${{ env.STACK_NAME }}"
-
-          echo "Stack deletion completed."

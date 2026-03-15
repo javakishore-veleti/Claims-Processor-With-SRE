@@ -1,9 +1,9 @@
 # =============================================================================
-# AWS_07 - EKS Cluster
-# Creates or deletes an EKS cluster with managed node group for the
+# AWS_07 - Create EKS Cluster
+# Creates an EKS cluster with managed node group for the
 # Claims Processor With SRE microservice.
 # =============================================================================
-name: "AWS_07 - EKS Cluster"
+name: "AWS_07 - Create EKS Cluster"
 
 on:
   workflow_dispatch:
@@ -16,14 +16,6 @@ on:
           - dev
           - staging
           - prod
-
-      action:
-        description: 'Action to perform'
-        required: true
-        type: choice
-        options:
-          - create
-          - delete
 
       node_count:
         description: 'Number of worker nodes (desired count)'
@@ -44,7 +36,7 @@ env:
 
 jobs:
   eks-cluster:
-    name: ${{ github.event.inputs.action }} EKS Cluster (${{ github.event.inputs.environment }})
+    name: Create EKS Cluster (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
 
@@ -69,7 +61,6 @@ jobs:
       # Resolve VPC and Subnet IDs from CloudFormation exports
       # -----------------------------------------------------------------
       - name: Resolve VPC and Subnet IDs
-        if: ${{ github.event.inputs.action == 'create' }}
         id: resolve-network
         run: |
           ENV="${{ github.event.inputs.environment }}"
@@ -113,7 +104,6 @@ jobs:
       # Deploy EKS Cluster (Create)
       # -----------------------------------------------------------------
       - name: Deploy EKS cluster stack
-        if: ${{ github.event.inputs.action == 'create' }}
         run: |
           ENV="${{ github.event.inputs.environment }}"
           NODE_COUNT=${{ github.event.inputs.node_count }}
@@ -147,7 +137,6 @@ jobs:
       # Update kubeconfig (Create)
       # -----------------------------------------------------------------
       - name: Update kubeconfig
-        if: ${{ github.event.inputs.action == 'create' }}
         run: |
           ENV="${{ github.event.inputs.environment }}"
           CLUSTER_NAME="${{ env.PROJECT_NAME }}-${ENV}-cluster"
@@ -165,7 +154,6 @@ jobs:
       # Print Stack Outputs (Create)
       # -----------------------------------------------------------------
       - name: Print stack outputs
-        if: ${{ github.event.inputs.action == 'create' }}
         run: |
           echo "Stack outputs:"
           aws cloudformation describe-stacks \
@@ -173,19 +161,3 @@ jobs:
             --query "Stacks[0].Outputs" \
             --output table
 
-      # -----------------------------------------------------------------
-      # Delete EKS Cluster Stack
-      # -----------------------------------------------------------------
-      - name: Delete EKS cluster stack
-        if: ${{ github.event.inputs.action == 'delete' }}
-        run: |
-          echo "Deleting EKS cluster stack: ${{ env.STACK_NAME }}"
-
-          aws cloudformation delete-stack \
-            --stack-name "${{ env.STACK_NAME }}"
-
-          echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete \
-            --stack-name "${{ env.STACK_NAME }}"
-
-          echo "EKS cluster stack deleted successfully."

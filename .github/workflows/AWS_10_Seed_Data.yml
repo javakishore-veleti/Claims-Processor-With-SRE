@@ -1,0 +1,295 @@
+# =============================================================================
+# AWS_10 - Data Seed
+# Deploys the data-seed Lambda function and invokes it to populate or clear
+# the RDS PostgreSQL database with seed data for all modules:
+#   - 100 tenants
+#   - 10 members
+#   - 10 claims (one per stage)
+#   - 6 users, 9 roles, 13 privileges (entitlements)
+# =============================================================================
+name: "AWS_10 - Data Seed"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - seed
+          - clear
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+  STACK_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}-${{ inputs.environment }}-data-seed
+  TEMPLATE_FILE: DevOps/AWS/CloudFormation/data-seed-lambda.yaml
+
+jobs:
+  data-seed:
+    name: ${{ inputs.action == 'seed' && 'Seed' || 'Clear' }} Database (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # -------------------------------------------------------------------
+      # 1. Checkout repository
+      # -------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------------------
+      # 2. Configure AWS credentials
+      # -------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -------------------------------------------------------------------
+      # 3. Resolve RDS and networking parameters from CloudFormation exports
+      # -------------------------------------------------------------------
+      - name: Resolve RDS and networking parameters
+        id: params
+        run: |
+          ENV="${{ inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+
+          echo "Resolving parameters from CloudFormation exports (prefix: ${PREFIX})..."
+
+          # --- Networking from VPC stack ---
+          VPC_ID=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-VpcId'].Value | [0]" --output text)
+          PRIVATE_SUBNET_1=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PrivateSubnet1Id'].Value | [0]" --output text)
+          PRIVATE_SUBNET_2=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PrivateSubnet2Id'].Value | [0]" --output text)
+          RDS_SG=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-RDSSecurityGroupId'].Value | [0]" --output text)
+
+          # --- RDS connection info from core-infra stack ---
+          RDS_ENDPOINT=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-RDSEndpoint'].Value | [0]" --output text)
+          RDS_PORT=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-RDSPort'].Value | [0]" --output text)
+          RDS_DBNAME=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-RDSDBName'].Value | [0]" --output text)
+
+          # Fall back to defaults where appropriate
+          if [[ "$RDS_PORT" == "None" || -z "$RDS_PORT" ]]; then
+            RDS_PORT="5432"
+          fi
+          if [[ "$RDS_DBNAME" == "None" || -z "$RDS_DBNAME" ]]; then
+            RDS_DBNAME="claims_db"
+          fi
+
+          # --- RDS credentials from GitHub secrets ---
+          RDS_USERNAME="${{ secrets.CLAIMS_PROC_RDS_USERNAME }}"
+          RDS_PASSWORD="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}"
+          if [[ -z "$RDS_USERNAME" ]]; then
+            RDS_USERNAME="claims_user"
+          fi
+
+          # --- Validate all required values ---
+          ERRORS=0
+          for VAR_NAME in VPC_ID PRIVATE_SUBNET_1 PRIVATE_SUBNET_2 RDS_SG RDS_ENDPOINT; do
+            VAL=$(eval echo "\$$VAR_NAME")
+            if [[ -z "$VAL" || "$VAL" == "None" ]]; then
+              echo "::error::Failed to resolve ${VAR_NAME}. Ensure prerequisite stacks (vpc-sg, core-infra) are deployed."
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          if [[ -z "$RDS_PASSWORD" ]]; then
+            echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD secret is not configured."
+            ERRORS=$((ERRORS + 1))
+          fi
+          if [[ $ERRORS -gt 0 ]]; then
+            exit 1
+          fi
+
+          # --- Emit outputs ---
+          echo "vpc_id=${VPC_ID}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_2=${PRIVATE_SUBNET_2}" >> "$GITHUB_OUTPUT"
+          echo "rds_sg=${RDS_SG}" >> "$GITHUB_OUTPUT"
+          echo "rds_endpoint=${RDS_ENDPOINT}" >> "$GITHUB_OUTPUT"
+          echo "rds_port=${RDS_PORT}" >> "$GITHUB_OUTPUT"
+          echo "rds_username=${RDS_USERNAME}" >> "$GITHUB_OUTPUT"
+          echo "rds_password=${RDS_PASSWORD}" >> "$GITHUB_OUTPUT"
+          echo "rds_dbname=${RDS_DBNAME}" >> "$GITHUB_OUTPUT"
+
+          echo "--- Resolved parameters ---"
+          echo "  VPC         : ${VPC_ID}"
+          echo "  Subnets     : ${PRIVATE_SUBNET_1}, ${PRIVATE_SUBNET_2}"
+          echo "  RDS SG      : ${RDS_SG}"
+          echo "  RDS Endpoint: ${RDS_ENDPOINT}:${RDS_PORT}"
+          echo "  RDS DB      : ${RDS_DBNAME}"
+          echo "  RDS User    : ${RDS_USERNAME}"
+
+      # -------------------------------------------------------------------
+      # 4. Validate CloudFormation template
+      # -------------------------------------------------------------------
+      - name: Validate CloudFormation template
+        run: |
+          aws cloudformation validate-template \
+            --template-body "file://${{ env.TEMPLATE_FILE }}"
+          echo "Template validation successful."
+
+      # -------------------------------------------------------------------
+      # 5. Deploy Lambda stack
+      # -------------------------------------------------------------------
+      - name: Deploy data-seed Lambda stack
+        run: |
+          echo "Deploying stack: ${{ env.STACK_NAME }}"
+
+          aws cloudformation deploy \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --template-file "${{ env.TEMPLATE_FILE }}" \
+            --parameter-overrides \
+              "Environment=${{ inputs.environment }}" \
+              "ProjectName=${{ env.PROJECT_NAME }}" \
+              "VpcId=${{ steps.params.outputs.vpc_id }}" \
+              "PrivateSubnet1=${{ steps.params.outputs.private_subnet_1 }}" \
+              "PrivateSubnet2=${{ steps.params.outputs.private_subnet_2 }}" \
+              "RDSSecurityGroupId=${{ steps.params.outputs.rds_sg }}" \
+              "RDSEndpoint=${{ steps.params.outputs.rds_endpoint }}" \
+              "RDSPort=${{ steps.params.outputs.rds_port }}" \
+              "RDSUsername=${{ steps.params.outputs.rds_username }}" \
+              "RDSPassword=${{ steps.params.outputs.rds_password }}" \
+              "RDSDBName=${{ steps.params.outputs.rds_dbname }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --tags \
+              "Key=Project,Value=${{ env.PROJECT_NAME }}" \
+              "Key=Environment,Value=${{ inputs.environment }}" \
+              "Key=ManagedBy,Value=github-actions"
+
+          echo "Lambda stack deployment completed."
+
+      # -------------------------------------------------------------------
+      # 6. Wait for Lambda to be ready (VPC ENI provisioning)
+      # -------------------------------------------------------------------
+      - name: Wait for Lambda to become active
+        run: |
+          FUNCTION_NAME="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-data-seed"
+          echo "Waiting for Lambda function ${FUNCTION_NAME} to become Active..."
+
+          for i in $(seq 1 30); do
+            STATE=$(aws lambda get-function \
+              --function-name "${FUNCTION_NAME}" \
+              --query 'Configuration.State' --output text 2>/dev/null || echo "Pending")
+            LAST_STATUS=$(aws lambda get-function \
+              --function-name "${FUNCTION_NAME}" \
+              --query 'Configuration.LastUpdateStatus' --output text 2>/dev/null || echo "InProgress")
+
+            echo "  Attempt ${i}/30: State=${STATE}, LastUpdateStatus=${LAST_STATUS}"
+
+            if [[ "$STATE" == "Active" && "$LAST_STATUS" != "InProgress" ]]; then
+              echo "Lambda function is ready."
+              break
+            fi
+            if [[ $i -eq 30 ]]; then
+              echo "::warning::Lambda may still be provisioning VPC ENIs. Proceeding with invocation."
+            fi
+            sleep 10
+          done
+
+      # -------------------------------------------------------------------
+      # 7. Invoke Lambda function
+      # -------------------------------------------------------------------
+      - name: Invoke data-seed Lambda (${{ inputs.action }})
+        run: |
+          FUNCTION_NAME="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-data-seed"
+          ACTION="${{ inputs.action }}"
+
+          echo "Invoking Lambda: ${FUNCTION_NAME}"
+          echo "  Action : ${ACTION}"
+          echo "  Modules: all"
+
+          PAYLOAD=$(echo "{\"action\": \"${ACTION}\", \"modules\": \"all\"}" | base64)
+
+          aws lambda invoke \
+            --function-name "${FUNCTION_NAME}" \
+            --payload "${PAYLOAD}" \
+            --cli-binary-format raw-in-base64-out \
+            --log-type Tail \
+            --query 'LogResult' \
+            --output text /tmp/lambda-response.json > /tmp/lambda-logs-b64.txt 2>/dev/null || true
+
+          echo ""
+          echo "=== Lambda Response ==="
+          python3 -m json.tool /tmp/lambda-response.json 2>/dev/null || cat /tmp/lambda-response.json
+          echo ""
+
+          # Decode and display tail logs
+          if [[ -s /tmp/lambda-logs-b64.txt ]]; then
+            echo "=== Lambda Logs (tail) ==="
+            base64 -d /tmp/lambda-logs-b64.txt 2>/dev/null || true
+            echo ""
+          fi
+
+          # Check for errors in the response
+          STATUS_CODE=$(python3 -c "
+          import json, sys
+          try:
+              with open('/tmp/lambda-response.json') as f:
+                  resp = json.load(f)
+              print(resp.get('statusCode', 200))
+          except:
+              print(200)
+          " 2>/dev/null || echo "200")
+
+          if [[ "$STATUS_CODE" != "200" ]]; then
+            echo "::error::Lambda function returned status code ${STATUS_CODE}"
+            exit 1
+          fi
+
+          echo "============================================"
+          echo "  Data ${ACTION} completed successfully!"
+          echo "============================================"
+
+      # -------------------------------------------------------------------
+      # 8. Display stack outputs
+      # -------------------------------------------------------------------
+      - name: Display stack outputs
+        run: |
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --query 'Stacks[0].Outputs' \
+            --output table
+
+      # -------------------------------------------------------------------
+      # 9. Summary
+      # -------------------------------------------------------------------
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Data Seed Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Parameter | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Action** | \`${{ inputs.action }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **RDS Endpoint** | \`${{ steps.params.outputs.rds_endpoint }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Database** | \`${{ steps.params.outputs.rds_dbname }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -f /tmp/lambda-response.json ]]; then
+            echo "### Lambda Response" >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            python3 -m json.tool /tmp/lambda-response.json 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || cat /tmp/lambda-response.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi

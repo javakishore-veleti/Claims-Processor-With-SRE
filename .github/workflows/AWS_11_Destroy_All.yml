@@ -1,3 +1,20 @@
+# =============================================================================
+# AWS_11 - Destroy All AWS Resources
+# Tears down ALL CloudFormation stacks for a given environment in reverse
+# dependency order. Includes safety confirmation, optional RDS snapshot
+# retention, and optional S3 data preservation.
+#
+# Deletion order (reverse of creation):
+#   1. data-seed        (Lambda + SG)
+#   2. fargate          (ALB + ECS + IAM)
+#   3. eks              (EKS cluster + node group)
+#   4. secrets          (Secrets Manager)
+#   5. messaging-search (MSK + OpenSearch)
+#   6. auth             (Cognito)
+#   7. observability    (CloudWatch dashboards, alarms, log groups)
+#   8. core-infra       (RDS, S3, ElastiCache, ECR)
+#   9. vpc-sg           (VPC, subnets, NAT, security groups)
+# =============================================================================
 name: "AWS_11 - Destroy All AWS Resources"
 
 on:
@@ -11,177 +28,566 @@ on:
           - dev
           - staging
           - prod
+
       confirm_destroy:
         description: 'Type the environment name to confirm destruction'
         required: true
         type: string
+
       retain_rds_snapshot:
-        description: 'Create final RDS snapshot before deletion'
+        description: 'Create a final RDS snapshot before deletion'
         required: false
         type: boolean
         default: true
+
       retain_s3_data:
-        description: 'Retain S3 bucket data (skip bucket deletion)'
+        description: 'Retain S3 bucket data (skip bucket emptying/deletion)'
         required: false
         type: boolean
         default: true
 
 env:
-  CLAIMS_PROC_AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
-  CLAIMS_PROC_PROJECT: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
 
 jobs:
+  # =========================================================================
+  # Job 1: Validate the destruction request
+  # =========================================================================
   validate:
-    name: "Validate destruction request"
+    name: Validate destruction request
     runs-on: ubuntu-latest
     steps:
       - name: Confirm environment matches
         run: |
-          if [ "${{ inputs.confirm_destroy }}" != "${{ inputs.environment }}" ]; then
-            echo "::error::Confirmation failed. You typed '${{ inputs.confirm_destroy }}' but environment is '${{ inputs.environment }}'. They must match."
+          REQUESTED="${{ inputs.confirm_destroy }}"
+          EXPECTED="${{ inputs.environment }}"
+
+          if [[ "$REQUESTED" != "$EXPECTED" ]]; then
+            echo "::error::Confirmation failed. You typed '${REQUESTED}' but environment is '${EXPECTED}'. They must match exactly."
+            echo ""
+            echo "This is a safety check to prevent accidental destruction of resources."
+            echo "Re-run the workflow and type '${EXPECTED}' in the confirm_destroy field."
             exit 1
           fi
-          echo "Destruction confirmed for environment: ${{ inputs.environment }}"
 
+          echo "============================================"
+          echo "  DESTRUCTION CONFIRMED: ${EXPECTED}"
+          echo "============================================"
+          echo ""
+          echo "  Retain RDS Snapshot : ${{ inputs.retain_rds_snapshot }}"
+          echo "  Retain S3 Data      : ${{ inputs.retain_s3_data }}"
+          echo ""
+          echo "::warning::All CloudFormation stacks for '${EXPECTED}' will be deleted."
+
+  # =========================================================================
+  # Job 2: Destroy all stacks in reverse order
+  # =========================================================================
   destroy:
-    name: "Destroy ${{ inputs.environment }}"
+    name: Destroy all ${{ inputs.environment }} stacks
     needs: validate
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+
     steps:
-      - name: Configure AWS Credentials
+      # -------------------------------------------------------------------
+      # 1. Configure AWS credentials
+      # -------------------------------------------------------------------
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.CLAIMS_PROC_AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Delete Data Seed Lambda stack
+      # -------------------------------------------------------------------
+      # 2. Inventory existing stacks
+      # -------------------------------------------------------------------
+      - name: Inventory existing stacks
+        id: inventory
+        run: |
+          ENV="${{ inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+          DELETED=""
+          SKIPPED=""
+          FAILED=""
+
+          echo "Checking which stacks exist for prefix: ${PREFIX}"
+
+          STACKS=(
+            "${PREFIX}-data-seed"
+            "${PREFIX}-fargate"
+            "${PREFIX}-eks"
+            "${PREFIX}-secrets"
+            "${PREFIX}-messaging-search"
+            "${PREFIX}-auth"
+            "${PREFIX}-observability"
+            "${PREFIX}-core-infra"
+            "${PREFIX}-vpc-sg"
+          )
+
+          EXISTING=""
+          for STACK in "${STACKS[@]}"; do
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>/dev/null || echo "NOT_FOUND")
+
+            if [[ "$STATUS" != "NOT_FOUND" ]]; then
+              echo "  [EXISTS] ${STACK} (${STATUS})"
+              EXISTING="${EXISTING}${STACK},"
+            else
+              echo "  [SKIP]   ${STACK} (not found)"
+            fi
+          done
+
+          echo "existing_stacks=${EXISTING}" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------------
+      # 3. Delete: data-seed (Lambda + SG)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: data-seed"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-data-seed"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-data-seed"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete Fargate / API Gateway stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 4. Delete: fargate (ALB + ECS services + task defs + IAM)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: fargate"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-fargate"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-fargate"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete EKS Cluster stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          # Scale down all ECS services before deletion to speed up teardown
+          CLUSTER="${{ env.PROJECT_NAME }}-${{ inputs.environment }}"
+          SERVICES=$(aws ecs list-services \
+            --cluster "$CLUSTER" \
+            --query 'serviceArns[*]' --output text 2>/dev/null || echo "")
+
+          if [[ -n "$SERVICES" ]]; then
+            echo "Scaling down ECS services in cluster: ${CLUSTER}"
+            for SVC_ARN in $SERVICES; do
+              SVC_NAME=$(echo "$SVC_ARN" | awk -F'/' '{print $NF}')
+              echo "  Scaling down: ${SVC_NAME}"
+              aws ecs update-service \
+                --cluster "$CLUSTER" \
+                --service "$SVC_ARN" \
+                --desired-count 0 \
+                --no-cli-pager 2>/dev/null || true
+            done
+            echo "Waiting 30s for tasks to drain..."
+            sleep 30
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 5. Delete: eks (EKS cluster + node groups)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: eks"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-eks"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-eks"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete Secrets Manager stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete (EKS may take 10-15 minutes)..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 6. Delete: secrets (Secrets Manager)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: secrets"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-secrets"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-secrets"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete Messaging & Search stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 7. Delete: messaging-search (MSK + OpenSearch)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: messaging-search"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-messaging-search"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-messaging-search"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete Auth / Cognito stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete (MSK/OpenSearch may take 15-20 minutes)..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 8. Delete: auth (Cognito)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: auth"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-auth"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-auth"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete Observability stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 9. Delete: observability (CloudWatch dashboards, alarms, log groups)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: observability"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-observability"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-observability"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Create final RDS snapshot (if retained)
-        if: inputs.retain_rds_snapshot
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 10. Create final RDS snapshot before deleting core-infra
+      # -------------------------------------------------------------------
+      - name: Create final RDS snapshot
+        if: inputs.retain_rds_snapshot == true
         continue-on-error: true
         run: |
-          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+          PROJECT="${{ env.PROJECT_NAME }}"
           ENV="${{ inputs.environment }}"
           INSTANCE_ID="${PROJECT}-${ENV}-postgres"
           SNAPSHOT_ID="${PROJECT}-${ENV}-final-$(date +%Y%m%d-%H%M%S)"
 
+          echo "Checking if RDS instance exists: ${INSTANCE_ID}"
+          INSTANCE_STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$INSTANCE_ID" \
+            --query 'DBInstances[0].DBInstanceStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$INSTANCE_STATUS" == "NOT_FOUND" ]]; then
+            echo "RDS instance not found. Skipping snapshot."
+            exit 0
+          fi
+
           echo "Creating final RDS snapshot: ${SNAPSHOT_ID}"
+          echo "  Instance: ${INSTANCE_ID} (status: ${INSTANCE_STATUS})"
+
           aws rds create-db-snapshot \
-            --db-instance-identifier "${INSTANCE_ID}" \
-            --db-snapshot-identifier "${SNAPSHOT_ID}" 2>/dev/null || echo "RDS instance not found, skipping snapshot"
+            --db-instance-identifier "$INSTANCE_ID" \
+            --db-snapshot-identifier "$SNAPSHOT_ID" \
+            --tags \
+              "Key=Project,Value=${PROJECT}" \
+              "Key=Environment,Value=${ENV}" \
+              "Key=Purpose,Value=pre-destruction-backup" \
+              "Key=CreatedBy,Value=github-actions"
 
+          echo "Waiting for snapshot to complete..."
           aws rds wait db-snapshot-completed \
-            --db-snapshot-identifier "${SNAPSHOT_ID}" 2>/dev/null || true
+            --db-snapshot-identifier "$SNAPSHOT_ID"
 
-      - name: Empty S3 buckets (if not retained)
-        if: "!inputs.retain_s3_data"
+          echo "Final RDS snapshot created: ${SNAPSHOT_ID}"
+
+      # -------------------------------------------------------------------
+      # 11. Handle S3 buckets before core-infra deletion
+      # -------------------------------------------------------------------
+      - name: Handle S3 buckets
         continue-on-error: true
         run: |
-          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+          PROJECT="${{ env.PROJECT_NAME }}"
           ENV="${{ inputs.environment }}"
+          RETAIN="${{ inputs.retain_s3_data }}"
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          for SUFFIX in documents static; do
+          # Common bucket naming patterns
+          BUCKET_SUFFIXES=("documents" "static" "artifacts" "logs")
+
+          for SUFFIX in "${BUCKET_SUFFIXES[@]}"; do
             BUCKET="${PROJECT}-${ENV}-${ACCOUNT_ID}-${SUFFIX}"
-            echo "Emptying bucket: ${BUCKET}"
-            aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+
+            # Check if bucket exists
+            if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+              echo "Bucket not found: ${BUCKET} (skipping)"
+              continue
+            fi
+
+            if [[ "$RETAIN" == "true" ]]; then
+              echo "Retaining S3 data: ${BUCKET} (retain_s3_data=true)"
+              echo "  Note: The bucket will remain after stack deletion."
+              echo "  CloudFormation may fail to delete the stack if the bucket"
+              echo "  has a DeletionPolicy of Delete. The bucket will be orphaned."
+            else
+              echo "Emptying S3 bucket: ${BUCKET}"
+
+              # Check for versioning
+              VERSIONING=$(aws s3api get-bucket-versioning \
+                --bucket "$BUCKET" \
+                --query 'Status' --output text 2>/dev/null || echo "Disabled")
+
+              if [[ "$VERSIONING" == "Enabled" ]]; then
+                echo "  Bucket has versioning enabled. Deleting all object versions..."
+                aws s3api list-object-versions \
+                  --bucket "$BUCKET" \
+                  --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
+                  --output json > /tmp/versions.json 2>/dev/null || echo '{"Objects":[]}' > /tmp/versions.json
+
+                OBJECT_COUNT=$(python3 -c "
+          import json
+          with open('/tmp/versions.json') as f:
+              data = json.load(f)
+          objects = data.get('Objects') or []
+          print(len(objects))
+          ")
+
+                if [[ "$OBJECT_COUNT" -gt 0 ]]; then
+                  aws s3api delete-objects \
+                    --bucket "$BUCKET" \
+                    --delete "file:///tmp/versions.json" 2>/dev/null || true
+                fi
+
+                # Also delete markers
+                aws s3api list-object-versions \
+                  --bucket "$BUCKET" \
+                  --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
+                  --output json > /tmp/markers.json 2>/dev/null || echo '{"Objects":[]}' > /tmp/markers.json
+
+                MARKER_COUNT=$(python3 -c "
+          import json
+          with open('/tmp/markers.json') as f:
+              data = json.load(f)
+          objects = data.get('Objects') or []
+          print(len(objects))
+          ")
+
+                if [[ "$MARKER_COUNT" -gt 0 ]]; then
+                  aws s3api delete-objects \
+                    --bucket "$BUCKET" \
+                    --delete "file:///tmp/markers.json" 2>/dev/null || true
+                fi
+              else
+                # Simple non-versioned delete
+                aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+              fi
+
+              echo "  Emptied: ${BUCKET}"
+            fi
           done
 
-      - name: Delete Core Infrastructure stack
+      # -------------------------------------------------------------------
+      # 12. Delete: core-infra (RDS, S3, ElastiCache, ECR)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: core-infra"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-core-infra"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-core-infra"
+          echo "--- Deleting: ${STACK} ---"
 
-      - name: Delete VPC & Security Groups stack
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete (RDS may take 5-10 minutes)..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 13. Delete: vpc-sg (VPC, subnets, NAT gateway, security groups)
+      # -------------------------------------------------------------------
+      - name: "Delete stack: vpc-sg"
         continue-on-error: true
         run: |
-          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-vpc-sg"
-          echo "Deleting stack: ${STACK}"
-          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
-          echo "Done: ${STACK}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-vpc-sg"
+          echo "--- Deleting: ${STACK} ---"
 
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Skipping."
+            exit 0
+          fi
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -------------------------------------------------------------------
+      # 14. Verify all stacks are deleted
+      # -------------------------------------------------------------------
+      - name: Verify destruction
+        id: verify
+        run: |
+          ENV="${{ inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+
+          echo "=== Verifying all stacks are deleted ==="
+
+          STACKS=(
+            "${PREFIX}-data-seed"
+            "${PREFIX}-fargate"
+            "${PREFIX}-eks"
+            "${PREFIX}-secrets"
+            "${PREFIX}-messaging-search"
+            "${PREFIX}-auth"
+            "${PREFIX}-observability"
+            "${PREFIX}-core-infra"
+            "${PREFIX}-vpc-sg"
+          )
+
+          DELETED_COUNT=0
+          REMAINING_COUNT=0
+          REMAINING_LIST=""
+
+          for STACK in "${STACKS[@]}"; do
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>/dev/null || echo "DELETED")
+
+            if [[ "$STATUS" == "DELETED" || "$STATUS" == "DELETE_COMPLETE" ]]; then
+              echo "  [DELETED]   ${STACK}"
+              DELETED_COUNT=$((DELETED_COUNT + 1))
+            else
+              echo "  [REMAINING] ${STACK} (${STATUS})"
+              REMAINING_COUNT=$((REMAINING_COUNT + 1))
+              REMAINING_LIST="${REMAINING_LIST}\n  - ${STACK} (${STATUS})"
+            fi
+          done
+
+          echo ""
+          echo "Deleted: ${DELETED_COUNT} / ${#STACKS[@]} stacks"
+
+          echo "deleted_count=${DELETED_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "remaining_count=${REMAINING_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "total_count=${#STACKS[@]}" >> "$GITHUB_OUTPUT"
+
+          if [[ $REMAINING_COUNT -gt 0 ]]; then
+            echo "::warning::${REMAINING_COUNT} stack(s) could not be deleted. Manual cleanup may be required."
+            echo -e "Remaining stacks:${REMAINING_LIST}"
+          fi
+
+      # -------------------------------------------------------------------
+      # 15. Destruction Summary
+      # -------------------------------------------------------------------
       - name: Destruction Summary
+        if: always()
         run: |
-          echo "## Destruction Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **RDS Snapshot Retained:** ${{ inputs.retain_rds_snapshot }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **S3 Data Retained:** ${{ inputs.retain_s3_data }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Stacks Deleted (reverse order):" >> $GITHUB_STEP_SUMMARY
-          echo "1. data-seed" >> $GITHUB_STEP_SUMMARY
-          echo "2. fargate (API Gateway + ECS)" >> $GITHUB_STEP_SUMMARY
-          echo "3. eks" >> $GITHUB_STEP_SUMMARY
-          echo "4. secrets" >> $GITHUB_STEP_SUMMARY
-          echo "5. messaging-search" >> $GITHUB_STEP_SUMMARY
-          echo "6. auth (Cognito)" >> $GITHUB_STEP_SUMMARY
-          echo "7. observability" >> $GITHUB_STEP_SUMMARY
-          echo "8. core-infra (RDS, S3, ECR, Redis)" >> $GITHUB_STEP_SUMMARY
-          echo "9. vpc-sg" >> $GITHUB_STEP_SUMMARY
+          ENV="${{ inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+
+          echo "## Destruction Summary: \`${ENV}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "| Setting | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Environment** | \`${ENV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **AWS Region** | \`${{ env.AWS_REGION }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **RDS Snapshot Retained** | \`${{ inputs.retain_rds_snapshot }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **S3 Data Retained** | \`${{ inputs.retain_s3_data }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Stacks Deleted** | ${{ steps.verify.outputs.deleted_count }} / ${{ steps.verify.outputs.total_count }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Stacks (deletion order)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| # | Stack | Purpose |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|-------|---------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 1 | \`${PREFIX}-data-seed\` | Lambda function for DB seeding |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 2 | \`${PREFIX}-fargate\` | ALB + ECS Fargate services |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 3 | \`${PREFIX}-eks\` | EKS cluster + node groups |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 4 | \`${PREFIX}-secrets\` | Secrets Manager secrets |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 5 | \`${PREFIX}-messaging-search\` | MSK (Kafka) + OpenSearch |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 6 | \`${PREFIX}-auth\` | Cognito user pools |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 7 | \`${PREFIX}-observability\` | CloudWatch dashboards, alarms |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 8 | \`${PREFIX}-core-infra\` | RDS, S3, ElastiCache, ECR |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 9 | \`${PREFIX}-vpc-sg\` | VPC, subnets, NAT, security groups |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ steps.verify.outputs.remaining_count }}" -gt "0" ]]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "> **Warning:** ${{ steps.verify.outputs.remaining_count }} stack(s) may require manual cleanup." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,9 +1,9 @@
 # =============================================================================
-# AWS_01 - VPC & Security Groups
-# Deploys or deletes the CloudFormation stack for VPC networking and
+# AWS_01 - Create VPC & Security Groups
+# Deploys the CloudFormation stack for VPC networking and
 # security groups used by the Claims Processor microservice.
 # =============================================================================
-name: "AWS_01 - VPC & Security Groups"
+name: "AWS_01 - Create VPC & Security Groups"
 
 on:
   workflow_dispatch:
@@ -16,14 +16,6 @@ on:
           - dev
           - staging
           - prod
-
-      action:
-        description: 'Action to perform'
-        required: true
-        type: choice
-        options:
-          - create
-          - delete
 
       use_existing_vpc:
         description: 'Use an existing VPC (true) or create a new one (false)'
@@ -44,7 +36,7 @@ env:
 
 jobs:
   deploy-vpc-security-groups:
-    name: ${{ inputs.action == 'create' && 'Deploy' || 'Delete' }} VPC & Security Groups (${{ inputs.environment }})
+    name: Deploy VPC & Security Groups (${{ inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
 
@@ -105,7 +97,6 @@ jobs:
       # 4. Validate CloudFormation template
       # -------------------------------------------------------------------
       - name: Validate CloudFormation template
-        if: inputs.action == 'create'
         run: |
           aws cloudformation validate-template \
             --template-body "file://${{ env.TEMPLATE_FILE }}"
@@ -115,7 +106,6 @@ jobs:
       # 5. Deploy CloudFormation stack
       # -------------------------------------------------------------------
       - name: Deploy CloudFormation stack
-        if: inputs.action == 'create'
         run: |
           echo "Deploying stack: ${{ env.STACK_NAME }}"
 
@@ -139,7 +129,6 @@ jobs:
       # 6. Display stack outputs
       # -------------------------------------------------------------------
       - name: Display stack outputs
-        if: inputs.action == 'create'
         run: |
           echo "=== Stack Outputs ==="
           aws cloudformation describe-stacks \
@@ -147,19 +136,3 @@ jobs:
             --query 'Stacks[0].Outputs' \
             --output table
 
-      # -------------------------------------------------------------------
-      # 7. Delete CloudFormation stack
-      # -------------------------------------------------------------------
-      - name: Delete CloudFormation stack
-        if: inputs.action == 'delete'
-        run: |
-          echo "Deleting stack: ${{ env.STACK_NAME }}"
-
-          aws cloudformation delete-stack \
-            --stack-name "${{ env.STACK_NAME }}"
-
-          echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete \
-            --stack-name "${{ env.STACK_NAME }}"
-
-          echo "Stack deletion completed."
