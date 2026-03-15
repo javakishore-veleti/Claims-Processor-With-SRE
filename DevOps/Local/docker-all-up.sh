@@ -19,6 +19,7 @@ PROJECT_NAME="claims-processor-devops"
 NETWORK_NAME="claims-processor-network"
 
 # ── Optional service flags (default: false unless set) ─────────────────────
+ENABLE_KAFKA="${CLAIMS_PROCESSOR_APP_LOCAL_KAFKA:-false}"
 ENABLE_REDIS="${CLAIMS_PROCESSOR_APP_LOCAL_REDIS:-false}"
 ENABLE_ELASTICSEARCH="${CLAIMS_PROCESSOR_APP_LOCAL_ELASTICSEARCH:-false}"
 ENABLE_KIBANA="${CLAIMS_PROCESSOR_APP_LOCAL_KIBANA:-false}"
@@ -38,8 +39,7 @@ fi
 SERVICES=("Postgres")
 
 [[ "$ENABLE_REDIS" == "true" ]] && SERVICES+=("Redis")
-
-SERVICES+=("Kafka")
+[[ "$ENABLE_KAFKA" == "true" ]] && SERVICES+=("Kafka")
 
 if [[ "$ENABLE_ELASTICSEARCH" == "true" ]]; then
     SERVICES+=("Search/Elastic")
@@ -64,8 +64,8 @@ echo "  Starting ALL local Docker Compose services"
 echo "  Project: $PROJECT_NAME"
 echo "  Network: $NETWORK_NAME"
 echo "=========================================="
-echo "  Optional: Redis=$ENABLE_REDIS, ES=$ENABLE_ELASTICSEARCH, Kibana=$ENABLE_KIBANA"
-echo "            Filebeat=$ENABLE_FILEBEAT, WireMock=$ENABLE_WIREMOCK, Ollama=$ENABLE_OLLAMA"
+echo "  Optional: Kafka=$ENABLE_KAFKA, Redis=$ENABLE_REDIS, ES=$ENABLE_ELASTICSEARCH"
+echo "            Kibana=$ENABLE_KIBANA, Filebeat=$ENABLE_FILEBEAT, WireMock=$ENABLE_WIREMOCK, Ollama=$ENABLE_OLLAMA"
 echo "=========================================="
 
 for svc in "${SERVICES[@]}"; do
