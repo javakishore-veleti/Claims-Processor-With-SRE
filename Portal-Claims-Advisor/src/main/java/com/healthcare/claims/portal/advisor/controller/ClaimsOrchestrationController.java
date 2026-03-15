@@ -121,17 +121,31 @@ public class ClaimsOrchestrationController {
      * Dashboard data: aggregates information from multiple services for the advisor dashboard.
      */
     @GetMapping("/dashboard")
-    public ApiResponse<?> getDashboardData(@RequestHeader("X-Tenant-Id") String tenantId) {
+    public ApiResponse<?> getDashboardData(
+            @RequestHeader(value = "X-Tenant-Id", defaultValue = "default-tenant") String tenantId) {
         log.info("Fetching dashboard data for tenant {}", tenantId);
 
-        // Compose data from multiple services for dashboard
-        ApiResponse<TenantRespDTO> tenantResponse = tenantsClient.getTenant(tenantId);
-        ApiResponse<List<ClaimRespDTO>> claimsResponse = claimsClient.searchClaims(null, null, 0, 10);
-
         Map<String, Object> dashboard = new HashMap<>();
-        dashboard.put("tenant", tenantResponse != null ? tenantResponse.getData() : null);
-        dashboard.put("recentClaims", claimsResponse != null ? claimsResponse.getData() : null);
 
+        // Fetch claims (graceful fallback)
+        try {
+            ApiResponse<List<ClaimRespDTO>> claimsResponse = claimsClient.searchClaims(null, null, 0, 10);
+            dashboard.put("recentClaims", claimsResponse != null ? claimsResponse.getData() : java.util.Collections.emptyList());
+        } catch (Exception e) {
+            log.warn("Failed to fetch claims for dashboard: {}", e.getMessage());
+            dashboard.put("recentClaims", java.util.Collections.emptyList());
+        }
+
+        // Fetch tenant info (graceful fallback)
+        try {
+            ApiResponse<TenantRespDTO> tenantResponse = tenantsClient.getTenantByTenantId(tenantId);
+            dashboard.put("tenant", tenantResponse != null ? tenantResponse.getData() : null);
+        } catch (Exception e) {
+            log.warn("Failed to fetch tenant info: {}", e.getMessage());
+            dashboard.put("tenant", null);
+        }
+
+        dashboard.put("tenantId", tenantId);
         return ApiResponse.success(dashboard, "Dashboard data retrieved");
     }
 

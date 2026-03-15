@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@FeignClient(name = "api-tenants", url = "${claims.service-client.services.api-tenants.url:http://localhost:8085}")
+@FeignClient(name = "api-tenants", url = "${claims.service-client.services.api-tenants.url:http://localhost:8086}")
 public interface TenantsFeignClient {
 
     @PostMapping("/api/v1/tenants")
@@ -17,6 +17,9 @@ public interface TenantsFeignClient {
 
     @GetMapping("/api/v1/tenants/{id}")
     ApiResponse<TenantRespDTO> getTenant(@PathVariable String id);
+
+    @GetMapping("/api/v1/tenants/by-tenant-id/{tenantId}")
+    ApiResponse<TenantRespDTO> getTenantByTenantId(@PathVariable String tenantId);
 
     @GetMapping("/api/v1/tenants")
     ApiResponse<List<TenantRespDTO>> searchTenants(@RequestParam(required = false) String name,

@@ -151,3 +151,7 @@ Commit and push all code to git.
 
 ## Instruction 39: P1-P11 Priority Task Execution
 Worked through README_PENDING_TASKS.md priorities P1 (fix & stabilize) through P11 (documentation). 71 of 101 tasks completed. Remaining 30 tasks are deferred (Testcontainers, Angular E2E, performance testing, CI/CD, cloud deployments, ADRs, runbooks).
+
+## Instruction 40: GitHub Actions for AWS Deployment
+1. Prefix all workflows with AWS_01 etc for sequencing
+2. 
