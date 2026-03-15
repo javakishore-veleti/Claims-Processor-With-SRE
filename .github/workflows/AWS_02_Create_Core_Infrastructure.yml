@@ -186,8 +186,48 @@ jobs:
           echo "Using RDS instance class: ${RDS_CLASS}"
 
       # ------------------------------------------------------------------
-      # 5. Deploy stack (create/update)
+      # 5. Pre-flight: detect and abort on stuck stack states
+      #    CloudFormation cannot deploy onto a ROLLBACK_COMPLETE stack.
+      #    Developers must delete the stuck stack manually before re-running.
       # ------------------------------------------------------------------
+      - name: Pre-flight stack state check
+        run: |
+          STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
+
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          echo "Stack: ${STACK_NAME}"
+          echo "Status: ${STATUS}"
+
+          case "${STATUS}" in
+            CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+              echo "Stack is in a deployable state — proceeding."
+              ;;
+            DOES_NOT_EXIST)
+              echo "Stack does not exist — will be created."
+              ;;
+            ROLLBACK_COMPLETE|CREATE_FAILED)
+              echo ""
+              echo "ERROR: Stack '${STACK_NAME}' is in state '${STATUS}'."
+              echo "CloudFormation cannot update a stack in this state."
+              echo ""
+              echo "Fix: delete the stuck stack from the AWS Console, then re-run this workflow."
+              echo "  AWS Console → CloudFormation → ${STACK_NAME} → Delete"
+              echo ""
+              echo "This happened because a previous deployment attempt failed and rolled back."
+              echo "Deleting and re-running is safe — all resources were already cleaned up by the rollback."
+              exit 1
+              ;;
+            *ROLLBACK*|*FAILED*|*IN_PROGRESS*)
+              echo ""
+              echo "ERROR: Stack '${STACK_NAME}' is in state '${STATUS}'."
+              echo "Wait for the stack to finish its current operation, or delete it from the AWS Console."
+              exit 1
+              ;;
+          esac
       - name: Deploy CloudFormation stack
         run: |
           STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
