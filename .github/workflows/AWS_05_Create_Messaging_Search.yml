@@ -6,6 +6,9 @@
 # ============================================================
 
 name: "AWS_05 - Create Messaging & Search"
+# NOTE: This stack (MSK/Kinesis/OpenSearch) is OPTIONAL.
+# The platform uses embedded Kafka (API-Events-Kafka module) by default.
+# Run this only if you need AWS-managed Kafka or OpenSearch at scale.
 
 on:
   workflow_dispatch:

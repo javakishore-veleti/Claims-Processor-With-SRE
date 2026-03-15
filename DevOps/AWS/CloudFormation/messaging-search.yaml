@@ -46,20 +46,21 @@ Parameters:
     MaxValue: 10
     Description: Number of OpenSearch data nodes
 
-  UseMSK:
-    Type: String
-    Default: 'false'
-    AllowedValues: ['true', 'false']
-    Description: >
-      Use Amazon MSK (Managed Kafka) instead of Kinesis Data Streams.
-      Set to true for Kafka-native workloads; false for serverless Kinesis.
+  # ---- MSK/KINESIS COMMENTED OUT — using embedded Kafka ----
+  # UseMSK:
+  # Type: String
+  # Default: 'false'
+  # AllowedValues: ['true', 'false']
+  # Description: >
+  # Use Amazon MSK (Managed Kafka) instead of Kinesis Data Streams.
+  # Set to true for Kafka-native workloads; false for serverless Kinesis.
 
 # ============================================================
 # Conditions
 # ============================================================
 Conditions:
-  CreateMSK: !Equals [!Ref UseMSK, 'true']
-  CreateKinesis: !Not [!Condition CreateMSK]
+# CreateMSK: !Equals [!Ref UseMSK, 'true']
+# CreateKinesis: !Not [!Condition CreateMSK]
 
 # ============================================================
 # Resources
@@ -67,183 +68,178 @@ Conditions:
 Resources:
 
   # ----------------------------------------------------------
+  # ---- KINESIS COMMENTED OUT — using embedded Kafka instead ----
   # Kinesis Data Streams (conditional — when UseMSK = false)
   # ----------------------------------------------------------
-  KinesisClaimsTopic:
-    Type: AWS::Kinesis::Stream
-    Condition: CreateKinesis
-    Properties:
-      Name: !Sub '${ProjectName}-${Environment}-claims-topic'
-      ShardCount: 1
-      RetentionPeriodHours: 168
-      StreamEncryption:
-        EncryptionType: KMS
-        KeyId: alias/aws/kinesis
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ManagedBy
-          Value: github-actions
-        - Key: Component
-          Value: messaging-search
-        - Key: Service
-          Value: messaging
-        - Key: Stream
-          Value: claims-topic
-
-  KinesisDocumentsTopic:
-    Type: AWS::Kinesis::Stream
-    Condition: CreateKinesis
-    Properties:
-      Name: !Sub '${ProjectName}-${Environment}-documents-topic'
-      ShardCount: 1
-      RetentionPeriodHours: 168
-      StreamEncryption:
-        EncryptionType: KMS
-        KeyId: alias/aws/kinesis
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ManagedBy
-          Value: github-actions
-        - Key: Component
-          Value: messaging-search
-        - Key: Service
-          Value: messaging
-        - Key: Stream
-          Value: documents-topic
-
-  KinesisNotificationsTopic:
-    Type: AWS::Kinesis::Stream
-    Condition: CreateKinesis
-    Properties:
-      Name: !Sub '${ProjectName}-${Environment}-notifications-topic'
-      ShardCount: 1
-      RetentionPeriodHours: 168
-      StreamEncryption:
-        EncryptionType: KMS
-        KeyId: alias/aws/kinesis
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ManagedBy
-          Value: github-actions
-        - Key: Component
-          Value: messaging-search
-        - Key: Service
-          Value: messaging
-        - Key: Stream
-          Value: notifications-topic
-
-  KinesisAuditTopic:
-    Type: AWS::Kinesis::Stream
-    Condition: CreateKinesis
-    Properties:
-      Name: !Sub '${ProjectName}-${Environment}-audit-topic'
-      ShardCount: 1
-      RetentionPeriodHours: 168
-      StreamEncryption:
-        EncryptionType: KMS
-        KeyId: alias/aws/kinesis
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ManagedBy
-          Value: github-actions
-        - Key: Component
-          Value: messaging-search
-        - Key: Service
-          Value: messaging
-        - Key: Stream
-          Value: audit-topic
-
+  # KinesisClaimsTopic:
+  # Type: AWS::Kinesis::Stream
+  # Condition: CreateKinesis
+  # Properties:
+  # Name: !Sub '${ProjectName}-${Environment}-claims-topic'
+  # ShardCount: 1
+  # RetentionPeriodHours: 168
+  # StreamEncryption:
+  # EncryptionType: KMS
+  # KeyId: alias/aws/kinesis
+  # Tags:
+  # - Key: Project
+  # Value: !Ref ProjectName
+  # - Key: Environment
+  # Value: !Ref Environment
+  # - Key: ManagedBy
+  # Value: github-actions
+  # - Key: Component
+  # Value: messaging-search
+  # - Key: Service
+  # Value: messaging
+  # - Key: Stream
+  # Value: claims-topic
+  #   # KinesisDocumentsTopic:
+  # Type: AWS::Kinesis::Stream
+  # Condition: CreateKinesis
+  # Properties:
+  # Name: !Sub '${ProjectName}-${Environment}-documents-topic'
+  # ShardCount: 1
+  # RetentionPeriodHours: 168
+  # StreamEncryption:
+  # EncryptionType: KMS
+  # KeyId: alias/aws/kinesis
+  # Tags:
+  # - Key: Project
+  # Value: !Ref ProjectName
+  # - Key: Environment
+  # Value: !Ref Environment
+  # - Key: ManagedBy
+  # Value: github-actions
+  # - Key: Component
+  # Value: messaging-search
+  # - Key: Service
+  # Value: messaging
+  # - Key: Stream
+  # Value: documents-topic
+  #   # KinesisNotificationsTopic:
+  # Type: AWS::Kinesis::Stream
+  # Condition: CreateKinesis
+  # Properties:
+  # Name: !Sub '${ProjectName}-${Environment}-notifications-topic'
+  # ShardCount: 1
+  # RetentionPeriodHours: 168
+  # StreamEncryption:
+  # EncryptionType: KMS
+  # KeyId: alias/aws/kinesis
+  # Tags:
+  # - Key: Project
+  # Value: !Ref ProjectName
+  # - Key: Environment
+  # Value: !Ref Environment
+  # - Key: ManagedBy
+  # Value: github-actions
+  # - Key: Component
+  # Value: messaging-search
+  # - Key: Service
+  # Value: messaging
+  # - Key: Stream
+  # Value: notifications-topic
+  #   # KinesisAuditTopic:
+  # Type: AWS::Kinesis::Stream
+  # Condition: CreateKinesis
+  # Properties:
+  # Name: !Sub '${ProjectName}-${Environment}-audit-topic'
+  # ShardCount: 1
+  # RetentionPeriodHours: 168
+  # StreamEncryption:
+  # EncryptionType: KMS
+  # KeyId: alias/aws/kinesis
+  # Tags:
+  # - Key: Project
+  # Value: !Ref ProjectName
+  # - Key: Environment
+  # Value: !Ref Environment
+  # - Key: ManagedBy
+  # Value: github-actions
+  # - Key: Component
+  # Value: messaging-search
+  # - Key: Service
+  # Value: messaging
+  # - Key: Stream
+  # Value: audit-topic
+  #   # ----------------------------------------------------------
+  # ---- MSK COMMENTED OUT — using embedded Kafka instead ----
+  # # MSK Cluster (conditional — when UseMSK = true)
   # ----------------------------------------------------------
-  # MSK Cluster (conditional — when UseMSK = true)
-  # ----------------------------------------------------------
-  MSKSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Condition: CreateMSK
-    Properties:
-      GroupDescription: !Sub '${ProjectName}-${Environment} MSK cluster security group'
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 9092
-          ToPort: 9098
-          SourceSecurityGroupId: !Ref AppSecurityGroupId
-          Description: Allow Kafka plaintext and TLS from app layer
-        - IpProtocol: tcp
-          FromPort: 2181
-          ToPort: 2181
-          SourceSecurityGroupId: !Ref AppSecurityGroupId
-          Description: Allow ZooKeeper from app layer
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: ManagedBy
-          Value: github-actions
-        - Key: Component
-          Value: messaging-search
-        - Key: Service
-          Value: msk
-
-  MSKConfiguration:
-    Type: AWS::MSK::Configuration
-    Condition: CreateMSK
-    Properties:
-      Name: !Sub '${ProjectName}-${Environment}-msk-config'
-      Description: !Sub 'MSK configuration for ${ProjectName} ${Environment}'
-      KafkaVersionsList:
-        - '3.6.0'
-      ServerProperties: |
-        auto.create.topics.enable=true
-        default.replication.factor=2
-        min.insync.replicas=1
-        num.partitions=3
-        log.retention.hours=168
-        log.retention.bytes=1073741824
-
-  MSKCluster:
-    Type: AWS::MSK::Cluster
-    Condition: CreateMSK
-    Properties:
-      ClusterName: !Sub '${ProjectName}-${Environment}-msk'
-      KafkaVersion: '3.6.0'
-      NumberOfBrokerNodes: 2
-      BrokerNodeGroupInfo:
-        InstanceType: kafka.t3.small
-        ClientSubnets:
-          - !Ref PrivateSubnet1
-          - !Ref PrivateSubnet2
-        SecurityGroups:
-          - !Ref MSKSecurityGroup
-        StorageInfo:
-          EBSStorageInfo:
-            VolumeSize: 50
-      ConfigurationInfo:
-        Arn: !GetAtt MSKConfiguration.Arn
-        Revision: 1
-      EncryptionInfo:
-        EncryptionInTransit:
-          ClientBroker: TLS_PLAINTEXT
-          InCluster: true
-      EnhancedMonitoring: DEFAULT
-      Tags:
-        Project: !Ref ProjectName
-        Environment: !Ref Environment
-        Service: msk
-
-  # ----------------------------------------------------------
+  # MSKSecurityGroup:
+  # Type: AWS::EC2::SecurityGroup
+  # Condition: CreateMSK
+  # Properties:
+  # GroupDescription: !Sub '${ProjectName}-${Environment} MSK cluster security group'
+  # VpcId: !Ref VpcId
+  # SecurityGroupIngress:
+  # - IpProtocol: tcp
+  # FromPort: 9092
+  # ToPort: 9098
+  # SourceSecurityGroupId: !Ref AppSecurityGroupId
+  # Description: Allow Kafka plaintext and TLS from app layer
+  # - IpProtocol: tcp
+  # FromPort: 2181
+  # ToPort: 2181
+  # SourceSecurityGroupId: !Ref AppSecurityGroupId
+  # Description: Allow ZooKeeper from app layer
+  # Tags:
+  # - Key: Project
+  # Value: !Ref ProjectName
+  # - Key: Environment
+  # Value: !Ref Environment
+  # - Key: ManagedBy
+  # Value: github-actions
+  # - Key: Component
+  # Value: messaging-search
+  # - Key: Service
+  # Value: msk
+  #   # MSKConfiguration:
+  # Type: AWS::MSK::Configuration
+  # Condition: CreateMSK
+  # Properties:
+  # Name: !Sub '${ProjectName}-${Environment}-msk-config'
+  # Description: !Sub 'MSK configuration for ${ProjectName} ${Environment}'
+  # KafkaVersionsList:
+  # - '3.6.0'
+  # ServerProperties: |
+  # auto.create.topics.enable=true
+  # default.replication.factor=2
+  # min.insync.replicas=1
+  # num.partitions=3
+  # log.retention.hours=168
+  # log.retention.bytes=1073741824
+  #   # MSKCluster:
+  # Type: AWS::MSK::Cluster
+  # Condition: CreateMSK
+  # Properties:
+  # ClusterName: !Sub '${ProjectName}-${Environment}-msk'
+  # KafkaVersion: '3.6.0'
+  # NumberOfBrokerNodes: 2
+  # BrokerNodeGroupInfo:
+  # InstanceType: kafka.t3.small
+  # ClientSubnets:
+  # - !Ref PrivateSubnet1
+  # - !Ref PrivateSubnet2
+  # SecurityGroups:
+  # - !Ref MSKSecurityGroup
+  # StorageInfo:
+  # EBSStorageInfo:
+  # VolumeSize: 50
+  # ConfigurationInfo:
+  # Arn: !GetAtt MSKConfiguration.Arn
+  # Revision: 1
+  # EncryptionInfo:
+  # EncryptionInTransit:
+  # ClientBroker: TLS_PLAINTEXT
+  # InCluster: true
+  # EnhancedMonitoring: DEFAULT
+  # Tags:
+  # Project: !Ref ProjectName
+  # Environment: !Ref Environment
+  # Service: msk
+  #   # ----------------------------------------------------------
   # OpenSearch Domain
   # ----------------------------------------------------------
   OpenSearchSecurityGroup:
@@ -336,57 +332,56 @@ Resources:
 # ============================================================
 Outputs:
   # Kinesis outputs (conditional)
-  KinesisClaimsTopicArn:
-    Condition: CreateKinesis
-    Description: ARN of the claims-topic Kinesis stream
-    Value: !GetAtt KinesisClaimsTopic.Arn
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-kinesis-claims-topic-arn'
-
-  KinesisDocumentsTopicArn:
-    Condition: CreateKinesis
-    Description: ARN of the documents-topic Kinesis stream
-    Value: !GetAtt KinesisDocumentsTopic.Arn
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-kinesis-documents-topic-arn'
-
-  KinesisNotificationsTopicArn:
-    Condition: CreateKinesis
-    Description: ARN of the notifications-topic Kinesis stream
-    Value: !GetAtt KinesisNotificationsTopic.Arn
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-kinesis-notifications-topic-arn'
-
-  KinesisAuditTopicArn:
-    Condition: CreateKinesis
-    Description: ARN of the audit-topic Kinesis stream
-    Value: !GetAtt KinesisAuditTopic.Arn
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-kinesis-audit-topic-arn'
-
-  # MSK outputs (conditional)
-  MSKClusterArn:
-    Condition: CreateMSK
-    Description: ARN of the MSK cluster
-    Value: !Ref MSKCluster
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-msk-cluster-arn'
-
-  MSKBootstrapBrokers:
-    Condition: CreateMSK
-    Description: MSK bootstrap broker connection string (plaintext)
-    Value: !GetAtt MSKCluster.BootstrapBrokerString
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-msk-bootstrap-brokers'
-
-  MSKBootstrapBrokersTls:
-    Condition: CreateMSK
-    Description: MSK bootstrap broker connection string (TLS)
-    Value: !GetAtt MSKCluster.BootstrapBrokerStringTls
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-msk-bootstrap-brokers-tls'
-
-  # OpenSearch outputs
+  # ---- KINESIS/MSK OUTPUT COMMENTED OUT ----
+  # KinesisClaimsTopicArn:
+  # Condition: CreateKinesis
+  # Description: ARN of the claims-topic Kinesis stream
+  # Value: !GetAtt KinesisClaimsTopic.Arn
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-kinesis-claims-topic-arn'
+  #   # ---- KINESIS/MSK OUTPUT COMMENTED OUT ----
+  # KinesisDocumentsTopicArn:
+  # Condition: CreateKinesis
+  # Description: ARN of the documents-topic Kinesis stream
+  # Value: !GetAtt KinesisDocumentsTopic.Arn
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-kinesis-documents-topic-arn'
+  #   # ---- KINESIS/MSK OUTPUT COMMENTED OUT ----
+  # KinesisNotificationsTopicArn:
+  # Condition: CreateKinesis
+  # Description: ARN of the notifications-topic Kinesis stream
+  # Value: !GetAtt KinesisNotificationsTopic.Arn
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-kinesis-notifications-topic-arn'
+  #   # ---- KINESIS/MSK OUTPUT COMMENTED OUT ----
+  # KinesisAuditTopicArn:
+  # Condition: CreateKinesis
+  # Description: ARN of the audit-topic Kinesis stream
+  # Value: !GetAtt KinesisAuditTopic.Arn
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-kinesis-audit-topic-arn'
+  #   # MSK outputs (conditional)
+  # ---- KINESIS/MSK OUTPUT COMMENTED OUT ----
+  # MSKClusterArn:
+  # Condition: CreateMSK
+  # Description: ARN of the MSK cluster
+  # Value: !Ref MSKCluster
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-msk-cluster-arn'
+  #   # ---- KINESIS/MSK OUTPUT COMMENTED OUT ----
+  # MSKBootstrapBrokers:
+  # Condition: CreateMSK
+  # Description: MSK bootstrap broker connection string (plaintext)
+  # Value: !GetAtt MSKCluster.BootstrapBrokerString
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-msk-bootstrap-brokers'
+  #   # MSKBootstrapBrokersTls:
+  # Condition: CreateMSK
+  # Description: MSK bootstrap broker connection string (TLS)
+  # Value: !GetAtt MSKCluster.BootstrapBrokerStringTls
+  # Export:
+  # Name: !Sub '${ProjectName}-${Environment}-msk-bootstrap-brokers-tls'
+  #   # OpenSearch outputs
   OpenSearchDomainEndpoint:
     Description: OpenSearch domain endpoint URL
     Value: !Sub 'https://${OpenSearchDomain.DomainEndpoint}'

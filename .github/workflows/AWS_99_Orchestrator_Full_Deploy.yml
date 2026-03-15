@@ -47,16 +47,16 @@ on:
         default: 'latest'
 
       skip_messaging:
-        description: 'Skip MSK + OpenSearch stack (~$200+/mo) — run AWS_05 separately later to add it'
+        description: 'Skip MSK + OpenSearch (using embedded Kafka — enable only if you need AWS-managed Kafka/OpenSearch)'
         required: false
         type: boolean
-        default: false
+        default: true
 
       skip_eks:
-        description: 'Skip EKS cluster stack (~$150+/mo) — run AWS_07 separately later to add it'
+        description: 'Skip EKS cluster (using Fargate for containers — EKS only needed for custom Kubernetes workloads)'
         required: false
         type: boolean
-        default: false
+        default: true
 
       skip_build:
         description: 'Skip Docker build & push — use when images are already in ECR'
@@ -123,7 +123,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Stack | Current Status | Action |" >> "$GITHUB_STEP_SUMMARY"
           echo "|-------|---------------|--------|" >> "$GITHUB_STEP_SUMMARY"
-          for stack in vpc-sg core-infra observability messaging-search secrets eks fargate data-seed; do  # auth(cognito) excluded
+          for stack in vpc-sg core-infra observability secrets fargate data-seed; do  # auth(cognito), messaging(embedded kafka), eks excluded by default
             raw=$(aws cloudformation describe-stacks \
               --stack-name "${PRJ}-${ENV}-${stack}" \
               --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
