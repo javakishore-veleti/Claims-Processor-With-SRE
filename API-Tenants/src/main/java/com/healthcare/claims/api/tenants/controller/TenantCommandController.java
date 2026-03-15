@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,6 +32,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/tenants")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Tenants - Commands", description = "Tenant create, update, delete, status change")
 public class TenantCommandController {
 
     private final TenantCommandHandler commandHandler;

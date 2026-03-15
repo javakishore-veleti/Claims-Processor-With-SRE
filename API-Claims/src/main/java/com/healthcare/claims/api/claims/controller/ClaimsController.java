@@ -31,6 +31,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +43,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/claims")
 @RequiredArgsConstructor
+@Tag(name = "Claims", description = "Claims CRUD, search, stage management, and processing workflow")
 public class ClaimsController {
 
     private final ClaimService claimService;
@@ -48,6 +52,7 @@ public class ClaimsController {
     private final ClaimWorkflowService claimWorkflowService;
 
     @PostMapping
+    @Operation(summary = "Create a new claim", description = "Creates a claim for an existing member within a tenant")
     public ResponseEntity<ApiResponse<ClaimRespDTO>> createClaim(@Valid @RequestBody ClaimReqDTO request) {
         // Decrypt incoming encrypted IDs
         if (request.getCustomerId() != null) {
@@ -59,6 +64,7 @@ public class ClaimsController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get claim by ID", description = "Returns full claim details including extracted data and adjudication result")
     public ResponseEntity<ApiResponse<ClaimRespDTO>> getClaimById(@PathVariable String id) {
         String decryptedId = encryptionService.decrypt(id, IdType.CLAIM);
         ClaimRespDTO response = claimService.getClaimById(UUID.fromString(decryptedId));
@@ -67,6 +73,7 @@ public class ClaimsController {
     }
 
     @GetMapping
+    @Operation(summary = "Search claims", description = "Search claims by customerId, stage, claimNumber with pagination")
     public ResponseEntity<PagedResponse<ClaimRespDTO>> searchClaims(
             @RequestParam(required = false) String customerId,
             @RequestParam(required = false) ClaimStage stage,
@@ -93,6 +100,7 @@ public class ClaimsController {
     }
 
     @PatchMapping("/{id}/stage")
+    @Operation(summary = "Update claim stage", description = "Validates and advances the claim to a new processing stage")
     public ResponseEntity<ApiResponse<ClaimRespDTO>> updateClaimStage(@PathVariable String id,
                                                                       @RequestBody Map<String, String> body) {
         String decryptedId = encryptionService.decrypt(id, IdType.CLAIM);
@@ -112,6 +120,7 @@ public class ClaimsController {
     }
 
     @PostMapping("/{id}/documents")
+    @Operation(summary = "Upload claim documents", description = "Upload one or more claim artifacts (PDF, images, EDI)")
     public ResponseEntity<ApiResponse<List<String>>> uploadDocuments(
             @PathVariable String id,
             @RequestParam("files") List<MultipartFile> files,
@@ -126,6 +135,7 @@ public class ClaimsController {
     }
 
     @PostMapping("/{id}/process-documents")
+    @Operation(summary = "Process uploaded documents", description = "Runs AI extraction pipeline on uploaded documents")
     public ResponseEntity<ApiResponse<ClaimRespDTO>> processDocuments(@PathVariable String id,
             @RequestBody List<String> storageKeys) {
         String decryptedId = encryptionService.decrypt(id, IdType.CLAIM);
@@ -145,6 +155,7 @@ public class ClaimsController {
     }
 
     @PostMapping("/{id}/adjudicate")
+    @Operation(summary = "Run AI adjudication", description = "Confidence-based routing: >=95% auto-approve, 70-94% review, <70% escalate")
     public ResponseEntity<ApiResponse<ClaimRespDTO>> adjudicate(@PathVariable String id) {
         String decryptedId = encryptionService.decrypt(id, IdType.CLAIM);
         Claim claim = claimWorkflowService.adjudicate(UUID.fromString(decryptedId));

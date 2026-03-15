@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +27,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/tenants")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Tenants - Queries", description = "Tenant search, list, lookup")
 public class TenantQueryController {
 
     private final TenantQueryHandler queryHandler;

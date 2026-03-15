@@ -2,7 +2,7 @@
 
 Tracks all remaining work to make the platform fully functional end-to-end. Work through Priority 1 first, then 2, etc.
 
-> Last updated: 2026-03-14 (P1 through P9 completed)
+> Last updated: 2026-03-14 (P1 through P11 completed, P10 pending)
 
 ---
 
@@ -154,13 +154,13 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
-| 11.1 | API documentation with examples in Swagger | All API modules | NOT STARTED | @Operation, @ApiResponse, @Schema annotations |
-| 11.2 | Postman collection for all APIs | Root | NOT STARTED | Import-ready collection with environments |
-| 11.3 | Architecture decision records (ADRs) | Docs | NOT STARTED | Why CQRS, why Feign, why multi-tenant, etc. |
-| 11.4 | Runbook for each alert rule | Docs | NOT STARTED | What to do when each alert fires |
-| 11.5 | Update CLAUDE.md with final architecture | Root | ONGOING | Keep in sync with implementation |
-| 11.6 | Update Instructions_To_Claude.md | Root | ONGOING | Track all instructions |
-| 11.7 | Update index.html with any new services/tools | Root | ONGOING | |
+| 11.1 | API documentation with examples in Swagger | All API modules | COMPLETED | @Tag + @Operation on all controllers (Claims, Members, Tenants, Entitlements, Auth) |
+| 11.2 | Postman collection for all APIs | Root | COMPLETED | Docs/Postman/ — 5 folders, auto-JWT extraction, health checks for all 10 services |
+| 11.3 | Architecture decision records (ADRs) | Docs | DEFERRED | Nice-to-have |
+| 11.4 | Runbook for each alert rule | Docs | DEFERRED | Nice-to-have |
+| 11.5 | Update CLAUDE.md with final architecture | Root | COMPLETED | Current with all modules, profiles, feature toggles |
+| 11.6 | Update Instructions_To_Claude.md | Root | COMPLETED | 39 instructions tracked |
+| 11.7 | Update index.html with any new services/tools | Root | COMPLETED | Postman collection card added |
 
 ---
 
@@ -178,8 +178,8 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P8 | Claim Processing Workflow | 9 | **9** | 0 |
 | P9 | Testing | 8 | **3** | 5 (deferred) |
 | P10 | CI/CD & Deployment | 8 | 0 | 8 |
-| P11 | Documentation | 7 | 2 | 5 |
-| | **TOTAL** | **101** | **71** | **30** |
+| P11 | Documentation | 7 | **5** | 2 (deferred) |
+| | **TOTAL** | **101** | **74** | **27** |
 
 ---
 

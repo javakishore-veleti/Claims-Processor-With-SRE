@@ -18,6 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Authentication", description = "Login, logout, signup")
 public class AuthController {
 
     private final UserCommandHandler userCommandHandler;
@@ -38,6 +42,7 @@ public class AuthController {
     private final JwtService jwtService;
 
     @PostMapping("/signup")
+    @Operation(summary = "Sign up", description = "Create a new user account")
     public ResponseEntity<ApiResponse<Map<String, Object>>> signup(@Valid @RequestBody CreateUserCommand command) {
         User user = userCommandHandler.createUser(command);
         Map<String, Object> data = Map.of(
@@ -49,6 +54,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Login", description = "Authenticate with username/password, returns JWT token")
     public ResponseEntity<ApiResponse<Map<String, Object>>> login(@RequestBody Map<String, String> credentials) {
         String tenantId = credentials.get("tenantId");
         String username = credentials.get("username");

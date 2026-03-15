@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/entitlements/privileges")
 @RequiredArgsConstructor
+@Tag(name = "Privileges", description = "Privilege CRUD and management")
 public class PrivilegeController {
 
     private final EntitlementCommandHandler entitlementCommandHandler;

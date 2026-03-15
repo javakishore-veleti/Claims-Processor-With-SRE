@@ -15,12 +15,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/entitlements/users")
 @RequiredArgsConstructor
+@Tag(name = "Users - Commands", description = "User create, update, delete, group assignment")
 public class UserCommandController {
 
     private final UserCommandHandler userCommandHandler;

@@ -12,12 +12,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/entitlements/users")
 @RequiredArgsConstructor
+@Tag(name = "Users - Queries", description = "User search, list, lookup, privilege resolution")
 public class UserQueryController {
 
     private final UserQueryHandler userQueryHandler;

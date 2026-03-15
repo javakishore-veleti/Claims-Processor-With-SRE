@@ -1,0 +1,143 @@
+{
+    "info": {
+        "name": "Claims Processor With SRE",
+        "description": "API collection for the Healthcare Claims Processing Platform",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        { "key": "baseUrl", "value": "http://localhost" },
+        { "key": "tenantId", "value": "default-tenant" },
+        { "key": "jwtToken", "value": "" },
+        { "key": "claimId", "value": "" },
+        { "key": "memberId", "value": "" }
+    ],
+    "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{jwtToken}}" }]
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}:8087/api/v1/auth/login",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "X-Tenant-Id", "value": "{{tenantId}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+                        }
+                    },
+                    "event": [{
+                        "listen": "test",
+                        "script": {
+                            "exec": ["var json = pm.response.json();", "if(json.data && json.data.token) pm.collectionVariables.set('jwtToken', json.data.token);"]
+                        }
+                    }]
+                },
+                {
+                    "name": "Signup",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}:8087/api/v1/auth/signup",
+                        "header": [{ "key": "Content-Type", "value": "application/json" }],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"username\": \"newuser\",\n  \"email\": \"newuser@test.com\",\n  \"firstName\": \"New\",\n  \"lastName\": \"User\",\n  \"password\": \"password123\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Tenants",
+            "item": [
+                {
+                    "name": "List All Tenants",
+                    "request": { "method": "GET", "url": "{{baseUrl}}:8086/api/v1/tenants", "header": [{ "key": "X-Tenant-Id", "value": "{{tenantId}}" }] }
+                },
+                {
+                    "name": "Get Active Tenants",
+                    "request": { "method": "GET", "url": "{{baseUrl}}:8086/api/v1/tenants/active" }
+                },
+                {
+                    "name": "Create Tenant",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}:8086/api/v1/tenants",
+                        "header": [{ "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Healthcare\",\n  \"displayName\": \"Test Healthcare Inc\",\n  \"domain\": \"testhealthcare.com\",\n  \"plan\": \"professional\",\n  \"contactEmail\": \"admin@testhealthcare.com\"\n}" }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Members",
+            "item": [
+                {
+                    "name": "List Members",
+                    "request": { "method": "GET", "url": "{{baseUrl}}:8084/api/v1/members", "header": [{ "key": "X-Tenant-Id", "value": "{{tenantId}}" }] }
+                },
+                {
+                    "name": "Create Member",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}:8084/api/v1/members",
+                        "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Tenant-Id", "value": "{{tenantId}}" }],
+                        "body": { "mode": "raw", "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"memberId\": \"MBR-TEST-001\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Smith\",\n  \"dateOfBirth\": \"1985-06-15\",\n  \"email\": \"john.smith@email.com\",\n  \"policyNumber\": \"POL-001\"\n}" }
+                    }
+                },
+                {
+                    "name": "Lookup Member",
+                    "request": { "method": "GET", "url": "{{baseUrl}}:8084/api/v1/members/lookup?memberId=MBR-TEST-001", "header": [{ "key": "X-Tenant-Id", "value": "{{tenantId}}" }] }
+                }
+            ]
+        },
+        {
+            "name": "Claims",
+            "item": [
+                {
+                    "name": "List Claims",
+                    "request": { "method": "GET", "url": "{{baseUrl}}:8083/api/v1/claims", "header": [{ "key": "X-Tenant-Id", "value": "{{tenantId}}" }] }
+                },
+                {
+                    "name": "Create Claim",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}:8083/api/v1/claims",
+                        "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Tenant-Id", "value": "{{tenantId}}" }],
+                        "body": { "mode": "raw", "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"customerId\": \"CUST-001\",\n  \"claimNumber\": \"CLM-2026-0001\",\n  \"stage\": \"INTAKE_RECEIVED\"\n}" }
+                    }
+                },
+                {
+                    "name": "Check Eligibility",
+                    "request": { "method": "POST", "url": "{{baseUrl}}:8083/api/v1/claims/{{claimId}}/check-eligibility", "header": [{ "key": "X-Tenant-Id", "value": "{{tenantId}}" }] }
+                },
+                {
+                    "name": "Adjudicate Claim",
+                    "request": { "method": "POST", "url": "{{baseUrl}}:8083/api/v1/claims/{{claimId}}/adjudicate", "header": [{ "key": "X-Tenant-Id", "value": "{{tenantId}}" }] }
+                }
+            ]
+        },
+        {
+            "name": "Health Checks",
+            "item": [
+                { "name": "API-Claims Health", "request": { "method": "GET", "url": "{{baseUrl}}:8083/actuator/health" } },
+                { "name": "API-Members Health", "request": { "method": "GET", "url": "{{baseUrl}}:8084/actuator/health" } },
+                { "name": "API-Tenants Health", "request": { "method": "GET", "url": "{{baseUrl}}:8086/actuator/health" } },
+                { "name": "API-Entitlements Health", "request": { "method": "GET", "url": "{{baseUrl}}:8087/actuator/health" } },
+                { "name": "Portal-Advisor Health", "request": { "method": "GET", "url": "{{baseUrl}}:8081/actuator/health" } },
+                { "name": "Portal-Member Health", "request": { "method": "GET", "url": "{{baseUrl}}:8082/actuator/health" } },
+                { "name": "Portal-Batch Health", "request": { "method": "GET", "url": "{{baseUrl}}:8085/actuator/health" } },
+                { "name": "Portal-Tenants Health", "request": { "method": "GET", "url": "{{baseUrl}}:8088/actuator/health" } },
+                { "name": "Portal-Entitlements Health", "request": { "method": "GET", "url": "{{baseUrl}}:8089/actuator/health" } },
+                { "name": "Portal-SRE Health", "request": { "method": "GET", "url": "{{baseUrl}}:8090/actuator/health" } }
+            ]
+        }
+    ]
+}

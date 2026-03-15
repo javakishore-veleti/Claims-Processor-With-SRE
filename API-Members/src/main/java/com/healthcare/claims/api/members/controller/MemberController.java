@@ -32,14 +32,14 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/members")
 @RequiredArgsConstructor
-@Tag(name = "Members", description = "Member/Customer management API")
+@Tag(name = "Members", description = "Member/customer CRUD, search, and lookup")
 public class MemberController {
 
     private final MemberService memberService;
     private final EncryptionService encryptionService;
 
     @PostMapping
-    @Operation(summary = "Create a new member")
+    @Operation(summary = "Create member")
     public ResponseEntity<ApiResponse<MemberRespDTO>> createMember(@Valid @RequestBody MemberReqDTO request) {
         MemberRespDTO response = memberService.createMember(request);
         encryptResponseIds(response);
@@ -47,7 +47,7 @@ public class MemberController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a member by ID")
+    @Operation(summary = "Get member by ID")
     public ResponseEntity<ApiResponse<MemberRespDTO>> getMemberById(@PathVariable String id) {
         String decryptedId = encryptionService.decrypt(id, IdType.MEMBER);
         MemberRespDTO response = memberService.getMemberById(UUID.fromString(decryptedId));
@@ -56,7 +56,7 @@ public class MemberController {
     }
 
     @GetMapping
-    @Operation(summary = "Search members by query parameters")
+    @Operation(summary = "Search members", description = "Search by firstName, lastName, memberId, dateOfBirth, policyNumber")
     public ResponseEntity<PagedResponse<MemberRespDTO>> searchMembers(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
@@ -82,7 +82,7 @@ public class MemberController {
     }
 
     @GetMapping("/lookup")
-    @Operation(summary = "Lookup a member by memberId or SSN last 4 digits")
+    @Operation(summary = "Lookup member", description = "Lookup by memberId and/or last 4 SSN digits")
     public ResponseEntity<ApiResponse<MemberRespDTO>> lookupMember(
             @RequestParam(required = false) String memberId,
             @RequestParam(required = false) String ssnLast4) {
