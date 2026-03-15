@@ -133,7 +133,6 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} - EKS cluster security group'
-      GroupName: !Sub '${ProjectName}-${Environment}-sg-eks-cluster'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp

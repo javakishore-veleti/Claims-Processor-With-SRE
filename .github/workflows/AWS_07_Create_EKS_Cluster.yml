@@ -125,11 +125,6 @@ jobs:
               PublicSubnet2="${{ steps.resolve-network.outputs.PUBLIC_SUBNET_2 }}" \
               EKSNodeCount="${NODE_COUNT}" \
               EKSNodeInstanceType="${NODE_TYPE}" \
-            --tags \
-              Project=${{ env.PROJECT_NAME }} \
-              Environment="${ENV}" \
-              ManagedBy=github-actions \
-              Component=eks-cluster \
             --no-fail-on-empty-changeset
 
           echo "EKS cluster stack deployed successfully."

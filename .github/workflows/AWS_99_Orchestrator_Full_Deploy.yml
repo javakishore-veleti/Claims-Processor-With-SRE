@@ -1,0 +1,687 @@
+name: "AWS_99 — Full Environment Orchestrator"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Single workflow to deploy ALL AWS stacks in order.
+# - Checks which stacks already exist → skips them
+# - Reads all outputs from CloudFormation (no job-to-job passing needed)
+# - Optional: skip EKS, MSK/OpenSearch, and/or Docker image build
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+
+      use_existing_vpc:
+        description: 'Use an existing VPC instead of creating a new one'
+        required: false
+        type: boolean
+        default: false
+
+      existing_vpc_id:
+        description: 'Existing VPC ID (only when use_existing_vpc = true)'
+        required: false
+        type: string
+        default: ''
+
+      callback_url:
+        description: 'Cognito OAuth2 callback URL | local: http://localhost:8081/callback | post-deploy: https://<ALB-DNS>/callback'
+        required: false
+        type: string
+        default: 'http://localhost:8081/callback'
+
+      logout_url:
+        description: 'Cognito OAuth2 logout URL | local: http://localhost:8081/logout | post-deploy: https://<ALB-DNS>/logout'
+        required: false
+        type: string
+        default: 'http://localhost:8081/logout'
+
+      image_tag:
+        description: 'Docker image tag for Fargate services'
+        required: false
+        type: string
+        default: 'latest'
+
+      skip_messaging:
+        description: 'Skip MSK + OpenSearch stack (~$200+/mo) — run AWS_05 separately later to add it'
+        required: false
+        type: boolean
+        default: false
+
+      skip_eks:
+        description: 'Skip EKS cluster stack (~$150+/mo) — run AWS_07 separately later to add it'
+        required: false
+        type: boolean
+        default: false
+
+      skip_build:
+        description: 'Skip Docker build & push — use when images are already in ECR'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+
+jobs:
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 0  CHECK — Inspect every stack; emit skip/deploy flags
+  # ───────────────────────────────────────────────────────────────────────────
+  check:
+    name: "0 — Check Stack Statuses"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      s01: ${{ steps.status.outputs.s01 }}
+      s02: ${{ steps.status.outputs.s02 }}
+      s03: ${{ steps.status.outputs.s03 }}
+      s04: ${{ steps.status.outputs.s04 }}
+      s05: ${{ steps.status.outputs.s05 }}
+      s06: ${{ steps.status.outputs.s06 }}
+      s07: ${{ steps.status.outputs.s07 }}
+      s09: ${{ steps.status.outputs.s09 }}
+      s10: ${{ steps.status.outputs.s10 }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check all stack statuses
+        id: status
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          check_stack() {
+            local s
+            s=$(aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+            [[ "$s" == "CREATE_COMPLETE" || "$s" == "UPDATE_COMPLETE" ]] && echo "skip" || echo "deploy"
+          }
+
+          echo "s01=$(check_stack "${PRJ}-${ENV}-vpc-sg")"            >> "$GITHUB_OUTPUT"
+          echo "s02=$(check_stack "${PRJ}-${ENV}-core-infra")"        >> "$GITHUB_OUTPUT"
+          echo "s03=$(check_stack "${PRJ}-${ENV}-observability")"     >> "$GITHUB_OUTPUT"
+          echo "s04=$(check_stack "${PRJ}-${ENV}-auth")"              >> "$GITHUB_OUTPUT"
+          echo "s05=$(check_stack "${PRJ}-${ENV}-messaging-search")"  >> "$GITHUB_OUTPUT"
+          echo "s06=$(check_stack "${PRJ}-${ENV}-secrets")"           >> "$GITHUB_OUTPUT"
+          echo "s07=$(check_stack "${PRJ}-${ENV}-eks")"               >> "$GITHUB_OUTPUT"
+          echo "s09=$(check_stack "${PRJ}-${ENV}-fargate")"           >> "$GITHUB_OUTPUT"
+          echo "s10=$(check_stack "${PRJ}-${ENV}-data-seed")"         >> "$GITHUB_OUTPUT"
+
+          # ── Step Summary ──
+          echo "## 🔍 Pre-Flight Stack Status" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Stack | Current Status | Action |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|---------------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          for stack in vpc-sg core-infra observability auth messaging-search secrets eks fargate data-seed; do
+            raw=$(aws cloudformation describe-stacks \
+              --stack-name "${PRJ}-${ENV}-${stack}" \
+              --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+            if [[ "$raw" == "CREATE_COMPLETE" || "$raw" == "UPDATE_COMPLETE" ]]; then
+              icon="⏭️"; action="Skip (already deployed)"
+            else
+              icon="🚀"; action="Deploy"
+            fi
+            echo "| \`${PRJ}-${ENV}-${stack}\` | \`${raw}\` | ${icon} ${action} |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> **Environment:** \`$ENV\` | **Region:** \`${{ env.AWS_REGION }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1  VPC & SECURITY GROUPS
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-01-vpc:
+    name: "1 — VPC & Security Groups"
+    needs: check
+    if: needs.check.outputs.s01 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy VPC & Security Groups
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+          USE_EXISTING: ${{ inputs.use_existing_vpc }}
+          EXISTING_VPC: ${{ inputs.existing_vpc_id }}
+        run: |
+          CREATE_NEW="true"
+          [[ "${USE_EXISTING}" == "true" && -n "${EXISTING_VPC}" ]] && CREATE_NEW="false"
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/vpc-security-groups.yaml \
+            --stack-name "${PRJ}-${ENV}-vpc-sg" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              CreateNewVpc="${CREATE_NEW}" \
+              ExistingVpcId="${EXISTING_VPC}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-vpc-sg\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 2  CORE INFRASTRUCTURE (RDS, Redis, S3, ECR)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-02-core:
+    name: "2 — Core Infrastructure"
+    needs: [check, deploy-01-vpc]
+    if: always() && !failure() && needs.check.outputs.s02 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy Core Infrastructure
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          get_out() {
+            aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          VPC="${PRJ}-${ENV}-vpc-sg"
+          VPC_ID=$(get_out "$VPC" "VpcId")
+          PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
+          PRV2=$(get_out "$VPC" "PrivateSubnet2Id")
+          APP_SG=$(get_out "$VPC" "AppSecurityGroupId")
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/core-infrastructure.yaml \
+            --stack-name "${PRJ}-${ENV}-core-infra" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              VpcId="${VPC_ID}" \
+              PrivateSubnet1="${PRV1}" \
+              PrivateSubnet2="${PRV2}" \
+              AppSecurityGroupId="${APP_SG}" \
+              RDSMasterPassword="${{ secrets.CLAIMS_PROC_DB_PASSWORD }}" \
+              RedisAuthToken="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-core-infra\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 3  OBSERVABILITY (CloudWatch, CloudTrail, SNS)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-03-obs:
+    name: "3 — Observability"
+    needs: [check, deploy-02-core]
+    if: always() && !failure() && needs.check.outputs.s03 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy Observability Stack
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/observability.yaml \
+            --stack-name "${PRJ}-${ENV}-observability" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-observability\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 4  AUTH (Cognito)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-04-auth:
+    name: "4 — Auth (Cognito)"
+    needs: [check, deploy-03-obs]
+    if: always() && !failure() && needs.check.outputs.s04 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy Cognito Auth Stack
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+          CALLBACK_URL: ${{ inputs.callback_url }}
+          LOGOUT_URL: ${{ inputs.logout_url }}
+        run: |
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/auth-cognito.yaml \
+            --stack-name "${PRJ}-${ENV}-auth" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              CallbackURL="${CALLBACK_URL}" \
+              LogoutURL="${LOGOUT_URL}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-auth\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 5  MESSAGING & SEARCH (MSK + OpenSearch)  ── OPTIONAL (skip_messaging)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-05-messaging:
+    name: "5 — Messaging & Search (MSK/OpenSearch)"
+    needs: [check, deploy-04-auth]
+    if: always() && !failure() && needs.check.outputs.s05 == 'deploy' && inputs.skip_messaging == false
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy Messaging & Search
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          get_out() {
+            aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          VPC="${PRJ}-${ENV}-vpc-sg"
+          VPC_ID=$(get_out "$VPC" "VpcId")
+          PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
+          PRV2=$(get_out "$VPC" "PrivateSubnet2Id")
+          APP_SG=$(get_out "$VPC" "AppSecurityGroupId")
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/messaging-search.yaml \
+            --stack-name "${PRJ}-${ENV}-messaging-search" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              VpcId="${VPC_ID}" \
+              PrivateSubnet1="${PRV1}" \
+              PrivateSubnet2="${PRV2}" \
+              AppSecurityGroupId="${APP_SG}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-messaging-search\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 6  SECRETS MANAGER
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-06-secrets:
+    name: "6 — Secrets Manager"
+    needs: [check, deploy-04-auth, deploy-05-messaging]
+    if: always() && !failure() && needs.check.outputs.s06 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Secrets Manager Stack
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/secrets-manager.yaml \
+            --stack-name "${PRJ}-${ENV}-secrets" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-secrets\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Populate secrets with infrastructure values
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+          DB_PASS: ${{ secrets.CLAIMS_PROC_DB_PASSWORD }}
+          REDIS_TOKEN: ${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}
+          JWT_KEY: ${{ secrets.CLAIMS_PROC_JWT_SIGNING_KEY }}
+          AES_KEY: ${{ secrets.CLAIMS_PROC_AES_ENCRYPTION_KEY }}
+        run: |
+          get_out() {
+            aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          CORE="${PRJ}-${ENV}-core-infra"
+          AUTH="${PRJ}-${ENV}-auth"
+          SEC="${PRJ}-${ENV}-secrets"
+
+          RDS_HOST=$(get_out "$CORE" "RDSEndpoint")
+          RDS_PORT=$(get_out "$CORE" "RDSPort")
+          POOL_ID=$(get_out "$AUTH" "UserPoolId")
+          CLIENT_ID=$(get_out "$AUTH" "UserPoolClientId")
+          DOMAIN=$(get_out "$AUTH" "UserPoolDomain")
+          RDS_ARN=$(get_out "$SEC" "RDSCredentialsSecretArn")
+          JWT_ARN=$(get_out "$SEC" "JWTSigningKeySecretArn")
+          ENC_ARN=$(get_out "$SEC" "EncryptionKeysSecretArn")
+          COG_ARN=$(get_out "$SEC" "CognitoConfigSecretArn")
+          REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
+
+          [[ -n "$RDS_ARN" && -n "$DB_PASS" ]] && \
+            aws secretsmanager put-secret-value --secret-id "$RDS_ARN" \
+              --secret-string "{\"username\":\"claims_user\",\"password\":\"${DB_PASS}\",\"host\":\"${RDS_HOST}\",\"port\":\"${RDS_PORT}\",\"dbname\":\"claims_db\"}"
+
+          [[ -n "$REDIS_ARN" && -n "$REDIS_TOKEN" ]] && \
+            aws secretsmanager put-secret-value --secret-id "$REDIS_ARN" \
+              --secret-string "{\"auth-token\":\"${REDIS_TOKEN}\"}"
+
+          [[ -n "$JWT_ARN" && -n "$JWT_KEY" ]] && \
+            aws secretsmanager put-secret-value --secret-id "$JWT_ARN" \
+              --secret-string "{\"signing-key\":\"${JWT_KEY}\"}"
+
+          [[ -n "$ENC_ARN" && -n "$AES_KEY" ]] && \
+            aws secretsmanager put-secret-value --secret-id "$ENC_ARN" \
+              --secret-string "{\"aes-key\":\"${AES_KEY}\"}"
+
+          [[ -n "$COG_ARN" ]] && \
+            aws secretsmanager put-secret-value --secret-id "$COG_ARN" \
+              --secret-string "{\"userPoolId\":\"${POOL_ID}\",\"clientId\":\"${CLIENT_ID}\",\"domain\":\"${DOMAIN}\"}"
+
+          echo "::notice::Secrets populated for ${ENV}"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 7  EKS CLUSTER  ── OPTIONAL (skip_eks)
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-07-eks:
+    name: "7 — EKS Cluster"
+    needs: [check, deploy-06-secrets]
+    if: always() && !failure() && needs.check.outputs.s07 == 'deploy' && inputs.skip_eks == false
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy EKS Cluster
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          get_out() {
+            aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          VPC="${PRJ}-${ENV}-vpc-sg"
+          VPC_ID=$(get_out "$VPC" "VpcId")
+          PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
+          PRV2=$(get_out "$VPC" "PrivateSubnet2Id")
+          PUB1=$(get_out "$VPC" "PublicSubnet1Id")
+          PUB2=$(get_out "$VPC" "PublicSubnet2Id")
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/eks-cluster.yaml \
+            --stack-name "${PRJ}-${ENV}-eks" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              VpcId="${VPC_ID}" \
+              PrivateSubnet1="${PRV1}" \
+              PrivateSubnet2="${PRV2}" \
+              PublicSubnet1="${PUB1}" \
+              PublicSubnet2="${PUB2}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-eks\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 8  BUILD & PUSH DOCKER IMAGES TO ECR  ── OPTIONAL (skip_build)
+  # ───────────────────────────────────────────────────────────────────────────
+  build-images:
+    name: "8 — Build & Push Docker Images"
+    needs: [check, deploy-06-secrets]
+    if: always() && !failure() && inputs.skip_build == false
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Build Java artifacts
+        run: mvn clean install -DskipTests -B -q
+      - name: Build & push Docker images
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${REGISTRY}"
+
+          MODULES=(
+            "api-claims:API-Claims"
+            "api-members:API-Members"
+            "api-tenants:API-Tenants"
+            "api-entitlements:API-Entitlements"
+            "portal-claims-advisor:Portal-Claims-Advisor"
+            "portal-claims-member:Portal-Claims-Member"
+            "portal-batch-assignment:Portal-Batch-Assignment"
+            "portal-tenants:Portal-Tenants"
+            "portal-entitlements:Portal-Entitlements"
+            "portal-sre:Portal-SRE"
+          )
+
+          for entry in "${MODULES[@]}"; do
+            NAME="${entry%%:*}"
+            DIR="${entry##*:}"
+            REPO="${REGISTRY}/${PRJ}-${NAME}"
+
+            aws ecr describe-repositories --repository-names "${PRJ}-${NAME}" 2>/dev/null || \
+              aws ecr create-repository --repository-name "${PRJ}-${NAME}"
+
+            docker build -t "${REPO}:${IMAGE_TAG}" "${DIR}/"
+            docker push "${REPO}:${IMAGE_TAG}"
+            echo "  ✅ Pushed ${NAME}:${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 9  API GATEWAY + FARGATE SERVICES
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-09-fargate:
+    name: "9 — API Gateway & Fargate Services"
+    needs: [check, build-images, deploy-07-eks]
+    if: always() && !failure() && needs.check.outputs.s09 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy API Gateway & Fargate
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          get_out() {
+            aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          VPC="${PRJ}-${ENV}-vpc-sg"
+          SEC="${PRJ}-${ENV}-secrets"
+          AUTH="${PRJ}-${ENV}-auth"
+
+          VPC_ID=$(get_out "$VPC" "VpcId")
+          PUB1=$(get_out "$VPC" "PublicSubnet1Id")
+          PUB2=$(get_out "$VPC" "PublicSubnet2Id")
+          PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
+          PRV2=$(get_out "$VPC" "PrivateSubnet2Id")
+          APP_SG=$(get_out "$VPC" "AppSecurityGroupId")
+          ALB_SG=$(get_out "$VPC" "ALBSecurityGroupId")
+          RDS_ARN=$(get_out "$SEC" "RDSCredentialsSecretArn")
+          REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
+          POOL_ID=$(get_out "$AUTH" "UserPoolId")
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
+            --stack-name "${PRJ}-${ENV}-fargate" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              VpcId="${VPC_ID}" \
+              PublicSubnet1="${PUB1}" \
+              PublicSubnet2="${PUB2}" \
+              PrivateSubnet1="${PRV1}" \
+              PrivateSubnet2="${PRV2}" \
+              AppSecurityGroupId="${APP_SG}" \
+              ALBSecurityGroupId="${ALB_SG}" \
+              ImageTag="${IMAGE_TAG}" \
+              AWSAccountId="${ACCOUNT_ID}" \
+              AWSRegion="${AWS_REGION}" \
+              RDSSecretArn="${RDS_ARN}" \
+              RedisSecretArn="${REDIS_ARN}" \
+              CognitoUserPoolId="${POOL_ID}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-fargate\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 10  DATA SEED LAMBDA
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-10-seed:
+    name: "10 — Data Seed Lambda"
+    needs: [check, deploy-09-fargate]
+    if: always() && !failure() && needs.check.outputs.s10 == 'deploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy Data Seed Lambda
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          get_out() {
+            aws cloudformation describe-stacks --stack-name "$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          VPC="${PRJ}-${ENV}-vpc-sg"
+          CORE="${PRJ}-${ENV}-core-infra"
+
+          VPC_ID=$(get_out "$VPC" "VpcId")
+          PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
+          PRV2=$(get_out "$VPC" "PrivateSubnet2Id")
+          RDS_SG=$(get_out "$VPC" "RDSSecurityGroupId")
+          RDS_ENDPOINT=$(get_out "$CORE" "RDSEndpoint")
+          RDS_PORT=$(get_out "$CORE" "RDSPort")
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/data-seed-lambda.yaml \
+            --stack-name "${PRJ}-${ENV}-data-seed" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              VpcId="${VPC_ID}" \
+              PrivateSubnet1="${PRV1}" \
+              PrivateSubnet2="${PRV2}" \
+              RDSSecurityGroupId="${RDS_SG}" \
+              RDSEndpoint="${RDS_ENDPOINT}" \
+              RDSPort="${RDS_PORT}" \
+              RDSUsername="claims_user" \
+              RDSPassword="${{ secrets.CLAIMS_PROC_DB_PASSWORD }}" \
+              RDSDBName="claims_db" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+          echo "### ✅ Stack: \`${PRJ}-${ENV}-data-seed\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # SUMMARY — Full environment dashboard
+  # ───────────────────────────────────────────────────────────────────────────
+  summary:
+    name: "✅ Environment Dashboard"
+    needs:
+      - deploy-01-vpc
+      - deploy-02-core
+      - deploy-03-obs
+      - deploy-04-auth
+      - deploy-05-messaging
+      - deploy-06-secrets
+      - deploy-07-eks
+      - build-images
+      - deploy-09-fargate
+      - deploy-10-seed
+    if: always()
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Generate environment dashboard
+        env:
+          ENV: ${{ inputs.environment }}
+          REGION: ${{ env.AWS_REGION }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          REPO: ${{ github.repository }}
+        run: |
+          chmod +x DevOps/AWS/scripts/environment-dashboard.sh
+          bash DevOps/AWS/scripts/environment-dashboard.sh

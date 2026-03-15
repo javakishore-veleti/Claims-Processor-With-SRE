@@ -73,7 +73,6 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} - Data seed Lambda (outbound to RDS on 5432)'
-      GroupName: !Sub '${ProjectName}-${Environment}-sg-data-seed-lambda'
       VpcId: !Ref VpcId
       SecurityGroupEgress:
         - IpProtocol: tcp

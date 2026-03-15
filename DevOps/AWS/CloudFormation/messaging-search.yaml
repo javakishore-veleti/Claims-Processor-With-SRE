@@ -84,6 +84,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: messaging
         - Key: Stream
@@ -104,6 +108,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: messaging
         - Key: Stream
@@ -124,6 +132,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: messaging
         - Key: Stream
@@ -144,6 +156,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: messaging
         - Key: Stream
@@ -157,7 +173,6 @@ Resources:
     Condition: CreateMSK
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} MSK cluster security group'
-      GroupName: !Sub '${ProjectName}-${Environment}-msk-sg'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -175,6 +190,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: msk
 
@@ -231,7 +250,6 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} OpenSearch security group'
-      GroupName: !Sub '${ProjectName}-${Environment}-opensearch-sg'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -244,6 +262,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: opensearch
 
@@ -302,6 +324,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: messaging-search
         - Key: Service
           Value: opensearch
 

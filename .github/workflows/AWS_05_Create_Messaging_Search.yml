@@ -114,11 +114,6 @@ jobs:
               OpenSearchInstanceCount="$(jq -r '.[] | select(.ParameterKey=="OpenSearchInstanceCount") | .ParameterValue' ${PARAMETERS_FILE})" \
               UseMSK="${USE_MSK}" \
             --capabilities CAPABILITY_IAM \
-            --tags \
-              Key=Project,Value="${PROJECT_NAME}" \
-              Key=Environment,Value="${ENV}" \
-              Key=ManagedBy,Value=github-actions \
-              Key=Component,Value=messaging-search \
             --no-fail-on-empty-changeset
 
           echo "::notice::Stack ${STACK_NAME} deployed successfully"
