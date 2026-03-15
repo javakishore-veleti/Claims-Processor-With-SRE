@@ -825,6 +825,28 @@ File: [`DevOps/AWS/IAM/claims-proc-policy-4-auth-observability.json`](DevOps/AWS
         "sns:Subscribe", "sns:Unsubscribe", "sns:Publish", "sns:TagResource"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "CloudTrail",
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:CreateTrail", "cloudtrail:UpdateTrail", "cloudtrail:DeleteTrail",
+        "cloudtrail:GetTrail", "cloudtrail:GetTrailStatus", "cloudtrail:StartLogging",
+        "cloudtrail:StopLogging", "cloudtrail:DescribeTrails", "cloudtrail:ListTrails",
+        "cloudtrail:PutEventSelectors", "cloudtrail:GetEventSelectors",
+        "cloudtrail:AddTags", "cloudtrail:RemoveTags", "cloudtrail:ListTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CostExplorer",
+      "Effect": "Allow",
+      "Action": [
+        "ce:GetCostAndUsage", "ce:GetCostForecast",
+        "ce:GetDimensionValues", "ce:GetTags",
+        "budgets:DescribeBudgets", "budgets:ViewBudget"
+      ],
+      "Resource": "*"
     }
   ]
 }
