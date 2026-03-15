@@ -2,7 +2,7 @@
 
 Tracks all remaining work to make the platform fully functional end-to-end. Work through Priority 1 first, then 2, etc.
 
-> Last updated: 2026-03-14 (P1 + P2 + P3 + P4 + P5 completed)
+> Last updated: 2026-03-14 (P1 through P6 completed)
 
 ---
 
@@ -89,13 +89,13 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
-| 6.1 | Implement KafkaEventPublisher to actually publish events | API-Claims | NOT STARTED | Feature toggle: claims.features.event-stream.enabled |
-| 6.2 | Implement KafkaEventPublisher for members | API-Members | NOT STARTED | |
-| 6.3 | Create Kafka consumers for search indexing | API-Claims, API-Members | NOT STARTED | Consume events → index in ES |
-| 6.4 | Create Kafka consumers for audit trail | API-Claims | NOT STARTED | Persist audit records |
-| 6.5 | Create Kafka consumers for notifications | API-Claims | NOT STARTED | Stage change → SNS/email notification |
-| 6.6 | Verify Kafka topics created on docker startup | DevOps | NOT STARTED | claims-submitted, claims-validated, etc. |
-| 6.7 | Add dead letter queue handling | API-Claims | NOT STARTED | Failed messages → claims-dlq topic |
+| 6.1 | Implement KafkaEventPublisher to actually publish events | API-Claims | COMPLETED | ClaimServiceImpl publishes CREATED/UPDATED/STAGE_CHANGED events |
+| 6.2 | Implement KafkaEventPublisher for members | API-Members | COMPLETED | MemberServiceImpl publishes CREATED/UPDATED events |
+| 6.3 | Create Kafka consumers for search indexing | API-Claims | COMPLETED | ClaimEventConsumer listens on 3 topics, group: claims-search-indexer |
+| 6.4 | Create Kafka consumers for audit trail | API-Claims | COMPLETED | ClaimAuditConsumer on all claim topics, group: claims-audit-trail |
+| 6.5 | Create Kafka consumers for notifications | API-Claims | COMPLETED | ClaimNotificationConsumer on stage-changed, group: claims-notifications |
+| 6.6 | Verify Kafka topics created on docker startup | DevOps | COMPLETED | Added 7 new topics (claims-updated, stage-changed, deleted, members-*) |
+| 6.7 | Add dead letter queue handling | API-Claims, API-Members | COMPLETED | Failed publishes → claims-dlq / members-dlq topics |
 
 ## Priority 7: Security & Authentication
 
@@ -173,13 +173,13 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P3 | Angular UIs | 20 | **17** | 3 (deferred) |
 | P4 | OpenTelemetry | 8 | **6** | 2 (verify) |
 | P5 | Elasticsearch & Kibana | 9 | **8** | 1 (verify) |
-| P6 | Event-Driven (Kafka) | 7 | 0 | 7 |
+| P6 | Event-Driven (Kafka) | 7 | **7** | 0 |
 | P7 | Security & Auth | 8 | 0 | 8 |
 | P8 | Claim Processing Workflow | 9 | 0 | 9 |
 | P9 | Testing | 8 | 0 | 8 |
 | P10 | CI/CD & Deployment | 8 | 0 | 8 |
 | P11 | Documentation | 7 | 2 | 5 |
-| | **TOTAL** | **101** | **49** | **52** |
+| | **TOTAL** | **101** | **56** | **45** |
 
 ---
 

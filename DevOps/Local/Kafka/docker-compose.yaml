@@ -60,6 +60,13 @@ services:
       kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic claims-paid        --partitions 3 --replication-factor 1
       kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic claims-denied      --partitions 3 --replication-factor 1
       kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic claims-dlq         --partitions 1 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic claims-updated      --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic claims-stage-changed --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic claims-deleted      --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic members-created     --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic members-updated     --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic members-deleted     --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --create --if-not-exists --topic members-dlq         --partitions 1 --replication-factor 1
       echo 'Topics created successfully.'
       kafka-topics --bootstrap-server Claims-Processor-kafka:9092 --list
       "

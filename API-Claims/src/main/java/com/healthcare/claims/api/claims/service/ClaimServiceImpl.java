@@ -4,6 +4,9 @@ import com.healthcare.claims.common.claims.dto.ClaimReqDTO;
 import com.healthcare.claims.common.claims.dto.ClaimRespDTO;
 import com.healthcare.claims.api.claims.model.Claim;
 import com.healthcare.claims.api.claims.model.ClaimStage;
+import com.healthcare.claims.api.claims.event.ClaimEvent;
+import com.healthcare.claims.api.claims.event.ClaimEventType;
+import com.healthcare.claims.api.claims.event.EventPublisher;
 import com.healthcare.claims.api.claims.repository.ClaimRepository;
 import com.healthcare.claims.api.claims.search.SearchIndexService;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +16,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +30,7 @@ public class ClaimServiceImpl implements ClaimService {
 
     private final ClaimRepository claimRepository;
     private final SearchIndexService searchIndexService;
+    private final EventPublisher eventPublisher;
 
     private static final String INDEX_NAME = "claims-data";
 
@@ -53,6 +57,8 @@ public class ClaimServiceImpl implements ClaimService {
         } catch (Exception e) {
             log.warn("Failed to index claim {} in search: {}", saved.getId(), e.getMessage());
         }
+
+        publishClaimEvent(ClaimEventType.CLAIM_CREATED, saved);
 
         return toResponse(saved);
     }
@@ -102,6 +108,8 @@ public class ClaimServiceImpl implements ClaimService {
             log.warn("Failed to update claim {} in search: {}", updated.getId(), e.getMessage());
         }
 
+        publishClaimEvent(ClaimEventType.CLAIM_UPDATED, updated);
+
         return toResponse(updated);
     }
 
@@ -121,7 +129,32 @@ public class ClaimServiceImpl implements ClaimService {
             log.warn("Failed to update claim stage {} in search: {}", updated.getId(), e.getMessage());
         }
 
+        publishClaimEvent(ClaimEventType.CLAIM_STAGE_CHANGED, updated);
+
         return toResponse(updated);
+    }
+
+    private void publishClaimEvent(ClaimEventType eventType, Claim claim) {
+        try {
+            ClaimEvent event = ClaimEvent.builder()
+                    .eventType(eventType)
+                    .claimId(claim.getId().toString())
+                    .customerId(claim.getCustomerId())
+                    .claimNumber(claim.getClaimNumber())
+                    .stage(claim.getStage() != null ? claim.getStage().name() : null)
+                    .timestamp(Instant.now())
+                    .build();
+            String topic = switch (eventType) {
+                case CLAIM_CREATED -> "claims-submitted";
+                case CLAIM_UPDATED -> "claims-updated";
+                case CLAIM_STAGE_CHANGED -> "claims-stage-changed";
+                case CLAIM_DELETED -> "claims-deleted";
+                default -> "claims-events";
+            };
+            eventPublisher.publish(topic, claim.getId().toString(), event);
+        } catch (Exception e) {
+            log.warn("Failed to publish {} event for claim {}: {}", eventType, claim.getClaimNumber(), e.getMessage());
+        }
     }
 
     private Map<String, Object> claimToMap(Claim claim) {

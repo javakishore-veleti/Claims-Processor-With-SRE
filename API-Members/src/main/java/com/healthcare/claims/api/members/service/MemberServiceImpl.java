@@ -3,6 +3,9 @@ package com.healthcare.claims.api.members.service;
 import com.healthcare.claims.common.members.dto.MemberReqDTO;
 import com.healthcare.claims.common.members.dto.MemberRespDTO;
 import com.healthcare.claims.api.members.model.Member;
+import com.healthcare.claims.api.members.event.EventPublisher;
+import com.healthcare.claims.api.members.event.MemberEvent;
+import com.healthcare.claims.api.members.event.MemberEventType;
 import com.healthcare.claims.api.members.repository.MemberRepository;
 import com.healthcare.claims.api.members.search.SearchIndexService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +29,7 @@ public class MemberServiceImpl implements MemberService {
 
     private final MemberRepository memberRepository;
     private final SearchIndexService searchIndexService;
+    private final EventPublisher eventPublisher;
 
     private static final String INDEX_NAME = "members-data";
 
@@ -43,6 +48,8 @@ public class MemberServiceImpl implements MemberService {
         } catch (Exception e) {
             log.warn("Failed to index member {} in search: {}", saved.getId(), e.getMessage());
         }
+
+        publishMemberEvent(MemberEventType.MEMBER_CREATED, saved);
 
         return mapToResponse(saved);
     }
@@ -89,6 +96,8 @@ public class MemberServiceImpl implements MemberService {
             log.warn("Failed to update member {} in search: {}", updated.getId(), e.getMessage());
         }
 
+        publishMemberEvent(MemberEventType.MEMBER_UPDATED, updated);
+
         return mapToResponse(updated);
     }
 
@@ -114,6 +123,27 @@ public class MemberServiceImpl implements MemberService {
         }
 
         return mapToResponse(member);
+    }
+
+    private void publishMemberEvent(MemberEventType eventType, Member member) {
+        try {
+            MemberEvent event = MemberEvent.builder()
+                    .eventType(eventType)
+                    .memberId(member.getId().toString())
+                    .memberNumber(member.getMemberId())
+                    .firstName(member.getFirstName())
+                    .lastName(member.getLastName())
+                    .timestamp(Instant.now())
+                    .build();
+            String topic = switch (eventType) {
+                case MEMBER_CREATED -> "members-created";
+                case MEMBER_UPDATED -> "members-updated";
+                case MEMBER_DELETED -> "members-deleted";
+            };
+            eventPublisher.publish(topic, member.getId().toString(), event);
+        } catch (Exception e) {
+            log.warn("Failed to publish {} event for member {}: {}", eventType, member.getMemberId(), e.getMessage());
+        }
     }
 
     private Map<String, Object> memberToMap(Member member) {

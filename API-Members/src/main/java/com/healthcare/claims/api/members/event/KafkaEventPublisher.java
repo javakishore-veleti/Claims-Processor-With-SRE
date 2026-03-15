@@ -21,16 +21,34 @@ public class KafkaEventPublisher implements EventPublisher {
 
     @Override
     public void publish(String topic, String key, Object event) {
-        log.info("Publishing event to Kafka: topic={}, key={}", topic, key);
-        kafkaTemplate.send(topic, key, event);
+        try {
+            log.info("Publishing event to Kafka: topic={}, key={}", topic, key);
+            kafkaTemplate.send(topic, key, event);
+        } catch (Exception e) {
+            log.error("Failed to publish to {}, sending to DLQ: {}", topic, e.getMessage());
+            try {
+                kafkaTemplate.send("members-dlq", key, event);
+            } catch (Exception dlqError) {
+                log.error("Failed to send to DLQ: {}", dlqError.getMessage());
+            }
+        }
     }
 
     @Override
     public void publish(String topic, String key, Object event, Map<String, String> headers) {
-        log.info("Publishing event to Kafka with headers: topic={}, key={}, headers={}", topic, key, headers.keySet());
-        ProducerRecord<String, Object> record = new ProducerRecord<>(topic, key, event);
-        headers.forEach((headerKey, headerValue) ->
-                record.headers().add(headerKey, headerValue.getBytes()));
-        kafkaTemplate.send(record);
+        try {
+            log.info("Publishing event to Kafka with headers: topic={}, key={}, headers={}", topic, key, headers.keySet());
+            ProducerRecord<String, Object> record = new ProducerRecord<>(topic, key, event);
+            headers.forEach((headerKey, headerValue) ->
+                    record.headers().add(headerKey, headerValue.getBytes()));
+            kafkaTemplate.send(record);
+        } catch (Exception e) {
+            log.error("Failed to publish to {}, sending to DLQ: {}", topic, e.getMessage());
+            try {
+                kafkaTemplate.send("members-dlq", key, event);
+            } catch (Exception dlqError) {
+                log.error("Failed to send to DLQ: {}", dlqError.getMessage());
+            }
+        }
     }
 }
