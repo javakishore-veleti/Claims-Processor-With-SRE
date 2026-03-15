@@ -101,7 +101,6 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} RDS PostgreSQL security group'
-      GroupName: !Sub '${ProjectName}-${Environment}-sg-rds'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -574,7 +573,6 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} ElastiCache Redis security group'
-      GroupName: !Sub '${ProjectName}-${Environment}-sg-redis'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
