@@ -44,6 +44,9 @@ public class Claim {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Column(name = "customer_id", nullable = false)
     private String customerId;
 

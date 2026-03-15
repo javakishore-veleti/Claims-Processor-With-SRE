@@ -37,6 +37,9 @@ public class Member {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Column(name = "member_id", unique = true, nullable = false)
     private String memberId;
 
