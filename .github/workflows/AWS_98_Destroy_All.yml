@@ -1,5 +1,5 @@
 # =============================================================================
-# AWS_11 - Destroy All AWS Resources
+# AWS_98 - Destroy All AWS Resources
 # Tears down ALL CloudFormation stacks for a given environment in reverse
 # dependency order. Includes safety confirmation, optional RDS snapshot
 # retention, and optional S3 data preservation.
@@ -15,7 +15,7 @@
 #   8. core-infra       (RDS, S3, ElastiCache, ECR)
 #   9. vpc-sg           (VPC, subnets, NAT, security groups)
 # =============================================================================
-name: "AWS_11 - Destroy All AWS Resources"
+name: "AWS_98 - Destroy All AWS Resources"
 
 on:
   workflow_dispatch:
