@@ -41,7 +41,8 @@
         "cognito-identity:*",
         "cloudwatch:*",
         "logs:*",
-        "sns:*"
+        "sns:*",
+        "cloudtrail:*"
       ],
       "Resource": "*"
     },
