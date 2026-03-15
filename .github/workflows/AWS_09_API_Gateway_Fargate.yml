@@ -1,0 +1,253 @@
+# =============================================================================
+# AWS_09 - API Gateway & Fargate Deployment
+# Deploys or deletes the CloudFormation stack for ALB + ECS Fargate services
+# that host all 10 microservice modules behind path-based routing.
+# =============================================================================
+name: "AWS_09 - API Gateway & Fargate Deployment"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - delete
+
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: false
+        type: string
+        default: 'latest'
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: claims-proc
+  STACK_NAME: claims-proc-${{ inputs.environment }}-fargate
+  TEMPLATE_FILE: DevOps/AWS/CloudFormation/api-gateway-fargate.yaml
+
+jobs:
+  deploy-fargate:
+    name: ${{ inputs.action == 'deploy' && 'Deploy' || 'Delete' }} Fargate (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # -------------------------------------------------------------------
+      # 1. Checkout repository
+      # -------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------------------
+      # 2. Configure AWS credentials
+      # -------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -------------------------------------------------------------------
+      # 3. Resolve VPC, subnets, and security groups from CloudFormation exports
+      # -------------------------------------------------------------------
+      - name: Resolve networking parameters from VPC stack exports
+        id: networking
+        run: |
+          ENV="${{ inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+
+          echo "Resolving networking exports for prefix: ${PREFIX}"
+
+          VPC_ID=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-VpcId'].Value | [0]" --output text)
+          PUBLIC_SUBNET_1=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PublicSubnet1Id'].Value | [0]" --output text)
+          PUBLIC_SUBNET_2=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PublicSubnet2Id'].Value | [0]" --output text)
+          PRIVATE_SUBNET_1=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PrivateSubnet1Id'].Value | [0]" --output text)
+          PRIVATE_SUBNET_2=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PrivateSubnet2Id'].Value | [0]" --output text)
+          APP_SG=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-AppSecurityGroupId'].Value | [0]" --output text)
+          ALB_SG=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-ALBSecurityGroupId'].Value | [0]" --output text)
+
+          # Validate all values were resolved
+          for VAR_NAME in VPC_ID PUBLIC_SUBNET_1 PUBLIC_SUBNET_2 PRIVATE_SUBNET_1 PRIVATE_SUBNET_2 APP_SG ALB_SG; do
+            VAL=$(eval echo "\$$VAR_NAME")
+            if [[ -z "$VAL" || "$VAL" == "None" ]]; then
+              echo "::error::Failed to resolve ${VAR_NAME} from CloudFormation exports. Ensure the VPC stack (${PREFIX}-vpc-sg) is deployed."
+              exit 1
+            fi
+            echo "${VAR_NAME}=${VAL}"
+          done
+
+          echo "vpc_id=${VPC_ID}" >> "$GITHUB_OUTPUT"
+          echo "public_subnet_1=${PUBLIC_SUBNET_1}" >> "$GITHUB_OUTPUT"
+          echo "public_subnet_2=${PUBLIC_SUBNET_2}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_2=${PRIVATE_SUBNET_2}" >> "$GITHUB_OUTPUT"
+          echo "app_sg=${APP_SG}" >> "$GITHUB_OUTPUT"
+          echo "alb_sg=${ALB_SG}" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------------
+      # 4. Resolve ECR repository prefix and Secrets Manager ARNs
+      # -------------------------------------------------------------------
+      - name: Resolve ECR and secrets parameters
+        if: inputs.action == 'deploy'
+        id: app-params
+        run: |
+          ENV="${{ inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          # ECR repo prefix follows the convention: {project}-{env}
+          ECR_REPO_PREFIX="${PREFIX}"
+
+          # Resolve secrets ARNs from the secrets stack exports
+          RDS_SECRET_ARN=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-RDSSecretArn'].Value | [0]" --output text)
+          REDIS_SECRET_ARN=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-RedisSecretArn'].Value | [0]" --output text)
+
+          # Cognito User Pool ID (optional — may not exist)
+          COGNITO_USER_POOL_ID=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-CognitoUserPoolId'].Value | [0]" --output text 2>/dev/null || echo "")
+          if [[ "$COGNITO_USER_POOL_ID" == "None" ]]; then
+            COGNITO_USER_POOL_ID=""
+          fi
+
+          # Validate required values
+          for VAR_NAME in RDS_SECRET_ARN REDIS_SECRET_ARN; do
+            VAL=$(eval echo "\$$VAR_NAME")
+            if [[ -z "$VAL" || "$VAL" == "None" ]]; then
+              echo "::error::Failed to resolve ${VAR_NAME} from CloudFormation exports. Ensure prerequisite stacks are deployed."
+              exit 1
+            fi
+          done
+
+          echo "aws_account_id=${AWS_ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "ecr_repo_prefix=${ECR_REPO_PREFIX}" >> "$GITHUB_OUTPUT"
+          echo "rds_secret_arn=${RDS_SECRET_ARN}" >> "$GITHUB_OUTPUT"
+          echo "redis_secret_arn=${REDIS_SECRET_ARN}" >> "$GITHUB_OUTPUT"
+          echo "cognito_user_pool_id=${COGNITO_USER_POOL_ID}" >> "$GITHUB_OUTPUT"
+
+          echo "--- Resolved application parameters ---"
+          echo "  AWS Account  : ${AWS_ACCOUNT_ID}"
+          echo "  ECR Prefix   : ${ECR_REPO_PREFIX}"
+          echo "  RDS Secret   : ${RDS_SECRET_ARN}"
+          echo "  Redis Secret : ${REDIS_SECRET_ARN}"
+          echo "  Cognito Pool : ${COGNITO_USER_POOL_ID:-'(not configured)'}"
+
+      # -------------------------------------------------------------------
+      # 5. Validate CloudFormation template
+      # -------------------------------------------------------------------
+      - name: Validate CloudFormation template
+        if: inputs.action == 'deploy'
+        run: |
+          aws cloudformation validate-template \
+            --template-body "file://${{ env.TEMPLATE_FILE }}"
+          echo "Template validation successful."
+
+      # -------------------------------------------------------------------
+      # 6. Deploy CloudFormation stack
+      # -------------------------------------------------------------------
+      - name: Deploy CloudFormation stack
+        if: inputs.action == 'deploy'
+        run: |
+          echo "Deploying stack: ${{ env.STACK_NAME }}"
+          echo "Image tag: ${{ inputs.image_tag }}"
+
+          aws cloudformation deploy \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --template-file "${{ env.TEMPLATE_FILE }}" \
+            --parameter-overrides \
+              "Environment=${{ inputs.environment }}" \
+              "ProjectName=${{ env.PROJECT_NAME }}" \
+              "VpcId=${{ steps.networking.outputs.vpc_id }}" \
+              "PublicSubnet1=${{ steps.networking.outputs.public_subnet_1 }}" \
+              "PublicSubnet2=${{ steps.networking.outputs.public_subnet_2 }}" \
+              "PrivateSubnet1=${{ steps.networking.outputs.private_subnet_1 }}" \
+              "PrivateSubnet2=${{ steps.networking.outputs.private_subnet_2 }}" \
+              "AppSecurityGroupId=${{ steps.networking.outputs.app_sg }}" \
+              "ALBSecurityGroupId=${{ steps.networking.outputs.alb_sg }}" \
+              "ImageTag=${{ inputs.image_tag }}" \
+              "ECRRepoPrefix=${{ steps.app-params.outputs.ecr_repo_prefix }}" \
+              "AWSAccountId=${{ steps.app-params.outputs.aws_account_id }}" \
+              "AWSRegion=${{ env.AWS_REGION }}" \
+              "RDSSecretArn=${{ steps.app-params.outputs.rds_secret_arn }}" \
+              "RedisSecretArn=${{ steps.app-params.outputs.redis_secret_arn }}" \
+              "CognitoUserPoolId=${{ steps.app-params.outputs.cognito_user_pool_id }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --tags \
+              "Key=Project,Value=${{ env.PROJECT_NAME }}" \
+              "Key=Environment,Value=${{ inputs.environment }}" \
+              "Key=ManagedBy,Value=github-actions"
+
+          echo "Stack deployment completed."
+
+      # -------------------------------------------------------------------
+      # 7. Display stack outputs and ALB DNS name
+      # -------------------------------------------------------------------
+      - name: Display stack outputs
+        if: inputs.action == 'deploy'
+        run: |
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --query 'Stacks[0].Outputs' \
+            --output table
+
+          ALB_DNS=$(aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --query "Stacks[0].Outputs[?OutputKey=='ALBDnsName'].OutputValue | [0]" \
+            --output text)
+
+          echo ""
+          echo "============================================"
+          echo "  ALB DNS Name: http://${ALB_DNS}"
+          echo "============================================"
+          echo ""
+          echo "Path routing:"
+          echo "  /advisor/*            -> Portal-Claims-Advisor (8081) [default]"
+          echo "  /member/*             -> Portal-Claims-Member  (8082)"
+          echo "  /api/v1/claims/*      -> API-Claims            (8083)"
+          echo "  /api/v1/members/*     -> API-Members           (8084)"
+          echo "  /batch/*              -> Portal-Batch-Assignment(8085)"
+          echo "  /api/v1/tenants/*     -> API-Tenants           (8086)"
+          echo "  /api/v1/entitlements/* -> API-Entitlements      (8087)"
+          echo "  /tenant-mgmt/*        -> Portal-Tenants        (8088)"
+          echo "  /entitlement-mgmt/*   -> Portal-Entitlements   (8089)"
+          echo "  /sre/*                -> Portal-SRE            (8090)"
+
+      # -------------------------------------------------------------------
+      # 8. Delete CloudFormation stack
+      # -------------------------------------------------------------------
+      - name: Delete CloudFormation stack
+        if: inputs.action == 'delete'
+        run: |
+          echo "Deleting stack: ${{ env.STACK_NAME }}"
+
+          aws cloudformation delete-stack \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Stack deletion completed."

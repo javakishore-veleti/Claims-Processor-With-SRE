@@ -1,0 +1,197 @@
+name: "AWS_02 - Core Infrastructure (RDS, S3, ECR, Redis)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      action:
+        description: 'Stack action'
+        required: true
+        type: choice
+        options:
+          - create
+          - delete
+
+      vpc_id_override:
+        description: 'VPC ID override (leave empty to resolve from vpc-sg stack)'
+        required: false
+        type: string
+        default: ''
+
+      rds_instance_class:
+        description: 'RDS instance class'
+        required: false
+        type: string
+        default: ''
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+  STACK_NAME_PREFIX: claims-proc
+  CFN_TEMPLATE: DevOps/AWS/CloudFormation/core-infrastructure.yaml
+  PARAMS_DIR: DevOps/AWS/CloudFormation/Parameters
+
+jobs:
+  deploy-core-infrastructure:
+    name: "${{ inputs.action }} core-infra (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Checkout
+      # ------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. Configure AWS credentials
+      # ------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ------------------------------------------------------------------
+      # 3. Resolve VPC and subnet details from vpc-sg stack exports
+      # ------------------------------------------------------------------
+      - name: Resolve VPC and networking from vpc-sg stack
+        id: vpc
+        run: |
+          VPC_SG_STACK="${STACK_NAME_PREFIX}-${{ inputs.environment }}-vpc-sg"
+
+          if [ -n "${{ inputs.vpc_id_override }}" ]; then
+            echo "Using VPC ID override: ${{ inputs.vpc_id_override }}"
+            VPC_ID="${{ inputs.vpc_id_override }}"
+          else
+            echo "Looking up VPC ID from stack: ${VPC_SG_STACK}"
+            VPC_ID=$(aws cloudformation describe-stacks \
+              --stack-name "${VPC_SG_STACK}" \
+              --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" \
+              --output text)
+          fi
+
+          PRIVATE_SUBNET_1=$(aws cloudformation describe-stacks \
+            --stack-name "${VPC_SG_STACK}" \
+            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1'].OutputValue" \
+            --output text)
+
+          PRIVATE_SUBNET_2=$(aws cloudformation describe-stacks \
+            --stack-name "${VPC_SG_STACK}" \
+            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2'].OutputValue" \
+            --output text)
+
+          APP_SG_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${VPC_SG_STACK}" \
+            --query "Stacks[0].Outputs[?OutputKey=='AppSecurityGroupId'].OutputValue" \
+            --output text)
+
+          echo "vpc_id=${VPC_ID}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_2=${PRIVATE_SUBNET_2}" >> "$GITHUB_OUTPUT"
+          echo "app_sg_id=${APP_SG_ID}" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved VPC ID:           ${VPC_ID}"
+          echo "Resolved Private Subnet 1: ${PRIVATE_SUBNET_1}"
+          echo "Resolved Private Subnet 2: ${PRIVATE_SUBNET_2}"
+          echo "Resolved App SG ID:        ${APP_SG_ID}"
+
+      # ------------------------------------------------------------------
+      # 4. Resolve RDS instance class
+      # ------------------------------------------------------------------
+      - name: Resolve RDS instance class
+        id: rds
+        run: |
+          if [ -n "${{ inputs.rds_instance_class }}" ]; then
+            RDS_CLASS="${{ inputs.rds_instance_class }}"
+          elif [ -n "${{ vars.CLAIMS_PROC_RDS_INSTANCE_CLASS }}" ]; then
+            RDS_CLASS="${{ vars.CLAIMS_PROC_RDS_INSTANCE_CLASS }}"
+          else
+            RDS_CLASS="db.t3.medium"
+          fi
+          echo "rds_instance_class=${RDS_CLASS}" >> "$GITHUB_OUTPUT"
+          echo "Using RDS instance class: ${RDS_CLASS}"
+
+      # ------------------------------------------------------------------
+      # 5. Deploy stack (create/update)
+      # ------------------------------------------------------------------
+      - name: Deploy CloudFormation stack
+        if: inputs.action == 'create'
+        run: |
+          STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
+          ENV="${{ inputs.environment }}"
+          PARAMS_FILE="${PARAMS_DIR}/${ENV}.json"
+
+          echo "Deploying stack: ${STACK_NAME}"
+          echo "Template: ${CFN_TEMPLATE}"
+          echo "Parameters file: ${PARAMS_FILE}"
+
+          aws cloudformation deploy \
+            --stack-name "${STACK_NAME}" \
+            --template-file "${CFN_TEMPLATE}" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PROJECT_NAME}" \
+              VpcId="${{ steps.vpc.outputs.vpc_id }}" \
+              PrivateSubnet1="${{ steps.vpc.outputs.private_subnet_1 }}" \
+              PrivateSubnet2="${{ steps.vpc.outputs.private_subnet_2 }}" \
+              AppSecurityGroupId="${{ steps.vpc.outputs.app_sg_id }}" \
+              RDSInstanceClass="${{ steps.rds.outputs.rds_instance_class }}" \
+              RDSMasterPassword="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}" \
+              RedisAuthToken="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}" \
+              $(cat "${PARAMS_FILE}" | python3 -c "
+          import json, sys
+          params = json.load(sys.stdin)
+          skip = {'Environment', 'RDSInstanceClass'}
+          for p in params:
+              if p['ParameterKey'] not in skip:
+                  print(f\"{p['ParameterKey']}={p['ParameterValue']}\")
+          ") \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --tags \
+              Key=Project,Value="${PROJECT_NAME}" \
+              Key=Environment,Value="${ENV}" \
+              Key=ManagedBy,Value=GitHubActions \
+            --no-fail-on-empty-changeset
+
+          echo "Stack deployed successfully."
+
+      # ------------------------------------------------------------------
+      # 6. Print stack outputs
+      # ------------------------------------------------------------------
+      - name: Print stack outputs
+        if: inputs.action == 'create'
+        run: |
+          STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
+
+          echo "===== Stack Outputs ====="
+          aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].Outputs[*].[OutputKey, OutputValue]" \
+            --output table
+
+      # ------------------------------------------------------------------
+      # 7. Delete stack
+      # ------------------------------------------------------------------
+      - name: Delete CloudFormation stack
+        if: inputs.action == 'delete'
+        run: |
+          STACK_NAME="${STACK_NAME_PREFIX}-${{ inputs.environment }}-core-infra"
+
+          echo "Deleting stack: ${STACK_NAME}"
+          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
+
+          echo "Stack deleted successfully."

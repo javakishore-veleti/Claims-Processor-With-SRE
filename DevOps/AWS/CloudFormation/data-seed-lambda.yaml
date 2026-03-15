@@ -1,0 +1,232 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Data Seed Lambda for Claims Processor - populates RDS with initial seed data
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+  ProjectName:
+    Type: String
+    Default: claims-proc
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet::Id
+  RDSSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  RDSEndpoint:
+    Type: String
+  RDSPort:
+    Type: String
+    Default: '5432'
+  RDSUsername:
+    Type: String
+    Default: claims_user
+  RDSPassword:
+    Type: String
+    NoEcho: true
+  RDSDBName:
+    Type: String
+    Default: claims_db
+
+Resources:
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${ProjectName}-${Environment} Data Seed Lambda SG'
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          DestinationSecurityGroupId: !Ref RDSSecurityGroupId
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-lambda-seed-sg'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${Environment}-seed-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+        - PolicyName: SecretsManagerRead
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  DataSeedFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${Environment}-data-seed'
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !Ref RDSEndpoint
+          DB_PORT: !Ref RDSPort
+          DB_NAME: !Ref RDSDBName
+          DB_USER: !Ref RDSUsername
+          DB_PASSWORD: !Ref RDSPassword
+      Layers:
+        - !Sub 'arn:aws:lambda:${AWS::Region}:898466741470:layer:psycopg2-py312:1'
+      Code:
+        ZipFile: |
+          import os
+          import json
+          import psycopg2
+
+          def handler(event, context):
+              action = event.get('action', 'seed')
+              modules = event.get('modules', 'all')
+
+              conn = psycopg2.connect(
+                  host=os.environ['DB_HOST'],
+                  port=os.environ['DB_PORT'],
+                  dbname=os.environ['DB_NAME'],
+                  user=os.environ['DB_USER'],
+                  password=os.environ['DB_PASSWORD']
+              )
+              conn.autocommit = True
+              cur = conn.cursor()
+
+              results = {}
+
+              if action == 'clear':
+                  for table in ['claims', 'members', 'tenants', 'users', 'roles', 'privileges', 'groups']:
+                      try:
+                          cur.execute(f"DELETE FROM {table}")
+                          results[table] = 'cleared'
+                      except Exception as e:
+                          results[table] = f'skip: {str(e)}'
+                          conn.rollback()
+                          conn.autocommit = True
+                  cur.close()
+                  conn.close()
+                  return {'statusCode': 200, 'body': json.dumps(results)}
+
+              # Seed tenants
+              if modules in ('all', 'tenants'):
+                  try:
+                      cur.execute("SELECT COUNT(*) FROM tenants")
+                      count = cur.fetchone()[0]
+                      if count == 0:
+                          for i in range(1, 101):
+                              tid = f'TNT-{i:03d}'
+                              cur.execute(
+                                  "INSERT INTO tenants (tenant_id, name, status, plan, domain, created_date) VALUES (%s, %s, %s, %s, %s, NOW())",
+                                  (tid, f'Tenant {i}', 'ACTIVE' if i <= 80 else ('TRIAL' if i <= 90 else 'SUSPENDED'),
+                                   'Enterprise' if i <= 30 else ('Professional' if i <= 70 else 'Starter'),
+                                   f'tenant{i}.health.io')
+                              )
+                          results['tenants'] = '100 seeded'
+                      else:
+                          results['tenants'] = f'skip: {count} exist'
+                  except Exception as e:
+                      results['tenants'] = f'error: {str(e)}'
+
+              # Seed members
+              if modules in ('all', 'members'):
+                  try:
+                      cur.execute("SELECT COUNT(*) FROM members")
+                      count = cur.fetchone()[0]
+                      if count == 0:
+                          names = [('John','Smith'), ('Jane','Doe'), ('Robert','Johnson'), ('Maria','Garcia'),
+                                   ('David','Wilson'), ('Sarah','Brown'), ('Michael','Chen'), ('Emily','Taylor'),
+                                   ('James','Williams'), ('Lisa','Anderson')]
+                          for i, (fn, ln) in enumerate(names, 1):
+                              cur.execute(
+                                  "INSERT INTO members (member_id, first_name, last_name, tenant_id, status, created_date) VALUES (%s, %s, %s, %s, %s, NOW())",
+                                  (f'MBR-{i:03d}', fn, ln, 'TNT-001', 'ACTIVE')
+                              )
+                          results['members'] = '10 seeded'
+                      else:
+                          results['members'] = f'skip: {count} exist'
+                  except Exception as e:
+                      results['members'] = f'error: {str(e)}'
+
+              # Seed claims
+              if modules in ('all', 'claims'):
+                  try:
+                      cur.execute("SELECT COUNT(*) FROM claims")
+                      count = cur.fetchone()[0]
+                      if count == 0:
+                          stages = ['INTAKE_RECEIVED', 'DATA_EXTRACTION', 'EXTRACTION_REVIEW', 'ELIGIBILITY_CHECK',
+                                    'ADJUDICATION', 'ADJUDICATION_REVIEW', 'APPROVED', 'DENIED', 'SETTLEMENT', 'CLOSED']
+                          for i in range(1, 11):
+                              cur.execute(
+                                  "INSERT INTO claims (claim_number, customer_id, tenant_id, stage, amount, created_date) VALUES (%s, %s, %s, %s, %s, NOW())",
+                                  (f'CLM-2026-{i:04d}', f'MBR-{i:03d}', 'TNT-001', stages[i-1], round(100 + i * 234.50, 2))
+                              )
+                          results['claims'] = '10 seeded'
+                      else:
+                          results['claims'] = f'skip: {count} exist'
+                  except Exception as e:
+                      results['claims'] = f'error: {str(e)}'
+
+              cur.close()
+              conn.close()
+              return {'statusCode': 200, 'body': json.dumps(results)}
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  LambdaFunctionArn:
+    Value: !GetAtt DataSeedFunction.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-data-seed-lambda-arn'
+  LambdaFunctionName:
+    Value: !Ref DataSeedFunction
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-data-seed-lambda-name'

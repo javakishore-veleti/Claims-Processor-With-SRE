@@ -1,0 +1,159 @@
+# ============================================================
+# AWS_05 - Messaging & Search (Kinesis/MSK, OpenSearch)
+# ============================================================
+# Deploys or deletes the messaging (Kinesis Data Streams or MSK)
+# and search (OpenSearch) infrastructure stack.
+# ============================================================
+
+name: "AWS_05 - Messaging & Search (Kinesis/MSK, OpenSearch)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - create
+          - delete
+      use_msk:
+        description: 'Use MSK (Managed Kafka) instead of Kinesis'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+  STACK_NAME: claims-proc-${{ github.event.inputs.environment }}-messaging-search
+  TEMPLATE_FILE: DevOps/AWS/CloudFormation/messaging-search.yaml
+  PARAMETERS_FILE: DevOps/AWS/CloudFormation/Parameters/${{ github.event.inputs.environment }}.json
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-messaging-search:
+    name: "${{ github.event.inputs.action }} Messaging & Search (${{ github.event.inputs.environment }})"
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # -------------------------------------------------------
+      # Checkout
+      # -------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # AWS Credentials
+      # -------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -------------------------------------------------------
+      # Resolve VPC exports from the networking stack
+      # -------------------------------------------------------
+      - name: Resolve VPC and subnet IDs from CloudFormation exports
+        if: github.event.inputs.action == 'create'
+        id: vpc
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+
+          VPC_ID=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PROJECT_NAME}-${ENV}-vpc-id'].Value" \
+            --output text)
+          echo "vpc_id=${VPC_ID}" >> "$GITHUB_OUTPUT"
+
+          PRIVATE_SUBNET_1=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PROJECT_NAME}-${ENV}-private-subnet-1'].Value" \
+            --output text)
+          echo "private_subnet_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
+
+          PRIVATE_SUBNET_2=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PROJECT_NAME}-${ENV}-private-subnet-2'].Value" \
+            --output text)
+          echo "private_subnet_2=${PRIVATE_SUBNET_2}" >> "$GITHUB_OUTPUT"
+
+          APP_SG=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PROJECT_NAME}-${ENV}-app-sg-id'].Value" \
+            --output text)
+          echo "app_sg=${APP_SG}" >> "$GITHUB_OUTPUT"
+
+          echo "::notice::VPC=${VPC_ID}, Subnet1=${PRIVATE_SUBNET_1}, Subnet2=${PRIVATE_SUBNET_2}, AppSG=${APP_SG}"
+
+      # -------------------------------------------------------
+      # Deploy Stack
+      # -------------------------------------------------------
+      - name: Deploy CloudFormation stack
+        if: github.event.inputs.action == 'create'
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          USE_MSK="${{ github.event.inputs.use_msk }}"
+
+          echo "Deploying stack: ${STACK_NAME}"
+          echo "Environment: ${ENV}"
+          echo "Use MSK: ${USE_MSK}"
+
+          aws cloudformation deploy \
+            --template-file "${TEMPLATE_FILE}" \
+            --stack-name "${STACK_NAME}" \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PROJECT_NAME}" \
+              VpcId="${{ steps.vpc.outputs.vpc_id }}" \
+              PrivateSubnet1="${{ steps.vpc.outputs.private_subnet_1 }}" \
+              PrivateSubnet2="${{ steps.vpc.outputs.private_subnet_2 }}" \
+              AppSecurityGroupId="${{ steps.vpc.outputs.app_sg }}" \
+              OpenSearchInstanceType="$(jq -r '.[] | select(.ParameterKey=="OpenSearchInstanceType") | .ParameterValue' ${PARAMETERS_FILE})" \
+              OpenSearchInstanceCount="$(jq -r '.[] | select(.ParameterKey=="OpenSearchInstanceCount") | .ParameterValue' ${PARAMETERS_FILE})" \
+              UseMSK="${USE_MSK}" \
+            --capabilities CAPABILITY_IAM \
+            --tags \
+              Key=Project,Value="${PROJECT_NAME}" \
+              Key=Environment,Value="${ENV}" \
+              Key=ManagedBy,Value=CloudFormation \
+            --no-fail-on-empty-changeset
+
+          echo "::notice::Stack ${STACK_NAME} deployed successfully"
+
+      # -------------------------------------------------------
+      # Delete Stack
+      # -------------------------------------------------------
+      - name: Delete CloudFormation stack
+        if: github.event.inputs.action == 'delete'
+        run: |
+          echo "Deleting stack: ${STACK_NAME}"
+
+          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
+
+          echo "::notice::Stack ${STACK_NAME} deleted successfully"
+
+      # -------------------------------------------------------
+      # Print Outputs
+      # -------------------------------------------------------
+      - name: Print stack outputs
+        if: github.event.inputs.action == 'create'
+        run: |
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].Outputs" \
+            --output table

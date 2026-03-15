@@ -1,0 +1,16 @@
+[
+  { "ParameterKey": "Environment", "ParameterValue": "dev" },
+  { "ParameterKey": "RDSInstanceClass", "ParameterValue": "db.t3.medium" },
+  { "ParameterKey": "RDSMultiAZ", "ParameterValue": "false" },
+  { "ParameterKey": "RDSAllocatedStorage", "ParameterValue": "20" },
+  { "ParameterKey": "RedisNodeType", "ParameterValue": "cache.t3.micro" },
+  { "ParameterKey": "RedisNumNodes", "ParameterValue": "1" },
+  { "ParameterKey": "OpenSearchInstanceType", "ParameterValue": "t3.small.search" },
+  { "ParameterKey": "OpenSearchInstanceCount", "ParameterValue": "1" },
+  { "ParameterKey": "FargateTaskCpu", "ParameterValue": "512" },
+  { "ParameterKey": "FargateTaskMemory", "ParameterValue": "1024" },
+  { "ParameterKey": "DesiredServiceCount", "ParameterValue": "1" },
+  { "ParameterKey": "EKSNodeCount", "ParameterValue": "2" },
+  { "ParameterKey": "EKSNodeInstanceType", "ParameterValue": "t3.medium" },
+  { "ParameterKey": "LogRetentionDays", "ParameterValue": "7" }
+]

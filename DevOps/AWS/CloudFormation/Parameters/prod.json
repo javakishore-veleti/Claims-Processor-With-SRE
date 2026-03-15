@@ -1,0 +1,16 @@
+[
+  { "ParameterKey": "Environment", "ParameterValue": "prod" },
+  { "ParameterKey": "RDSInstanceClass", "ParameterValue": "db.r6g.large" },
+  { "ParameterKey": "RDSMultiAZ", "ParameterValue": "true" },
+  { "ParameterKey": "RDSAllocatedStorage", "ParameterValue": "100" },
+  { "ParameterKey": "RedisNodeType", "ParameterValue": "cache.r6g.large" },
+  { "ParameterKey": "RedisNumNodes", "ParameterValue": "2" },
+  { "ParameterKey": "OpenSearchInstanceType", "ParameterValue": "r6g.large.search" },
+  { "ParameterKey": "OpenSearchInstanceCount", "ParameterValue": "3" },
+  { "ParameterKey": "FargateTaskCpu", "ParameterValue": "1024" },
+  { "ParameterKey": "FargateTaskMemory", "ParameterValue": "2048" },
+  { "ParameterKey": "DesiredServiceCount", "ParameterValue": "3" },
+  { "ParameterKey": "EKSNodeCount", "ParameterValue": "5" },
+  { "ParameterKey": "EKSNodeInstanceType", "ParameterValue": "m6i.xlarge" },
+  { "ParameterKey": "LogRetentionDays", "ParameterValue": "90" }
+]

@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Amazon Cognito User Pool, App Client, Groups, and Hosted UI Domain for
+  Claims-Processor-With-SRE authentication and authorization.
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+  ProjectName:
+    Type: String
+    Default: claims-proc
+    Description: Short project name used as a prefix for resource names
+
+  CallbackURL:
+    Type: String
+    Default: https://localhost:8081/callback
+    Description: OAuth2 callback URL for the web client
+
+  LogoutURL:
+    Type: String
+    Default: https://localhost:8081/logout
+    Description: Sign-out redirect URL for the web client
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # =========================================================================
+  # Cognito User Pool
+  # =========================================================================
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${ProjectName}-${Environment}-users'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: 'OFF'
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: tenantId
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+        - Name: role
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      UserPoolTags:
+        Project: !Ref ProjectName
+        Environment: !Ref Environment
+
+  # =========================================================================
+  # User Pool Domain (Hosted UI)
+  # =========================================================================
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub '${ProjectName}-${Environment}'
+      UserPoolId: !Ref UserPool
+
+  # =========================================================================
+  # User Pool Client — Web Application
+  # =========================================================================
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolDomain
+    Properties:
+      ClientName: !Sub '${ProjectName}-${Environment}-web-client'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !Ref CallbackURL
+      LogoutURLs:
+        - !Ref LogoutURL
+      SupportedIdentityProviders:
+        - COGNITO
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  # =========================================================================
+  # User Pool Groups
+  # =========================================================================
+  GroupClaimsAdmin:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: claims-admin
+      Description: Claims administrators with full access to claims management
+      UserPoolId: !Ref UserPool
+      Precedence: 1
+
+  GroupClaimsMember:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: claims-member
+      Description: Healthcare plan members with access to their own claims
+      UserPoolId: !Ref UserPool
+      Precedence: 10
+
+  GroupSreOps:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: sre-ops
+      Description: SRE/Operations team with access to observability and infrastructure
+      UserPoolId: !Ref UserPool
+      Precedence: 2
+
+  GroupTenantAdmin:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: tenant-admin
+      Description: Tenant administrators with access to tenant configuration
+      UserPoolId: !Ref UserPool
+      Precedence: 3
+
+  GroupBatchOperator:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: batch-operator
+      Description: Operators with access to batch assignment and import operations
+      UserPoolId: !Ref UserPool
+      Precedence: 5
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolArn:
+    Description: Cognito User Pool ARN
+    Value: !GetAtt UserPool.Arn
+
+  UserPoolClientId:
+    Description: Cognito User Pool App Client ID
+    Value: !Ref UserPoolClient
+
+  UserPoolDomain:
+    Description: Cognito Hosted UI domain
+    Value: !Sub '${ProjectName}-${Environment}.auth.${AWS::Region}.amazoncognito.com'

@@ -1,0 +1,165 @@
+# =============================================================================
+# AWS_01 - VPC & Security Groups
+# Deploys or deletes the CloudFormation stack for VPC networking and
+# security groups used by the Claims Processor microservice.
+# =============================================================================
+name: "AWS_01 - VPC & Security Groups"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - create
+          - delete
+
+      use_existing_vpc:
+        description: 'Use an existing VPC (true) or create a new one (false)'
+        required: true
+        type: boolean
+        default: true
+
+      vpc_id_override:
+        description: 'VPC ID override (optional — takes precedence over secret)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  STACK_NAME: claims-proc-${{ inputs.environment }}-vpc-sg
+  TEMPLATE_FILE: DevOps/AWS/CloudFormation/vpc-security-groups.yaml
+  PARAMETER_FILE: DevOps/AWS/CloudFormation/Parameters/${{ inputs.environment }}.json
+
+jobs:
+  deploy-vpc-security-groups:
+    name: ${{ inputs.action == 'create' && 'Deploy' || 'Delete' }} VPC & Security Groups (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # -------------------------------------------------------------------
+      # 1. Checkout repository
+      # -------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------------------
+      # 2. Configure AWS credentials
+      # -------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -------------------------------------------------------------------
+      # 3. Resolve VPC ID and CreateNewVpc flag
+      #    Priority: vpc_id_override > secret CLAIMS_PROC_VPC_ID > create new
+      # -------------------------------------------------------------------
+      - name: Resolve VPC ID
+        id: resolve-vpc
+        run: |
+          USE_EXISTING="${{ inputs.use_existing_vpc }}"
+          VPC_OVERRIDE="${{ inputs.vpc_id_override }}"
+          VPC_SECRET="${{ secrets.CLAIMS_PROC_VPC_ID }}"
+
+          if [[ "$USE_EXISTING" == "true" ]]; then
+            # Determine VPC ID: override takes precedence over secret
+            if [[ -n "$VPC_OVERRIDE" ]]; then
+              RESOLVED_VPC_ID="$VPC_OVERRIDE"
+              echo "Using VPC ID from workflow input override: $RESOLVED_VPC_ID"
+            elif [[ -n "$VPC_SECRET" ]]; then
+              RESOLVED_VPC_ID="$VPC_SECRET"
+              echo "Using VPC ID from repository secret CLAIMS_PROC_VPC_ID"
+            else
+              echo "::error::use_existing_vpc is true but no VPC ID was provided (neither vpc_id_override input nor CLAIMS_PROC_VPC_ID secret)"
+              exit 1
+            fi
+            CREATE_NEW_VPC="false"
+          else
+            RESOLVED_VPC_ID=""
+            CREATE_NEW_VPC="true"
+            echo "Will create a new VPC"
+          fi
+
+          echo "vpc_id=$RESOLVED_VPC_ID" >> "$GITHUB_OUTPUT"
+          echo "create_new_vpc=$CREATE_NEW_VPC" >> "$GITHUB_OUTPUT"
+          echo "--- Resolved values ---"
+          echo "  CreateNewVpc : $CREATE_NEW_VPC"
+          echo "  VPC ID       : ${RESOLVED_VPC_ID:-'(new VPC will be created)'}"
+
+      # -------------------------------------------------------------------
+      # 4. Validate CloudFormation template
+      # -------------------------------------------------------------------
+      - name: Validate CloudFormation template
+        if: inputs.action == 'create'
+        run: |
+          aws cloudformation validate-template \
+            --template-body "file://${{ env.TEMPLATE_FILE }}"
+          echo "Template validation successful."
+
+      # -------------------------------------------------------------------
+      # 5. Deploy CloudFormation stack
+      # -------------------------------------------------------------------
+      - name: Deploy CloudFormation stack
+        if: inputs.action == 'create'
+        run: |
+          echo "Deploying stack: ${{ env.STACK_NAME }}"
+
+          aws cloudformation deploy \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --template-file "${{ env.TEMPLATE_FILE }}" \
+            --parameter-overrides \
+              $(cat "${{ env.PARAMETER_FILE }}" | jq -r '.[] | "\(.ParameterKey)=\(.ParameterValue)"') \
+              "CreateNewVpc=${{ steps.resolve-vpc.outputs.create_new_vpc }}" \
+              "ExistingVpcId=${{ steps.resolve-vpc.outputs.vpc_id }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --tags \
+              "Key=Project,Value=claims-proc" \
+              "Key=Environment,Value=${{ inputs.environment }}" \
+              "Key=ManagedBy,Value=github-actions"
+
+          echo "Stack deployment completed."
+
+      # -------------------------------------------------------------------
+      # 6. Display stack outputs
+      # -------------------------------------------------------------------
+      - name: Display stack outputs
+        if: inputs.action == 'create'
+        run: |
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --query 'Stacks[0].Outputs' \
+            --output table
+
+      # -------------------------------------------------------------------
+      # 7. Delete CloudFormation stack
+      # -------------------------------------------------------------------
+      - name: Delete CloudFormation stack
+        if: inputs.action == 'delete'
+        run: |
+          echo "Deleting stack: ${{ env.STACK_NAME }}"
+
+          aws cloudformation delete-stack \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Stack deletion completed."

@@ -1,0 +1,191 @@
+# =============================================================================
+# AWS_07 - EKS Cluster
+# Creates or deletes an EKS cluster with managed node group for the
+# Claims Processor With SRE microservice.
+# =============================================================================
+name: "AWS_07 - EKS Cluster"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - create
+          - delete
+
+      node_count:
+        description: 'Number of worker nodes (desired count)'
+        required: false
+        type: number
+        default: 2
+
+      node_instance_type:
+        description: 'EC2 instance type for worker nodes'
+        required: false
+        type: string
+        default: 't3.medium'
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+  STACK_NAME: claims-proc-${{ github.event.inputs.environment }}-eks
+
+jobs:
+  eks-cluster:
+    name: ${{ github.event.inputs.action }} EKS Cluster (${{ github.event.inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # -----------------------------------------------------------------
+      # Checkout
+      # -----------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------
+      # Configure AWS Credentials
+      # -----------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------
+      # Resolve VPC and Subnet IDs from CloudFormation exports
+      # -----------------------------------------------------------------
+      - name: Resolve VPC and Subnet IDs
+        if: ${{ github.event.inputs.action == 'create' }}
+        id: resolve-network
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          PREFIX="${{ env.PROJECT_NAME }}-${ENV}"
+
+          echo "Resolving network resources from CloudFormation exports..."
+
+          VPC_ID=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-VpcId'].Value" \
+            --output text)
+          echo "VPC_ID=${VPC_ID}" >> "$GITHUB_OUTPUT"
+
+          PRIVATE_SUBNET_1=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PrivateSubnet1Id'].Value" \
+            --output text)
+          echo "PRIVATE_SUBNET_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
+
+          PRIVATE_SUBNET_2=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PrivateSubnet2Id'].Value" \
+            --output text)
+          echo "PRIVATE_SUBNET_2=${PRIVATE_SUBNET_2}" >> "$GITHUB_OUTPUT"
+
+          PUBLIC_SUBNET_1=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PublicSubnet1Id'].Value" \
+            --output text)
+          echo "PUBLIC_SUBNET_1=${PUBLIC_SUBNET_1}" >> "$GITHUB_OUTPUT"
+
+          PUBLIC_SUBNET_2=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='${PREFIX}-PublicSubnet2Id'].Value" \
+            --output text)
+          echo "PUBLIC_SUBNET_2=${PUBLIC_SUBNET_2}" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved network:"
+          echo "  VPC:              ${VPC_ID}"
+          echo "  Private Subnet 1: ${PRIVATE_SUBNET_1}"
+          echo "  Private Subnet 2: ${PRIVATE_SUBNET_2}"
+          echo "  Public Subnet 1:  ${PUBLIC_SUBNET_1}"
+          echo "  Public Subnet 2:  ${PUBLIC_SUBNET_2}"
+
+      # -----------------------------------------------------------------
+      # Deploy EKS Cluster (Create)
+      # -----------------------------------------------------------------
+      - name: Deploy EKS cluster stack
+        if: ${{ github.event.inputs.action == 'create' }}
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          NODE_COUNT=${{ github.event.inputs.node_count }}
+          NODE_TYPE="${{ github.event.inputs.node_instance_type }}"
+
+          echo "Deploying EKS cluster stack: ${{ env.STACK_NAME }}"
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/eks-cluster.yaml \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${{ env.PROJECT_NAME }}" \
+              VpcId="${{ steps.resolve-network.outputs.VPC_ID }}" \
+              PrivateSubnet1="${{ steps.resolve-network.outputs.PRIVATE_SUBNET_1 }}" \
+              PrivateSubnet2="${{ steps.resolve-network.outputs.PRIVATE_SUBNET_2 }}" \
+              PublicSubnet1="${{ steps.resolve-network.outputs.PUBLIC_SUBNET_1 }}" \
+              PublicSubnet2="${{ steps.resolve-network.outputs.PUBLIC_SUBNET_2 }}" \
+              EKSNodeCount="${NODE_COUNT}" \
+              EKSNodeInstanceType="${NODE_TYPE}" \
+            --tags \
+              Project=${{ env.PROJECT_NAME }} \
+              Environment="${ENV}" \
+              ManagedBy=cloudformation \
+            --no-fail-on-empty-changeset
+
+          echo "EKS cluster stack deployed successfully."
+
+      # -----------------------------------------------------------------
+      # Update kubeconfig (Create)
+      # -----------------------------------------------------------------
+      - name: Update kubeconfig
+        if: ${{ github.event.inputs.action == 'create' }}
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          CLUSTER_NAME="${{ env.PROJECT_NAME }}-${ENV}-cluster"
+
+          echo "Updating kubeconfig for cluster: ${CLUSTER_NAME}"
+          aws eks update-kubeconfig \
+            --name "${CLUSTER_NAME}" \
+            --region "${{ env.AWS_REGION }}"
+
+          echo "Verifying cluster connectivity..."
+          kubectl get nodes
+          kubectl cluster-info
+
+      # -----------------------------------------------------------------
+      # Print Stack Outputs (Create)
+      # -----------------------------------------------------------------
+      - name: Print stack outputs
+        if: ${{ github.event.inputs.action == 'create' }}
+        run: |
+          echo "Stack outputs:"
+          aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --query "Stacks[0].Outputs" \
+            --output table
+
+      # -----------------------------------------------------------------
+      # Delete EKS Cluster Stack
+      # -----------------------------------------------------------------
+      - name: Delete EKS cluster stack
+        if: ${{ github.event.inputs.action == 'delete' }}
+        run: |
+          echo "Deleting EKS cluster stack: ${{ env.STACK_NAME }}"
+
+          aws cloudformation delete-stack \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "EKS cluster stack deleted successfully."

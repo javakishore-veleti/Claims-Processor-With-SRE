@@ -1,0 +1,303 @@
+# =============================================================================
+# AWS_08 - Build & Push Docker Images to ECR
+# Builds Java modules with Maven, creates Docker images, and pushes them
+# to Amazon ECR for the Claims Processor With SRE microservice.
+# =============================================================================
+name: "AWS_08 - Build & Push Docker Images to ECR"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      modules:
+        description: 'Module(s) to build and push'
+        required: true
+        type: choice
+        options:
+          - all
+          - api-claims
+          - api-members
+          - api-tenants
+          - api-entitlements
+          - portal-claims-advisor
+          - portal-claims-member
+          - portal-batch-assignment
+          - portal-tenants
+          - portal-entitlements
+          - portal-sre
+
+      image_tag:
+        description: 'Docker image tag'
+        required: false
+        type: string
+        default: 'latest'
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+  JAVA_VERSION: '17'
+
+jobs:
+  build-and-push:
+    name: Build & Push (${{ github.event.inputs.modules }}) to ECR
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # -----------------------------------------------------------------
+      # Checkout
+      # -----------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------
+      # Set up JDK 17
+      # -----------------------------------------------------------------
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      # -----------------------------------------------------------------
+      # Cache Maven dependencies
+      # -----------------------------------------------------------------
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # -----------------------------------------------------------------
+      # Build all modules with Maven
+      # -----------------------------------------------------------------
+      - name: Build with Maven
+        run: |
+          echo "Building all modules..."
+          mvn clean install -DskipTests -B -q
+          echo "Maven build completed successfully."
+
+      # -----------------------------------------------------------------
+      # Configure AWS Credentials
+      # -----------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------
+      # Login to Amazon ECR
+      # -----------------------------------------------------------------
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # -----------------------------------------------------------------
+      # Get AWS Account ID
+      # -----------------------------------------------------------------
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "ACCOUNT_ID=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "AWS Account ID: ${ACCOUNT_ID}"
+
+      # -----------------------------------------------------------------
+      # Build and Push Docker Images
+      # -----------------------------------------------------------------
+      - name: Build and push Docker images
+        env:
+          ECR_REGISTRY: ${{ steps.aws-account.outputs.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SELECTED_MODULES: ${{ github.event.inputs.modules }}
+          ENV: ${{ github.event.inputs.environment }}
+        run: |
+          # ---------------------------------------------------------------
+          # Module configuration: name -> directory, port
+          # ---------------------------------------------------------------
+          declare -A MODULE_DIRS
+          MODULE_DIRS["api-claims"]="API-Claims"
+          MODULE_DIRS["api-members"]="API-Members"
+          MODULE_DIRS["api-tenants"]="API-Tenants"
+          MODULE_DIRS["api-entitlements"]="API-Entitlements"
+          MODULE_DIRS["portal-claims-advisor"]="Portal-Claims-Advisor"
+          MODULE_DIRS["portal-claims-member"]="Portal-Claims-Member"
+          MODULE_DIRS["portal-batch-assignment"]="Portal-Batch-Assignment"
+          MODULE_DIRS["portal-tenants"]="Portal-Tenants"
+          MODULE_DIRS["portal-entitlements"]="Portal-Entitlements"
+          MODULE_DIRS["portal-sre"]="Portal-SRE"
+
+          declare -A MODULE_PORTS
+          MODULE_PORTS["api-claims"]="8083"
+          MODULE_PORTS["api-members"]="8084"
+          MODULE_PORTS["api-tenants"]="8086"
+          MODULE_PORTS["api-entitlements"]="8087"
+          MODULE_PORTS["portal-claims-advisor"]="8081"
+          MODULE_PORTS["portal-claims-member"]="8082"
+          MODULE_PORTS["portal-batch-assignment"]="8085"
+          MODULE_PORTS["portal-tenants"]="8088"
+          MODULE_PORTS["portal-entitlements"]="8089"
+          MODULE_PORTS["portal-sre"]="8090"
+
+          # ---------------------------------------------------------------
+          # Determine which modules to build
+          # ---------------------------------------------------------------
+          if [ "${SELECTED_MODULES}" == "all" ]; then
+            MODULES=("api-claims" "api-members" "api-tenants" "api-entitlements" \
+                     "portal-claims-advisor" "portal-claims-member" "portal-batch-assignment" \
+                     "portal-tenants" "portal-entitlements" "portal-sre")
+          else
+            MODULES=("${SELECTED_MODULES}")
+          fi
+
+          echo "============================================="
+          echo "Building and pushing ${#MODULES[@]} module(s)"
+          echo "Registry: ${ECR_REGISTRY}"
+          echo "Tag: ${IMAGE_TAG}"
+          echo "Environment: ${ENV}"
+          echo "============================================="
+
+          FAILED_MODULES=()
+          SUCCESS_COUNT=0
+
+          for MODULE in "${MODULES[@]}"; do
+            MODULE_DIR="${MODULE_DIRS[$MODULE]}"
+            MODULE_PORT="${MODULE_PORTS[$MODULE]}"
+            REPO_NAME="${PROJECT_NAME}/${MODULE}"
+            FULL_IMAGE="${ECR_REGISTRY}/${REPO_NAME}"
+
+            echo ""
+            echo "---------------------------------------------"
+            echo "Processing: ${MODULE}"
+            echo "  Directory: ${MODULE_DIR}"
+            echo "  Port:      ${MODULE_PORT}"
+            echo "  Image:     ${FULL_IMAGE}:${IMAGE_TAG}"
+            echo "---------------------------------------------"
+
+            # Check if module directory exists
+            if [ ! -d "${MODULE_DIR}" ]; then
+              echo "WARNING: Directory ${MODULE_DIR} does not exist. Skipping."
+              FAILED_MODULES+=("${MODULE}")
+              continue
+            fi
+
+            # Ensure ECR repository exists (create if not)
+            aws ecr describe-repositories \
+              --repository-names "${REPO_NAME}" 2>/dev/null || \
+            aws ecr create-repository \
+              --repository-name "${REPO_NAME}" \
+              --image-scanning-configuration scanOnPush=true \
+              --tags Key=Project,Value=${PROJECT_NAME} \
+                     Key=Environment,Value=${ENV} \
+                     Key=ManagedBy,Value=github-actions
+
+            # Check if Dockerfile exists in module directory
+            if [ ! -f "${MODULE_DIR}/Dockerfile" ]; then
+              echo "WARNING: No Dockerfile found in ${MODULE_DIR}. Skipping."
+              FAILED_MODULES+=("${MODULE}")
+              continue
+            fi
+
+            # Build Docker image
+            echo "Building Docker image..."
+            docker build \
+              --build-arg APP_PORT="${MODULE_PORT}" \
+              --build-arg APP_MODULE="${MODULE_DIR}" \
+              --build-arg ENVIRONMENT="${ENV}" \
+              -t "${FULL_IMAGE}:${IMAGE_TAG}" \
+              -t "${FULL_IMAGE}:${ENV}-${IMAGE_TAG}" \
+              -t "${FULL_IMAGE}:${GITHUB_SHA::8}" \
+              -f "${MODULE_DIR}/Dockerfile" \
+              .
+
+            if [ $? -ne 0 ]; then
+              echo "ERROR: Docker build failed for ${MODULE}"
+              FAILED_MODULES+=("${MODULE}")
+              continue
+            fi
+
+            # Push all tags
+            echo "Pushing Docker images..."
+            docker push "${FULL_IMAGE}:${IMAGE_TAG}"
+            docker push "${FULL_IMAGE}:${ENV}-${IMAGE_TAG}"
+            docker push "${FULL_IMAGE}:${GITHUB_SHA::8}"
+
+            if [ $? -ne 0 ]; then
+              echo "ERROR: Docker push failed for ${MODULE}"
+              FAILED_MODULES+=("${MODULE}")
+              continue
+            fi
+
+            echo "Successfully built and pushed: ${MODULE}"
+            SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+          done
+
+          # ---------------------------------------------------------------
+          # Summary
+          # ---------------------------------------------------------------
+          echo ""
+          echo "============================================="
+          echo "Build & Push Summary"
+          echo "============================================="
+          echo "Total modules:     ${#MODULES[@]}"
+          echo "Successful:        ${SUCCESS_COUNT}"
+          echo "Failed/Skipped:    ${#FAILED_MODULES[@]}"
+
+          if [ ${#FAILED_MODULES[@]} -gt 0 ]; then
+            echo ""
+            echo "Failed/Skipped modules:"
+            for FM in "${FAILED_MODULES[@]}"; do
+              echo "  - ${FM}"
+            done
+          fi
+
+          # Fail the job if any module failed
+          if [ ${#FAILED_MODULES[@]} -gt 0 ] && [ "${SELECTED_MODULES}" != "all" ]; then
+            echo ""
+            echo "ERROR: One or more selected modules failed."
+            exit 1
+          fi
+
+      # -----------------------------------------------------------------
+      # List pushed images
+      # -----------------------------------------------------------------
+      - name: List pushed images
+        env:
+          ECR_REGISTRY: ${{ steps.aws-account.outputs.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SELECTED_MODULES: ${{ github.event.inputs.modules }}
+        run: |
+          echo "============================================="
+          echo "Pushed Images Summary"
+          echo "============================================="
+
+          if [ "${SELECTED_MODULES}" == "all" ]; then
+            MODULES=("api-claims" "api-members" "api-tenants" "api-entitlements" \
+                     "portal-claims-advisor" "portal-claims-member" "portal-batch-assignment" \
+                     "portal-tenants" "portal-entitlements" "portal-sre")
+          else
+            MODULES=("${SELECTED_MODULES}")
+          fi
+
+          for MODULE in "${MODULES[@]}"; do
+            REPO_NAME="${PROJECT_NAME}/${MODULE}"
+            echo ""
+            echo "Repository: ${REPO_NAME}"
+            aws ecr describe-images \
+              --repository-name "${REPO_NAME}" \
+              --query "imageDetails[?contains(imageTags, '${IMAGE_TAG}')].{Tags:imageTags,Pushed:imagePushedAt,Size:imageSizeInBytes}" \
+              --output table 2>/dev/null || echo "  (no images found or repository does not exist)"
+          done

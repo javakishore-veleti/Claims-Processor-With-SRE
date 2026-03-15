@@ -1,0 +1,132 @@
+name: "AWS_10 - Data Seed"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - seed
+          - clear
+
+env:
+  CLAIMS_PROC_AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  CLAIMS_PROC_PROJECT: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  data-seed:
+    name: "${{ inputs.action }} data in ${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.CLAIMS_PROC_AWS_REGION }}
+
+      - name: Resolve infrastructure from CloudFormation exports
+        id: resolve
+        run: |
+          ENV="${{ inputs.environment }}"
+          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+
+          # Get VPC and subnet info from vpc-sg stack
+          VPC_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT}-${ENV}-vpc-sg" \
+            --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text 2>/dev/null || echo "")
+
+          PRIVATE_SUBNET_1=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT}-${ENV}-vpc-sg" \
+            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1'].OutputValue" --output text 2>/dev/null || echo "")
+
+          PRIVATE_SUBNET_2=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT}-${ENV}-vpc-sg" \
+            --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2'].OutputValue" --output text 2>/dev/null || echo "")
+
+          RDS_SG=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT}-${ENV}-vpc-sg" \
+            --query "Stacks[0].Outputs[?OutputKey=='RDSSecurityGroupId'].OutputValue" --output text 2>/dev/null || echo "")
+
+          # Fallback to GitHub secrets if stack not found
+          VPC_ID="${VPC_ID:-${{ secrets.CLAIMS_PROC_VPC_ID }}}"
+          PRIVATE_SUBNET_1="${PRIVATE_SUBNET_1:-${{ secrets.CLAIMS_PROC_SUBNET_PRIVATE_1 }}}"
+          PRIVATE_SUBNET_2="${PRIVATE_SUBNET_2:-${{ secrets.CLAIMS_PROC_SUBNET_PRIVATE_2 }}}"
+
+          # Get RDS endpoint from core-infra stack
+          RDS_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT}-${ENV}-core-infra" \
+            --query "Stacks[0].Outputs[?OutputKey=='RDSEndpoint'].OutputValue" --output text 2>/dev/null || echo "")
+
+          echo "VPC_ID=${VPC_ID}" >> $GITHUB_OUTPUT
+          echo "PRIVATE_SUBNET_1=${PRIVATE_SUBNET_1}" >> $GITHUB_OUTPUT
+          echo "PRIVATE_SUBNET_2=${PRIVATE_SUBNET_2}" >> $GITHUB_OUTPUT
+          echo "RDS_SG=${RDS_SG}" >> $GITHUB_OUTPUT
+          echo "RDS_ENDPOINT=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+
+      - name: Deploy Data Seed Lambda
+        run: |
+          ENV="${{ inputs.environment }}"
+          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+          STACK_NAME="${PROJECT}-${ENV}-data-seed"
+
+          aws cloudformation deploy \
+            --template-file DevOps/AWS/CloudFormation/data-seed-lambda.yaml \
+            --stack-name "${STACK_NAME}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PROJECT}" \
+              VpcId="${{ steps.resolve.outputs.VPC_ID }}" \
+              PrivateSubnet1="${{ steps.resolve.outputs.PRIVATE_SUBNET_1 }}" \
+              PrivateSubnet2="${{ steps.resolve.outputs.PRIVATE_SUBNET_2 }}" \
+              RDSSecurityGroupId="${{ steps.resolve.outputs.RDS_SG }}" \
+              RDSEndpoint="${{ steps.resolve.outputs.RDS_ENDPOINT }}" \
+              RDSPassword="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}" \
+            --tags \
+              Project="${PROJECT}" \
+              Environment="${ENV}" \
+              ManagedBy=github-actions
+
+      - name: Invoke Data Seed Lambda
+        run: |
+          ENV="${{ inputs.environment }}"
+          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+          FUNCTION_NAME="${PROJECT}-${ENV}-data-seed"
+
+          echo "Invoking Lambda: ${FUNCTION_NAME} with action=${{ inputs.action }}"
+
+          aws lambda invoke \
+            --function-name "${FUNCTION_NAME}" \
+            --payload "$(echo '{"action":"${{ inputs.action }}","modules":"all"}' | base64)" \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/response.json
+
+          echo "=== Lambda Response ==="
+          cat /tmp/response.json
+          echo ""
+
+      - name: Summary
+        run: |
+          echo "## Data Seed Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Response:**" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/response.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,187 @@
+name: "AWS_11 - Destroy All AWS Resources"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirm_destroy:
+        description: 'Type the environment name to confirm destruction'
+        required: true
+        type: string
+      retain_rds_snapshot:
+        description: 'Create final RDS snapshot before deletion'
+        required: false
+        type: boolean
+        default: true
+      retain_s3_data:
+        description: 'Retain S3 bucket data (skip bucket deletion)'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  CLAIMS_PROC_AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  CLAIMS_PROC_PROJECT: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  validate:
+    name: "Validate destruction request"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm environment matches
+        run: |
+          if [ "${{ inputs.confirm_destroy }}" != "${{ inputs.environment }}" ]; then
+            echo "::error::Confirmation failed. You typed '${{ inputs.confirm_destroy }}' but environment is '${{ inputs.environment }}'. They must match."
+            exit 1
+          fi
+          echo "Destruction confirmed for environment: ${{ inputs.environment }}"
+
+  destroy:
+    name: "Destroy ${{ inputs.environment }}"
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.CLAIMS_PROC_AWS_REGION }}
+
+      - name: Delete Data Seed Lambda stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-data-seed"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete Fargate / API Gateway stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-fargate"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete EKS Cluster stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-eks"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete Secrets Manager stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-secrets"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete Messaging & Search stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-messaging-search"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete Auth / Cognito stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-auth"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete Observability stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-observability"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Create final RDS snapshot (if retained)
+        if: inputs.retain_rds_snapshot
+        continue-on-error: true
+        run: |
+          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+          ENV="${{ inputs.environment }}"
+          INSTANCE_ID="${PROJECT}-${ENV}-postgres"
+          SNAPSHOT_ID="${PROJECT}-${ENV}-final-$(date +%Y%m%d-%H%M%S)"
+
+          echo "Creating final RDS snapshot: ${SNAPSHOT_ID}"
+          aws rds create-db-snapshot \
+            --db-instance-identifier "${INSTANCE_ID}" \
+            --db-snapshot-identifier "${SNAPSHOT_ID}" 2>/dev/null || echo "RDS instance not found, skipping snapshot"
+
+          aws rds wait db-snapshot-completed \
+            --db-snapshot-identifier "${SNAPSHOT_ID}" 2>/dev/null || true
+
+      - name: Empty S3 buckets (if not retained)
+        if: "!inputs.retain_s3_data"
+        continue-on-error: true
+        run: |
+          PROJECT="${{ env.CLAIMS_PROC_PROJECT }}"
+          ENV="${{ inputs.environment }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          for SUFFIX in documents static; do
+            BUCKET="${PROJECT}-${ENV}-${ACCOUNT_ID}-${SUFFIX}"
+            echo "Emptying bucket: ${BUCKET}"
+            aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+          done
+
+      - name: Delete Core Infrastructure stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-core-infra"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Delete VPC & Security Groups stack
+        continue-on-error: true
+        run: |
+          STACK="${{ env.CLAIMS_PROC_PROJECT }}-${{ inputs.environment }}-vpc-sg"
+          echo "Deleting stack: ${STACK}"
+          aws cloudformation delete-stack --stack-name "${STACK}" 2>/dev/null || true
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}" 2>/dev/null || true
+          echo "Done: ${STACK}"
+
+      - name: Destruction Summary
+        run: |
+          echo "## Destruction Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **RDS Snapshot Retained:** ${{ inputs.retain_rds_snapshot }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Data Retained:** ${{ inputs.retain_s3_data }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Stacks Deleted (reverse order):" >> $GITHUB_STEP_SUMMARY
+          echo "1. data-seed" >> $GITHUB_STEP_SUMMARY
+          echo "2. fargate (API Gateway + ECS)" >> $GITHUB_STEP_SUMMARY
+          echo "3. eks" >> $GITHUB_STEP_SUMMARY
+          echo "4. secrets" >> $GITHUB_STEP_SUMMARY
+          echo "5. messaging-search" >> $GITHUB_STEP_SUMMARY
+          echo "6. auth (Cognito)" >> $GITHUB_STEP_SUMMARY
+          echo "7. observability" >> $GITHUB_STEP_SUMMARY
+          echo "8. core-infra (RDS, S3, ECR, Redis)" >> $GITHUB_STEP_SUMMARY
+          echo "9. vpc-sg" >> $GITHUB_STEP_SUMMARY

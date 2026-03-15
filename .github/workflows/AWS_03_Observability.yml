@@ -1,0 +1,88 @@
+name: "AWS_03 - Observability (CloudWatch, CloudTrail)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: "Stack action"
+        required: true
+        type: choice
+        options:
+          - create
+          - delete
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  STACK_NAME: claims-proc-${{ github.event.inputs.environment }}-observability
+  TEMPLATE_FILE: DevOps/AWS/CloudFormation/observability.yaml
+  PARAMS_FILE: DevOps/AWS/CloudFormation/Parameters/${{ github.event.inputs.environment }}.json
+
+jobs:
+  deploy:
+    name: "${{ github.event.inputs.action }} observability stack (${{ github.event.inputs.environment }})"
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy CloudFormation stack
+        if: ${{ github.event.inputs.action == 'create' }}
+        run: |
+          echo "Deploying stack: ${{ env.STACK_NAME }}"
+          aws cloudformation deploy \
+            --template-file "${{ env.TEMPLATE_FILE }}" \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --parameter-overrides file://${{ env.PARAMS_FILE }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --tags \
+              Project=claims-proc \
+              Environment=${{ github.event.inputs.environment }} \
+              ManagedBy=github-actions \
+            --no-fail-on-empty-changeset
+
+          echo "Stack outputs:"
+          aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --query "Stacks[0].Outputs" \
+            --output table
+
+      - name: Delete CloudFormation stack
+        if: ${{ github.event.inputs.action == 'delete' }}
+        run: |
+          echo "Deleting stack: ${{ env.STACK_NAME }}"
+
+          # Empty the CloudTrail S3 bucket before deletion (bucket must be empty)
+          BUCKET_NAME="claims-proc-${{ github.event.inputs.environment }}-cloudtrail-logs-$(aws sts get-caller-identity --query Account --output text)"
+          if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Emptying bucket: $BUCKET_NAME"
+            aws s3 rm "s3://$BUCKET_NAME" --recursive
+          fi
+
+          aws cloudformation delete-stack \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "${{ env.STACK_NAME }}"
+
+          echo "Stack deleted successfully."
