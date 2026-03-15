@@ -449,11 +449,73 @@ Add the following secrets to **each** environment (`dev`, `staging`, `prod`):
 |---|---|
 | `CLAIMS_PROC_AWS_ACCESS_KEY_ID` | AWS IAM Access Key ID (e.g. `AKIA...`) |
 | `CLAIMS_PROC_AWS_SECRET_ACCESS_KEY` | AWS IAM Secret Access Key |
-| `CLAIMS_PROC_RDS_MASTER_PASSWORD` | PostgreSQL master password — min 8 chars, no `/ @ "` characters |
-| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token — min 16 chars |
-| `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 app encryption key — 32-byte base64 string |
+| `CLAIMS_PROC_RDS_MASTER_PASSWORD` | PostgreSQL master password — see guidance below |
+| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token — see guidance below |
+| `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 app encryption key — see guidance below |
 
 > You may use the same IAM credentials across all environments or separate AWS accounts per environment for stricter isolation.
+
+#### `CLAIMS_PROC_RDS_MASTER_PASSWORD`
+
+AWS RDS requires: **minimum 8 characters**, must not contain `/`, `@`, `"`, or spaces.
+
+**Recommended value for `dev` (copy-paste ready):**
+```
+BH6KuVN27f2aMVQWG7XC
+```
+
+To generate your own — with `openssl`:
+```bash
+openssl rand -base64 24 | tr -d '/+= ' | cut -c1-20
+```
+Or with Python 3 (available on all laptops without extra tools):
+```bash
+python3 -c "import secrets, string; c=string.ascii_letters+string.digits; print(''.join(secrets.choice(c) for _ in range(20)))"
+```
+
+Use different passwords per environment. Store the value in a password manager as well as the GitHub secret.
+
+> ⚠️ Use a **different, private password** for `staging` and `prod`. Store it in a secrets vault.
+
+#### `CLAIMS_PROC_REDIS_AUTH_TOKEN`
+
+AWS ElastiCache requires: **minimum 16 characters**, maximum 128, printable ASCII only (no spaces).
+
+**Recommended value for `dev` (copy-paste ready):**
+```
+4knQn7k0PNbTCx1V9qc15r6EfFh7sDgS
+```
+
+To generate your own — with `openssl`:
+```bash
+openssl rand -base64 32 | tr -d '/+= ' | cut -c1-32
+```
+Or with Python 3:
+```bash
+python3 -c "import secrets, string; c=string.ascii_letters+string.digits; print(''.join(secrets.choice(c) for _ in range(32)))"
+```
+
+> ⚠️ Use a **different, private token** for `staging` and `prod`. Store it in a secrets vault.
+
+#### `CLAIMS_PROC_ENCRYPTION_KEY`
+
+Used for AES-256-GCM encryption of sensitive IDs in the application (via `Common-Utils`). Must be a **base64-encoded 32-byte (256-bit) key**.
+
+**Recommended value for `dev` (copy-paste ready):**
+```
+bWbimbvUejwdlV0TQRFt0Qz9yKpsnLYmhQ4sot090u0=
+```
+
+To generate your own — with `openssl`:
+```bash
+openssl rand -base64 32
+```
+Or with Python 3:
+```bash
+python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
+```
+
+> ⚠️ Use a **unique, privately generated key** for `staging` and `prod`. If you rotate the key after data has been written, existing encrypted values will become unreadable. Store it in a secrets vault (e.g. AWS Secrets Manager, 1Password, HashiCorp Vault).
 
 ### Optional Variables
 
