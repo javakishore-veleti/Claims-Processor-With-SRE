@@ -165,4 +165,5 @@ AWS GitHub Actions Design:
    1. Each workflow will have the same stages but different deployment targets and configurations.
    2. Show deployment environments in a dropdown of Github Actions UI for manual trigger.
 2. Prefix all workflows with AWS_01 etc. for sequencing
-2. 
+3. We will have so man Github actions for AWS deployment.
+   1. By default we will use the existing VPC_ID and its subnets and security groups for deployment but we can have option to override them through workflow dispatch inputs.

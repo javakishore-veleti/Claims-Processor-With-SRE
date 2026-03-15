@@ -10,20 +10,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_NAME="claims-processor-devops"
 NETWORK_NAME="claims-processor-network"
 
-# Reverse order — tear down dependents before dependencies
+# Stop ALL possible services (reverse order) — safe to stop even if not running
 SERVICES=(
-  # "Ollama"                   # Commented out to save laptop resources
-  # "Wiremock"                 # Commented out to save laptop resources
+  "Ollama"
+  "Wiremock"
   "Tracing/Zipkin"
   "Tracing/Jaeger"
   "Observability/Grafana"
   "Observability/Alertmanager"
   "Observability/Prometheus"
-  # "Observability/Kibana"     # Commented out — depends on Elastic
-  # "Search/Filebeat"          # Commented out — depends on Elastic
-  # "Search/Elastic"           # Commented out — using DB search by default
+  "Observability/Kibana"
+  "Search/Filebeat"
+  "Search/Elastic"
   "Kafka"
-  # "Redis"                    # Commented out to save laptop resources — using Caffeine cache
+  "Redis"
   "Postgres"
 )
 
@@ -36,14 +36,17 @@ for svc in "${SERVICES[@]}"; do
   compose_file="${SCRIPT_DIR}/${svc}/docker-compose.yaml"
 
   if [[ ! -f "${compose_file}" ]]; then
-    echo "[WARN]  Compose file not found: ${compose_file} — skipping"
     continue
   fi
 
-  echo ""
-  echo "---------- Stopping: ${svc} ----------"
-  docker compose -p "$PROJECT_NAME" -f "${compose_file}" down
-  echo "[OK]    ${svc} stopped"
+  # Only try to stop if there are running containers for this compose file
+  running=$(docker compose -p "$PROJECT_NAME" -f "${compose_file}" ps -q 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "${running}" -gt 0 ]]; then
+    echo ""
+    echo "---------- Stopping: ${svc} ----------"
+    docker compose -p "$PROJECT_NAME" -f "${compose_file}" down
+    echo "[OK]    ${svc} stopped"
+  fi
 done
 
 # ── Docker Network Cleanup ──────────────────────────────────────────────────

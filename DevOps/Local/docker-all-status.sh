@@ -29,21 +29,21 @@ echo "  All Claims-Processor- Containers"
 echo "=========================================="
 docker ps -a --filter "name=Claims-Processor-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
-# ── Per-Service Status ──────────────────────────────────────────────────────
-SERVICES=(
+# ── Per-Service Status (check ALL, report which are running) ────────────────
+ALL_SERVICES=(
   "Postgres"
-  # "Redis"                    # Commented out to save laptop resources — using Caffeine cache
+  "Redis"
   "Kafka"
-  # "Search/Elastic"           # Commented out — using DB search by default
-  # "Observability/Kibana"     # Commented out — depends on Elastic
-  # "Search/Filebeat"          # Commented out — depends on Elastic
+  "Search/Elastic"
+  "Observability/Kibana"
+  "Search/Filebeat"
   "Observability/Prometheus"
   "Observability/Alertmanager"
   "Observability/Grafana"
   "Tracing/Jaeger"
   "Tracing/Zipkin"
-  # "Wiremock"       # Commented out to save laptop resources
-  # "Ollama"         # Commented out to save laptop resources
+  "Wiremock"
+  "Ollama"
 )
 
 echo ""
@@ -53,7 +53,7 @@ echo "=========================================="
 printf "%-35s %s\n" "SERVICE" "STATUS"
 echo "---------------------------------------------------"
 
-for svc in "${SERVICES[@]}"; do
+for svc in "${ALL_SERVICES[@]}"; do
   compose_file="${SCRIPT_DIR}/${svc}/docker-compose.yaml"
 
   if [[ ! -f "${compose_file}" ]]; then
@@ -61,7 +61,6 @@ for svc in "${SERVICES[@]}"; do
     continue
   fi
 
-  # Capture running container count for this compose project
   running=$(docker compose -p "$PROJECT_NAME" -f "${compose_file}" ps --status running -q 2>/dev/null | wc -l | tr -d ' ')
 
   if [[ "${running}" -gt 0 ]]; then

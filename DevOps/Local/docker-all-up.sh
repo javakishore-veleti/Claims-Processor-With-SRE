@@ -3,12 +3,28 @@
 # docker-all-up.sh
 # Creates the shared Docker network (if needed) and starts ALL local Docker
 # Compose services in dependency order.
+#
+# Optional services controlled by environment variables (default: false):
+#   CLAIMS_PROCESSOR_APP_LOCAL_REDIS=true
+#   CLAIMS_PROCESSOR_APP_LOCAL_ELASTICSEARCH=true
+#   CLAIMS_PROCESSOR_APP_LOCAL_KIBANA=true
+#   CLAIMS_PROCESSOR_APP_LOCAL_FILEBEAT=true
+#   CLAIMS_PROCESSOR_APP_LOCAL_WIREMOCK=true
+#   CLAIMS_PROCESSOR_APP_LOCAL_OLLAMA=true
 ###############################################################################
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_NAME="claims-processor-devops"
 NETWORK_NAME="claims-processor-network"
+
+# ── Optional service flags (default: false unless set) ─────────────────────
+ENABLE_REDIS="${CLAIMS_PROCESSOR_APP_LOCAL_REDIS:-false}"
+ENABLE_ELASTICSEARCH="${CLAIMS_PROCESSOR_APP_LOCAL_ELASTICSEARCH:-false}"
+ENABLE_KIBANA="${CLAIMS_PROCESSOR_APP_LOCAL_KIBANA:-false}"
+ENABLE_FILEBEAT="${CLAIMS_PROCESSOR_APP_LOCAL_FILEBEAT:-false}"
+ENABLE_WIREMOCK="${CLAIMS_PROCESSOR_APP_LOCAL_WIREMOCK:-false}"
+ENABLE_OLLAMA="${CLAIMS_PROCESSOR_APP_LOCAL_OLLAMA:-false}"
 
 # ── Docker Network ──────────────────────────────────────────────────────────
 if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
@@ -18,28 +34,38 @@ else
     echo "Docker network '$NETWORK_NAME' already exists"
 fi
 
-# ── Ordered list of service folders (dependency order) ──────────────────────
-SERVICES=(
-  "Postgres"
-  # "Redis"                    # Commented out to save laptop resources — using Caffeine cache
-  "Kafka"
-  # "Search/Elastic"           # Commented out — using DB search by default
-  # "Observability/Kibana"     # Commented out — depends on Elastic
-  # "Search/Filebeat"          # Commented out — depends on Elastic
-  "Observability/Prometheus"
-  "Observability/Alertmanager"
-  "Observability/Grafana"
-  "Tracing/Jaeger"
-  "Tracing/Zipkin"
-  # "Wiremock"       # Commented out to save laptop resources
-  # "Ollama"         # Commented out to save laptop resources (needs GPU, heavy)
+# ── Build ordered service list based on env vars ────────────────────────────
+SERVICES=("Postgres")
+
+[[ "$ENABLE_REDIS" == "true" ]] && SERVICES+=("Redis")
+
+SERVICES+=("Kafka")
+
+if [[ "$ENABLE_ELASTICSEARCH" == "true" ]]; then
+    SERVICES+=("Search/Elastic")
+    [[ "$ENABLE_KIBANA" == "true" ]] && SERVICES+=("Observability/Kibana")
+    [[ "$ENABLE_FILEBEAT" == "true" ]] && SERVICES+=("Search/Filebeat")
+fi
+
+SERVICES+=(
+    "Observability/Prometheus"
+    "Observability/Alertmanager"
+    "Observability/Grafana"
+    "Tracing/Jaeger"
+    "Tracing/Zipkin"
 )
+
+[[ "$ENABLE_WIREMOCK" == "true" ]] && SERVICES+=("Wiremock")
+[[ "$ENABLE_OLLAMA" == "true" ]] && SERVICES+=("Ollama")
 
 echo ""
 echo "=========================================="
 echo "  Starting ALL local Docker Compose services"
 echo "  Project: $PROJECT_NAME"
 echo "  Network: $NETWORK_NAME"
+echo "=========================================="
+echo "  Optional: Redis=$ENABLE_REDIS, ES=$ENABLE_ELASTICSEARCH, Kibana=$ENABLE_KIBANA"
+echo "            Filebeat=$ENABLE_FILEBEAT, WireMock=$ENABLE_WIREMOCK, Ollama=$ENABLE_OLLAMA"
 echo "=========================================="
 
 for svc in "${SERVICES[@]}"; do
@@ -56,18 +82,16 @@ for svc in "${SERVICES[@]}"; do
   echo "[OK]    ${svc} is up"
 
   # After Elasticsearch starts: initialize index templates and indices
-  # Commented out — Elastic is disabled to save laptop resources (using DB search by default)
-  # if [[ "${svc}" == "Search/Elastic" ]]; then
-  #   echo "[INIT]  Running Elasticsearch index template initialization..."
-  #   bash "${SCRIPT_DIR}/Search/Elastic/init-indices.sh" || echo "[WARN]  ES init-indices.sh failed (ES may not be ready yet)"
-  # fi
+  if [[ "${svc}" == "Search/Elastic" ]]; then
+    echo "[INIT]  Running Elasticsearch index template initialization..."
+    bash "${SCRIPT_DIR}/Search/Elastic/init-indices.sh" || echo "[WARN]  ES init-indices.sh failed (ES may not be ready yet)"
+  fi
 
-  # After Kibana starts: initialize data views in the background (Kibana takes time)
-  # Commented out — Kibana is disabled to save laptop resources (depends on Elastic)
-  # if [[ "${svc}" == "Observability/Kibana" ]]; then
-  #   echo "[INIT]  Running Kibana data view initialization in background..."
-  #   bash "${SCRIPT_DIR}/Observability/Kibana/init-kibana.sh" &
-  # fi
+  # After Kibana starts: initialize data views in the background
+  if [[ "${svc}" == "Observability/Kibana" ]]; then
+    echo "[INIT]  Running Kibana data view initialization in background..."
+    bash "${SCRIPT_DIR}/Observability/Kibana/init-kibana.sh" &
+  fi
 done
 
 echo ""
