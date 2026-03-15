@@ -93,66 +93,54 @@ jobs:
         if: steps.check.outputs.stack_status != 'NOT_FOUND'
         continue-on-error: true
         run: |
-          PROJECT="${{ env.PROJECT_NAME }}"
-          ENV="${{ inputs.environment }}"
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          BUCKET="${PROJECT}-${ENV}-${ACCOUNT_ID}-cloudtrail"
+          STACK="${{ steps.check.outputs.stack_name }}"
+          REGION="${{ env.AWS_REGION }}"
+
+          # Get actual bucket name from the live CloudFormation stack resource
+          # (avoids any hardcoded name mismatch with the template)
+          BUCKET=$(aws cloudformation describe-stack-resource \
+            --stack-name "$STACK" \
+            --logical-resource-id TrailLogsBucket \
+            --query 'StackResourceDetail.PhysicalResourceId' \
+            --output text 2>/dev/null || echo "")
+
+          if [[ -z "$BUCKET" || "$BUCKET" == "None" ]]; then
+            echo "TrailLogsBucket resource not found in stack — skipping."
+            exit 0
+          fi
 
           if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            echo "CloudTrail bucket not found: ${BUCKET} (skipping)"
+            echo "Bucket does not exist: ${BUCKET} — skipping."
             exit 0
           fi
 
           echo "Emptying CloudTrail S3 bucket: ${BUCKET}"
 
+          # Delete all versioned objects and delete markers (if versioning enabled)
           VERSIONING=$(aws s3api get-bucket-versioning \
             --bucket "$BUCKET" \
             --query 'Status' --output text 2>/dev/null || echo "Disabled")
 
           if [[ "$VERSIONING" == "Enabled" ]]; then
-            echo "  Bucket has versioning enabled. Deleting all object versions..."
-            aws s3api list-object-versions \
-              --bucket "$BUCKET" \
-              --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
-              --output json > /tmp/versions.json 2>/dev/null || echo '{"Objects":[]}' > /tmp/versions.json
-
-            OBJECT_COUNT=$(python3 -c "
-          import json
-          with open('/tmp/versions.json') as f:
-              data = json.load(f)
-          objects = data.get('Objects') or []
-          print(len(objects))
-          ")
-
-            if [[ "$OBJECT_COUNT" -gt 0 ]]; then
-              aws s3api delete-objects \
+            echo "  Versioning is enabled — deleting all versions and delete markers..."
+            for QUERY in \
+              'Versions[].{Key:Key,VersionId:VersionId}' \
+              'DeleteMarkers[].{Key:Key,VersionId:VersionId}'; do
+              aws s3api list-object-versions \
                 --bucket "$BUCKET" \
-                --delete "file:///tmp/versions.json" 2>/dev/null || true
-            fi
-
-            aws s3api list-object-versions \
-              --bucket "$BUCKET" \
-              --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
-              --output json > /tmp/markers.json 2>/dev/null || echo '{"Objects":[]}' > /tmp/markers.json
-
-            MARKER_COUNT=$(python3 -c "
-          import json
-          with open('/tmp/markers.json') as f:
-              data = json.load(f)
-          objects = data.get('Objects') or []
-          print(len(objects))
-          ")
-
-            if [[ "$MARKER_COUNT" -gt 0 ]]; then
-              aws s3api delete-objects \
-                --bucket "$BUCKET" \
-                --delete "file:///tmp/markers.json" 2>/dev/null || true
-            fi
+                --query "{Objects: ${QUERY}}" \
+                --output json 2>/dev/null > /tmp/s3_objects.json || echo '{"Objects":[]}' > /tmp/s3_objects.json
+              COUNT=$(python3 -c "import json,sys; d=json.load(open('/tmp/s3_objects.json')); print(len(d.get('Objects') or []))")
+              if [[ "$COUNT" -gt 0 ]]; then
+                aws s3api delete-objects --bucket "$BUCKET" --delete file:///tmp/s3_objects.json 2>/dev/null || true
+                echo "  Deleted ${COUNT} objects/markers."
+              fi
+            done
           else
             aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
           fi
 
-          echo "Emptied: ${BUCKET}"
+          echo "✅ Emptied: ${BUCKET}"
 
       - name: Delete stack
         if: steps.check.outputs.stack_status != 'NOT_FOUND'
