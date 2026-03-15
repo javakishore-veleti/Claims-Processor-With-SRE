@@ -248,6 +248,10 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
         Tools
     </a>
+    <a class="nav-tab" href="#docker-env">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+        Docker Env
+    </a>
     <a class="nav-tab" href="#credentials">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         Credentials
@@ -709,6 +713,45 @@
                     <tr><td>Batch Operator</td><td class="mono">batch</td><td class="mono">batch123</td><td class="mono">BATCH_OPERATOR</td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Docker Environment Variables -->
+    <div class="section" id="docker-env">
+        <div class="section-header">
+            <div class="section-icon teal">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+            </div>
+            <span class="section-title">Docker Optional Services (Env Vars)</span>
+            <span class="section-badge badge-tools">Resource Control</span>
+        </div>
+        <div class="card">
+            <div class="desc">Control which Docker containers start via environment variables. Default stack runs Postgres, Kafka, Prometheus, Alertmanager, Grafana, Jaeger, Zipkin. Optional services are <strong>disabled by default</strong> to save laptop resources.</div>
+            <table class="ref-table">
+                <thead>
+                    <tr>
+                        <th>Environment Variable</th>
+                        <th>Default</th>
+                        <th>Service</th>
+                        <th>RAM Saved</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="mono">CLAIMS_PROCESSOR_APP_LOCAL_REDIS</td><td><span class="badge badge-info">false</span></td><td>Redis (cache)</td><td>~10MB</td></tr>
+                    <tr><td class="mono">CLAIMS_PROCESSOR_APP_LOCAL_ELASTICSEARCH</td><td><span class="badge badge-info">false</span></td><td>Elasticsearch (search + logs)</td><td>~1GB</td></tr>
+                    <tr><td class="mono">CLAIMS_PROCESSOR_APP_LOCAL_KIBANA</td><td><span class="badge badge-info">false</span></td><td>Kibana (log analytics UI)</td><td>~540MB</td></tr>
+                    <tr><td class="mono">CLAIMS_PROCESSOR_APP_LOCAL_FILEBEAT</td><td><span class="badge badge-info">false</span></td><td>Filebeat (log shipper)</td><td>~55MB</td></tr>
+                    <tr><td class="mono">CLAIMS_PROCESSOR_APP_LOCAL_WIREMOCK</td><td><span class="badge badge-info">false</span></td><td>WireMock (API mocking)</td><td>~85MB</td></tr>
+                    <tr><td class="mono">CLAIMS_PROCESSOR_APP_LOCAL_OLLAMA</td><td><span class="badge badge-info">false</span></td><td>Ollama (local AI inference)</td><td>~11MB</td></tr>
+                    <tr class="group-row"><td colspan="4">Usage Examples</td></tr>
+                    <tr><td colspan="4" class="mono cmd" style="font-size: 0.75rem;">npm run devops:start:all &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Default (no optional services)</td></tr>
+                    <tr><td colspan="4" class="mono cmd" style="font-size: 0.75rem;">CLAIMS_PROCESSOR_APP_LOCAL_REDIS=true npm run devops:start:all &nbsp;&nbsp;&nbsp;# Enable Redis</td></tr>
+                    <tr><td colspan="4" class="mono cmd" style="font-size: 0.75rem;">CLAIMS_PROCESSOR_APP_LOCAL_ELASTICSEARCH=true CLAIMS_PROCESSOR_APP_LOCAL_KIBANA=true npm run devops:start:all &nbsp;# Enable ELK</td></tr>
+                </tbody>
+            </table>
+            <div class="desc" style="margin-top: 0.75rem;">
+                <strong>Fallbacks when disabled:</strong> Redis → Caffeine in-memory cache | Elasticsearch → JPA database queries | Kibana/Filebeat → Console JSON logs | WireMock → Direct API calls | Ollama → Mock AI extraction
+            </div>
         </div>
     </div>
 
