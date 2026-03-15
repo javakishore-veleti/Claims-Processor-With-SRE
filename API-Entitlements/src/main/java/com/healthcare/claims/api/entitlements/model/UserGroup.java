@@ -7,8 +7,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "user_groups", indexes = {
-    @Index(name = "idx_user_groups_user_id", columnList = "userId"),
-    @Index(name = "idx_user_groups_group_id", columnList = "groupId")
+    @Index(name = "idx_user_groups_user_id", columnList = "user_id"),
+    @Index(name = "idx_user_groups_group_id", columnList = "group_id")
 })
 @Getter
 @Setter

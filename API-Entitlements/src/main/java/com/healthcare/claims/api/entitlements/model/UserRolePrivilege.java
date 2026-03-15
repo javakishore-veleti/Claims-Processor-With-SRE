@@ -7,7 +7,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "user_role_privileges", indexes = {
-    @Index(name = "idx_user_role_privileges_user_id", columnList = "userId")
+    @Index(name = "idx_user_role_privileges_user_id", columnList = "user_id")
 })
 @Getter
 @Setter

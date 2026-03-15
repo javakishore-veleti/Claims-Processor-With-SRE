@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "groups", indexes = {
-    @Index(name = "idx_groups_tenant_id", columnList = "tenantId")
+    @Index(name = "idx_groups_tenant_id", columnList = "tenant_id")
 })
 @Getter
 @Setter

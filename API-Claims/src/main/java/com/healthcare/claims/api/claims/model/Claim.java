@@ -28,10 +28,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "claims", indexes = {
-    @Index(name = "idx_claims_tenant_id", columnList = "tenantId"),
-    @Index(name = "idx_claims_customer_id", columnList = "customerId"),
+    @Index(name = "idx_claims_tenant_id", columnList = "tenant_id"),
+    @Index(name = "idx_claims_customer_id", columnList = "customer_id"),
     @Index(name = "idx_claims_stage", columnList = "stage"),
-    @Index(name = "idx_claims_tenant_stage", columnList = "tenantId, stage")
+    @Index(name = "idx_claims_tenant_stage", columnList = "tenant_id, stage")
 })
 @Getter
 @Setter

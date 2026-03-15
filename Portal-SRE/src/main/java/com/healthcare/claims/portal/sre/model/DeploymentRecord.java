@@ -8,9 +8,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "deployment_records", indexes = {
-    @Index(name = "idx_deployment_service", columnList = "serviceName"),
+    @Index(name = "idx_deployment_service", columnList = "service_name"),
     @Index(name = "idx_deployment_env", columnList = "environment"),
-    @Index(name = "idx_deployment_deployed_at", columnList = "deployedAt")
+    @Index(name = "idx_deployment_deployed_at", columnList = "deployed_at")
 })
 @Getter
 @Setter

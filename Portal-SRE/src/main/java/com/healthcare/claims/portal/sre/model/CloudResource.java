@@ -10,9 +10,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "cloud_resources", indexes = {
-    @Index(name = "idx_cloud_resources_provider", columnList = "cloudProvider"),
-    @Index(name = "idx_cloud_resources_tenant", columnList = "tenantId"),
-    @Index(name = "idx_cloud_resources_type", columnList = "resourceType")
+    @Index(name = "idx_cloud_resources_provider", columnList = "cloud_provider"),
+    @Index(name = "idx_cloud_resources_tenant", columnList = "tenant_id"),
+    @Index(name = "idx_cloud_resources_type", columnList = "resource_type")
 })
 @Getter
 @Setter

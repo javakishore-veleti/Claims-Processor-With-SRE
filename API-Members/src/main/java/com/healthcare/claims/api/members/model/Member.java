@@ -20,12 +20,12 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "members", indexes = {
-    @Index(name = "idx_members_tenant_id", columnList = "tenantId"),
-    @Index(name = "idx_members_member_id", columnList = "memberId"),
-    @Index(name = "idx_members_last_name", columnList = "lastName"),
-    @Index(name = "idx_members_tenant_last_name", columnList = "tenantId, lastName"),
+    @Index(name = "idx_members_tenant_id", columnList = "tenant_id"),
+    @Index(name = "idx_members_member_id", columnList = "member_id"),
+    @Index(name = "idx_members_last_name", columnList = "last_name"),
+    @Index(name = "idx_members_tenant_last_name", columnList = "tenant_id, last_name"),
     @Index(name = "idx_members_email", columnList = "email"),
-    @Index(name = "idx_members_policy_number", columnList = "policyNumber")
+    @Index(name = "idx_members_policy_number", columnList = "policy_number")
 })
 @Data
 @NoArgsConstructor

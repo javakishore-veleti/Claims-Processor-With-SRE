@@ -12,7 +12,7 @@ import java.util.UUID;
 @Table(name = "privileges", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"tenant_id", "name"})
 }, indexes = {
-    @Index(name = "idx_privileges_tenant_id", columnList = "tenantId"),
+    @Index(name = "idx_privileges_tenant_id", columnList = "tenant_id"),
     @Index(name = "idx_privileges_resource", columnList = "resource")
 })
 @Getter
