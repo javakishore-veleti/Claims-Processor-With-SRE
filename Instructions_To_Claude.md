@@ -174,6 +174,11 @@ AWS GitHub Actions Design:
       3. AWS CloudWatch, AWS Cloudtrail, AWS Cognito Pool, RDS Postgres DB, AWS S3 Bucket, AWS EKS, AWS ECR for Docker images, AWS OpenSearch, AWS Kinesis
       4. Infrastructure AWs API Gateway, AWS Fargate, AWS ECR
       5. AWS Secrets Manager for managing the secrets in non-local environments and also for inter-service communication authentication secrets management.
+      6. A GitHub action to populate initial data seed in RDS Postgres DB after deployment using AWS Lambda or AWS SSM Run Command or AWS CloudFormation custom resource.
+      7. 
       
+   4. WE need to have another GitHub action that destorys eveything. 
+   5. I am thinking we will have Cloudformation template to make the job easy both for creation of the above resources and destroying the above and also obtaining the status
+   5. Not sure what I am missing here
             
 
