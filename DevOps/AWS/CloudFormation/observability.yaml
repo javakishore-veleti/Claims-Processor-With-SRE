@@ -44,6 +44,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: api-claims
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupApiMembers:
     Type: AWS::Logs::LogGroup
@@ -57,6 +61,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: api-members
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupApiTenants:
     Type: AWS::Logs::LogGroup
@@ -70,6 +78,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: api-tenants
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupApiEntitlements:
     Type: AWS::Logs::LogGroup
@@ -83,6 +95,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: api-entitlements
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupPortalClaimsAdvisor:
     Type: AWS::Logs::LogGroup
@@ -96,6 +112,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: portal-claims-advisor
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupPortalClaimsMember:
     Type: AWS::Logs::LogGroup
@@ -109,6 +129,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: portal-claims-member
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupPortalBatchAssignment:
     Type: AWS::Logs::LogGroup
@@ -122,6 +146,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: portal-batch-assignment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupPortalTenants:
     Type: AWS::Logs::LogGroup
@@ -135,6 +163,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: portal-tenants
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupPortalEntitlements:
     Type: AWS::Logs::LogGroup
@@ -148,6 +180,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: portal-entitlements
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   LogGroupPortalSre:
     Type: AWS::Logs::LogGroup
@@ -161,6 +197,10 @@ Resources:
           Value: !Ref Environment
         - Key: Service
           Value: portal-sre
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   # =========================================================================
   # SNS Topic — alarm notifications
@@ -174,6 +214,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   # =========================================================================
   # CloudWatch Dashboard
@@ -320,6 +364,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   AlarmHighLatencyP99:
     Type: AWS::CloudWatch::Alarm
@@ -347,6 +395,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   AlarmLowAvailability:
     Type: AWS::CloudWatch::Alarm
@@ -374,6 +426,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   AlarmRdsCpuHigh:
     Type: AWS::CloudWatch::Alarm
@@ -401,6 +457,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   AlarmRdsFreeStorageLow:
     Type: AWS::CloudWatch::Alarm
@@ -428,6 +488,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   # =========================================================================
   # CloudTrail — S3 bucket, trail, CloudWatch Logs integration
@@ -440,7 +504,7 @@ Resources:
         Rules:
           - Id: ExpireOldTrailLogs
             Status: Enabled
-            ExpirationInDays: !Ref LogRetentionDays
+            ExpirationInDays: 90
             Transitions:
               - StorageClass: GLACIER
                 TransitionInDays: 30
@@ -458,6 +522,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   TrailLogsBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -496,6 +564,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   TrailCloudWatchRole:
     Type: AWS::IAM::Role
@@ -523,6 +595,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
   CloudTrail:
     Type: AWS::CloudTrail::Trail
@@ -542,6 +618,10 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+        - Key: ManagedBy
+          Value: github-actions
+        - Key: Component
+          Value: observability
 
 # ---------------------------------------------------------------------------
 # Outputs

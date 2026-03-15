@@ -46,11 +46,6 @@ jobs:
             --stack-name "${{ env.STACK_NAME }}" \
             --parameter-overrides file://${{ env.PARAMS_FILE }} \
             --capabilities CAPABILITY_NAMED_IAM \
-            --tags \
-              Project=claims-proc \
-              Environment=${{ github.event.inputs.environment }} \
-              ManagedBy=github-actions \
-              Component=observability \
             --no-fail-on-empty-changeset
 
           echo "Stack outputs:"
