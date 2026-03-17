@@ -274,16 +274,14 @@ Resources:
         - Key: Service
           Value: opensearch
 
-  OpenSearchServiceLinkedRole:
-    Type: AWS::IAM::ServiceLinkedRole
-    DeletionPolicy: Retain
-    Properties:
-      AWSServiceName: es.amazonaws.com
-      Description: Role for OpenSearch to access VPC resources
+  # NOTE: The OpenSearch service-linked role (AWSServiceRoleForAmazonElasticsearchService)
+  # is a global singleton per AWS account. It only needs to be created once and persists
+  # across all stacks. Removed from this template to avoid CREATE_FAILED when it already exists.
+  # If deploying OpenSearch for the first time in a new account, create it manually:
+  #   aws iam create-service-linked-role --aws-service-name es.amazonaws.com
 
   OpenSearchDomain:
     Type: AWS::OpenSearchService::Domain
-    DependsOn: OpenSearchServiceLinkedRole
     Properties:
       DomainName: !Sub '${ProjectName}-${Environment}-search'
       EngineVersion: OpenSearch_2.11
