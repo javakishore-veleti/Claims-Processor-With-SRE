@@ -93,7 +93,32 @@ jobs:
           echo "  App SG ID:        ${APP_SG_ID}"
 
       # ----------------------------------------------------------------
-      # 4. Pre-flight stack state check
+      # 4. Validate RDS master password
+      # ----------------------------------------------------------------
+      - name: Validate RDS master password
+        run: |
+          TOKEN="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD secret is not set."
+            echo "Go to: Settings > Secrets > Actions > New repository secret"
+            echo "Name: CLAIMS_PROC_RDS_MASTER_PASSWORD"
+            echo "Value: a strong password (8-128 chars, printable ASCII, no / \" @ or spaces)"
+            exit 1
+          fi
+          LEN=${#TOKEN}
+          if [ "$LEN" -lt 8 ] || [ "$LEN" -gt 128 ]; then
+            echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD must be 8-128 characters (current: ${LEN})."
+            exit 1
+          fi
+          if echo "$TOKEN" | grep -qP '[/"@\s]'; then
+            echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD contains invalid characters."
+            echo "RDS passwords must be printable ASCII without / \" @ or spaces."
+            exit 1
+          fi
+          echo "RDS master password validated (${LEN} chars)."
+
+      # ----------------------------------------------------------------
+      # 5. Pre-flight stack state check
       # ----------------------------------------------------------------
       - name: Pre-flight stack state check
         id: preflight

@@ -91,6 +91,83 @@ jobs:
       s09: ${{ steps.status.outputs.s09 }}
       s10: ${{ steps.status.outputs.s10 }}
     steps:
+      - name: Validate all secrets
+        run: |
+          ERRORS=0
+
+          # ── AWS Credentials ──
+          if [ -z "${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}" ]; then
+            echo "::error::CLAIMS_PROC_AWS_ACCESS_KEY_ID secret is not set."
+            ERRORS=$((ERRORS + 1))
+          fi
+          if [ -z "${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "::error::CLAIMS_PROC_AWS_SECRET_ACCESS_KEY secret is not set."
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ── RDS Master Password ──
+          RDS_PASS="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}"
+          if [ -z "$RDS_PASS" ]; then
+            echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD secret is not set."
+            ERRORS=$((ERRORS + 1))
+          else
+            LEN=${#RDS_PASS}
+            if [ "$LEN" -lt 8 ] || [ "$LEN" -gt 128 ]; then
+              echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD must be 8-128 characters (current: ${LEN})."
+              ERRORS=$((ERRORS + 1))
+            fi
+            if echo "$RDS_PASS" | grep -qP '[/"@\s]'; then
+              echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD contains invalid characters (/, \", @, or spaces)."
+              ERRORS=$((ERRORS + 1))
+            fi
+          fi
+
+          # ── Redis Auth Token ──
+          REDIS_TOKEN="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}"
+          if [ -z "$REDIS_TOKEN" ]; then
+            echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN secret is not set."
+            ERRORS=$((ERRORS + 1))
+          else
+            LEN=${#REDIS_TOKEN}
+            if [ "$LEN" -lt 16 ] || [ "$LEN" -gt 128 ]; then
+              echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN must be 16-128 characters (current: ${LEN})."
+              ERRORS=$((ERRORS + 1))
+            fi
+            if echo "$REDIS_TOKEN" | grep -qP '[/"@\s]'; then
+              echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN contains invalid characters (/, \", @, or spaces)."
+              ERRORS=$((ERRORS + 1))
+            fi
+          fi
+
+          # ── JWT Signing Key ──
+          if [ -z "${{ secrets.CLAIMS_PROC_JWT_SIGNING_KEY }}" ]; then
+            echo "::warning::CLAIMS_PROC_JWT_SIGNING_KEY is not set (needed by Secrets Manager stack)."
+          fi
+
+          # ── AES Encryption Key ──
+          if [ -z "${{ secrets.CLAIMS_PROC_AES_ENCRYPTION_KEY }}" ]; then
+            echo "::warning::CLAIMS_PROC_AES_ENCRYPTION_KEY is not set (needed by Secrets Manager stack)."
+          fi
+
+          # ── Summary ──
+          if [ "$ERRORS" -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "  ${ERRORS} secret validation error(s)"
+            echo "=========================================="
+            echo ""
+            echo "Fix: Go to GitHub > Settings > Secrets and variables > Actions"
+            echo ""
+            echo "Password/token rules (RDS + Redis):"
+            echo "  - Printable ASCII characters only"
+            echo "  - No forward slash (/), double quote (\"), at sign (@), or spaces"
+            echo "  - RDS password: 8-128 characters"
+            echo "  - Redis token:  16-128 characters"
+            exit 1
+          fi
+
+          echo "All secrets validated successfully."
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -410,25 +487,6 @@ jobs:
           aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Validate Redis auth token
-        run: |
-          TOKEN="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}"
-          if [ -z "$TOKEN" ]; then
-            echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN secret is not set."
-            echo "Set it in: Settings > Secrets > Actions > CLAIMS_PROC_REDIS_AUTH_TOKEN"
-            echo "Requirements: 16-128 chars, printable ASCII, no / \" or @"
-            exit 1
-          fi
-          LEN=${#TOKEN}
-          if [ "$LEN" -lt 16 ] || [ "$LEN" -gt 128 ]; then
-            echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN must be 16-128 characters (current: ${LEN})."
-            exit 1
-          fi
-          if echo "$TOKEN" | grep -qP '[/"@\s]'; then
-            echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN contains invalid characters (/, \", @, or spaces)."
-            exit 1
-          fi
-          echo "Redis auth token validated (${LEN} chars)."
       - name: Deploy ElastiCache Redis
         env:
           ENV: ${{ inputs.environment }}
