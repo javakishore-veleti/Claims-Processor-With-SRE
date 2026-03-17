@@ -217,7 +217,7 @@ jobs:
               PrivateSubnet1="${PRV1}" \
               PrivateSubnet2="${PRV2}" \
               AppSecurityGroupId="${APP_SG}" \
-              RDSMasterPassword="${{ secrets.CLAIMS_PROC_DB_PASSWORD }}" \
+              RDSMasterPassword="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}" \
               RedisAuthToken="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
@@ -375,7 +375,7 @@ jobs:
         env:
           ENV: ${{ inputs.environment }}
           PRJ: ${{ env.PROJECT_NAME }}
-          DB_PASS: ${{ secrets.CLAIMS_PROC_DB_PASSWORD }}
+          DB_PASS: ${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}
           REDIS_TOKEN: ${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}
           JWT_KEY: ${{ secrets.CLAIMS_PROC_JWT_SIGNING_KEY }}
           AES_KEY: ${{ secrets.CLAIMS_PROC_AES_ENCRYPTION_KEY }}
@@ -642,7 +642,7 @@ jobs:
               RDSEndpoint="${RDS_ENDPOINT}" \
               RDSPort="${RDS_PORT}" \
               RDSUsername="claims_user" \
-              RDSPassword="${{ secrets.CLAIMS_PROC_DB_PASSWORD }}" \
+              RDSPassword="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}" \
               RDSDBName="claims_db" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
