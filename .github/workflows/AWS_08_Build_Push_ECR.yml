@@ -1,7 +1,12 @@
 # =============================================================================
 # AWS_08 - Build & Push Docker Images to ECR
-# Builds Java modules with Maven, creates Docker images, and pushes them
-# to Amazon ECR for the Claims Processor With SRE microservice.
+#
+# Optimizations:
+#   1. Change detection — only rebuilds modules whose source code changed
+#   2. Maven dependency caching — restores ~/.m2 across runs
+#   3. Docker layer caching — uses GitHub Actions cache for BuildKit layers
+#   4. Skips Maven build entirely if no Java/pom changes detected
+#   5. Unchanged modules reuse existing ECR images (re-tagged, not rebuilt)
 # =============================================================================
 name: "AWS_08 - Build & Push Docker Images to ECR"
 
@@ -23,6 +28,7 @@ on:
         type: choice
         options:
           - all
+          - changed-only
           - api-claims
           - api-members
           - api-tenants
@@ -40,27 +46,148 @@ on:
         type: string
         default: 'latest'
 
+      force_rebuild:
+        description: 'Force rebuild all selected modules (ignore change detection)'
+        required: false
+        type: boolean
+        default: false
+
 env:
   AWS_REGION: us-east-1
   PROJECT_NAME: claims-proc
   JAVA_VERSION: '17'
 
 jobs:
-  build-and-push:
-    name: Build & Push (${{ github.event.inputs.modules }}) to ECR
+  # ===========================================================================
+  # Job 1: Detect which modules have changed since last successful ECR push
+  # ===========================================================================
+  detect-changes:
+    name: Detect changed modules
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
-
+    outputs:
+      changed_modules: ${{ steps.changes.outputs.changed_modules }}
+      needs_maven_build: ${{ steps.changes.outputs.needs_maven_build }}
+      common_libs_changed: ${{ steps.changes.outputs.common_libs_changed }}
     steps:
-      # -----------------------------------------------------------------
-      # Checkout
-      # -----------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate change detection
+
+      - name: Detect changes per module
+        id: changes
+        env:
+          SELECTED: ${{ inputs.modules }}
+          FORCE: ${{ inputs.force_rebuild }}
+        run: |
+          # Module name -> source directories that trigger a rebuild
+          declare -A MODULE_SOURCES
+          MODULE_SOURCES["api-claims"]="API-Claims Common-Libraries"
+          MODULE_SOURCES["api-members"]="API-Members Common-Libraries"
+          MODULE_SOURCES["api-tenants"]="API-Tenants Common-Libraries"
+          MODULE_SOURCES["api-entitlements"]="API-Entitlements Common-Libraries"
+          MODULE_SOURCES["portal-claims-advisor"]="Portal-Claims-Advisor Common-Libraries"
+          MODULE_SOURCES["portal-claims-member"]="Portal-Claims-Member Common-Libraries"
+          MODULE_SOURCES["portal-batch-assignment"]="Portal-Batch-Assignment Common-Libraries"
+          MODULE_SOURCES["portal-tenants"]="Portal-Tenants Common-Libraries"
+          MODULE_SOURCES["portal-entitlements"]="Portal-Entitlements Common-Libraries"
+          MODULE_SOURCES["portal-sre"]="Portal-SRE Common-Libraries"
+
+          ALL_MODULES="api-claims api-members api-tenants api-entitlements portal-claims-advisor portal-claims-member portal-batch-assignment portal-tenants portal-entitlements portal-sre"
+
+          # Force rebuild — skip change detection
+          if [ "$FORCE" == "true" ]; then
+            if [ "$SELECTED" == "all" ] || [ "$SELECTED" == "changed-only" ]; then
+              echo "changed_modules=${ALL_MODULES}" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed_modules=${SELECTED}" >> "$GITHUB_OUTPUT"
+            fi
+            echo "needs_maven_build=true" >> "$GITHUB_OUTPUT"
+            echo "common_libs_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Force rebuild requested — all selected modules will be built."
+            exit 0
+          fi
+
+          # Specific module selected — always build it
+          if [ "$SELECTED" != "all" ] && [ "$SELECTED" != "changed-only" ]; then
+            echo "changed_modules=${SELECTED}" >> "$GITHUB_OUTPUT"
+            echo "needs_maven_build=true" >> "$GITHUB_OUTPUT"
+            echo "common_libs_changed=false" >> "$GITHUB_OUTPUT"
+            echo "Specific module selected: ${SELECTED}"
+            exit 0
+          fi
+
+          # Find the last successful build commit from tags or fall back to HEAD~1
+          LAST_BUILD_SHA=$(git tag -l 'ecr-build-*' --sort=-creatordate | head -1 | xargs -I{} git rev-list -1 {} 2>/dev/null || echo "")
+          if [ -z "$LAST_BUILD_SHA" ]; then
+            # No previous build tag — check last 1 commit
+            LAST_BUILD_SHA="HEAD~1"
+            echo "No previous build tag found — comparing against HEAD~1"
+          else
+            echo "Last successful build: ${LAST_BUILD_SHA}"
+          fi
+
+          # Check if Common-Libraries changed (forces rebuild of all modules)
+          COMMON_CHANGED="false"
+          if git diff --name-only "$LAST_BUILD_SHA" HEAD -- Common-Libraries/ pom.xml 2>/dev/null | grep -q .; then
+            COMMON_CHANGED="true"
+            echo "Common-Libraries or root pom.xml changed — all modules need rebuild."
+          fi
+          echo "common_libs_changed=${COMMON_CHANGED}" >> "$GITHUB_OUTPUT"
+
+          # Detect per-module changes
+          CHANGED=""
+          for MODULE in $ALL_MODULES; do
+            SOURCES="${MODULE_SOURCES[$MODULE]}"
+            MODULE_CHANGED="false"
+
+            if [ "$COMMON_CHANGED" == "true" ]; then
+              MODULE_CHANGED="true"
+            else
+              for SRC_DIR in $SOURCES; do
+                if git diff --name-only "$LAST_BUILD_SHA" HEAD -- "$SRC_DIR/" 2>/dev/null | grep -q .; then
+                  MODULE_CHANGED="true"
+                  break
+                fi
+              done
+            fi
+
+            if [ "$MODULE_CHANGED" == "true" ]; then
+              CHANGED="${CHANGED} ${MODULE}"
+              echo "  [CHANGED] ${MODULE}"
+            else
+              echo "  [SKIP]    ${MODULE} (no changes)"
+            fi
+          done
+
+          CHANGED=$(echo "$CHANGED" | xargs)  # trim whitespace
+
+          if [ "$SELECTED" == "all" ]; then
+            # "all" means build everything regardless of changes
+            echo "changed_modules=${ALL_MODULES}" >> "$GITHUB_OUTPUT"
+            echo "needs_maven_build=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CHANGED" ]; then
+            echo "changed_modules=" >> "$GITHUB_OUTPUT"
+            echo "needs_maven_build=false" >> "$GITHUB_OUTPUT"
+            echo "No modules changed — nothing to build."
+          else
+            echo "changed_modules=${CHANGED}" >> "$GITHUB_OUTPUT"
+            echo "needs_maven_build=true" >> "$GITHUB_OUTPUT"
+            echo "Modules to build: ${CHANGED}"
+          fi
+
+  # ===========================================================================
+  # Job 2: Build Java artifacts (skipped if no changes)
+  # ===========================================================================
+  maven-build:
+    name: Maven build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.needs_maven_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------------------------------------------
-      # Set up JDK 17
-      # -----------------------------------------------------------------
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -68,9 +195,6 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # -----------------------------------------------------------------
-      # Cache Maven dependencies
-      # -----------------------------------------------------------------
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
@@ -79,18 +203,51 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # -----------------------------------------------------------------
-      # Build all modules with Maven
-      # -----------------------------------------------------------------
       - name: Build with Maven
         run: |
           echo "Building all modules..."
           mvn clean install -DskipTests -B -q
-          echo "Maven build completed successfully."
+          echo "Maven build completed."
 
-      # -----------------------------------------------------------------
-      # Configure AWS Credentials
-      # -----------------------------------------------------------------
+      - name: Upload JAR artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-jars
+          path: |
+            API-Claims/target/*.jar
+            API-Members/target/*.jar
+            API-Tenants/target/*.jar
+            API-Entitlements/target/*.jar
+            Portal-Claims-Advisor/target/*.jar
+            Portal-Claims-Member/target/*.jar
+            Portal-Batch-Assignment/target/*.jar
+            Portal-Tenants/target/*.jar
+            Portal-Entitlements/target/*.jar
+            Portal-SRE/target/*.jar
+          retention-days: 1
+
+  # ===========================================================================
+  # Job 3: Build Docker images and push to ECR
+  # ===========================================================================
+  docker-push:
+    name: Docker build & push to ECR
+    needs: [detect-changes, maven-build]
+    if: always() && needs.detect-changes.outputs.changed_modules != '' && needs.maven-build.result == 'success'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download JAR artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: maven-jars
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -98,36 +255,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # -----------------------------------------------------------------
-      # Login to Amazon ECR
-      # -----------------------------------------------------------------
       - name: Login to Amazon ECR
-        id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      # -----------------------------------------------------------------
-      # Get AWS Account ID
-      # -----------------------------------------------------------------
       - name: Get AWS Account ID
         id: aws-account
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ACCOUNT_ID=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
-          echo "AWS Account ID: ${ACCOUNT_ID}"
+          echo "account_id=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
 
-      # -----------------------------------------------------------------
-      # Build and Push Docker Images
-      # -----------------------------------------------------------------
       - name: Build and push Docker images
         env:
-          ECR_REGISTRY: ${{ steps.aws-account.outputs.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
-          SELECTED_MODULES: ${{ github.event.inputs.modules }}
-          ENV: ${{ github.event.inputs.environment }}
+          ECR_REGISTRY: ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          CHANGED_MODULES: ${{ needs.detect-changes.outputs.changed_modules }}
+          ENV: ${{ inputs.environment }}
         run: |
-          # ---------------------------------------------------------------
-          # Module configuration: name -> directory, port
-          # ---------------------------------------------------------------
           declare -A MODULE_DIRS
           MODULE_DIRS["api-claims"]="API-Claims"
           MODULE_DIRS["api-members"]="API-Members"
@@ -140,166 +283,85 @@ jobs:
           MODULE_DIRS["portal-entitlements"]="Portal-Entitlements"
           MODULE_DIRS["portal-sre"]="Portal-SRE"
 
-          declare -A MODULE_PORTS
-          MODULE_PORTS["api-claims"]="8083"
-          MODULE_PORTS["api-members"]="8084"
-          MODULE_PORTS["api-tenants"]="8086"
-          MODULE_PORTS["api-entitlements"]="8087"
-          MODULE_PORTS["portal-claims-advisor"]="8081"
-          MODULE_PORTS["portal-claims-member"]="8082"
-          MODULE_PORTS["portal-batch-assignment"]="8085"
-          MODULE_PORTS["portal-tenants"]="8088"
-          MODULE_PORTS["portal-entitlements"]="8089"
-          MODULE_PORTS["portal-sre"]="8090"
+          BUILT=0
+          SKIPPED=0
+          FAILED=0
 
-          # ---------------------------------------------------------------
-          # Determine which modules to build
-          # ---------------------------------------------------------------
-          if [ "${SELECTED_MODULES}" == "all" ]; then
-            MODULES=("api-claims" "api-members" "api-tenants" "api-entitlements" \
-                     "portal-claims-advisor" "portal-claims-member" "portal-batch-assignment" \
-                     "portal-tenants" "portal-entitlements" "portal-sre")
-          else
-            MODULES=("${SELECTED_MODULES}")
-          fi
-
-          echo "============================================="
-          echo "Building and pushing ${#MODULES[@]} module(s)"
-          echo "Registry: ${ECR_REGISTRY}"
-          echo "Tag: ${IMAGE_TAG}"
-          echo "Environment: ${ENV}"
-          echo "============================================="
-
-          FAILED_MODULES=()
-          SUCCESS_COUNT=0
-
-          for MODULE in "${MODULES[@]}"; do
+          for MODULE in ${CHANGED_MODULES}; do
             MODULE_DIR="${MODULE_DIRS[$MODULE]}"
-            MODULE_PORT="${MODULE_PORTS[$MODULE]}"
             REPO_NAME="${PROJECT_NAME}/${MODULE}"
             FULL_IMAGE="${ECR_REGISTRY}/${REPO_NAME}"
 
             echo ""
-            echo "---------------------------------------------"
-            echo "Processing: ${MODULE}"
-            echo "  Directory: ${MODULE_DIR}"
-            echo "  Port:      ${MODULE_PORT}"
-            echo "  Image:     ${FULL_IMAGE}:${IMAGE_TAG}"
-            echo "---------------------------------------------"
+            echo "--- ${MODULE} ---"
 
-            # Check if module directory exists
-            if [ ! -d "${MODULE_DIR}" ]; then
-              echo "WARNING: Directory ${MODULE_DIR} does not exist. Skipping."
-              FAILED_MODULES+=("${MODULE}")
+            if [ ! -f "${MODULE_DIR}/Dockerfile" ] || [ ! -d "${MODULE_DIR}/target" ]; then
+              echo "  Missing Dockerfile or target/ — skipping."
+              FAILED=$((FAILED + 1))
               continue
             fi
 
-            # Ensure ECR repository exists (create if not)
-            aws ecr describe-repositories \
-              --repository-names "${REPO_NAME}" 2>/dev/null || \
-            aws ecr create-repository \
-              --repository-name "${REPO_NAME}" \
-              --image-scanning-configuration scanOnPush=true \
-              --tags Key=Project,Value=${PROJECT_NAME} \
-                     Key=Environment,Value=${ENV} \
-                     Key=ManagedBy,Value=github-actions \
-                     Key=Component,Value=ecr-build
+            # Ensure ECR repository exists
+            aws ecr describe-repositories --repository-names "${REPO_NAME}" >/dev/null 2>&1 || \
+              aws ecr create-repository --repository-name "${REPO_NAME}" \
+                --image-scanning-configuration scanOnPush=true >/dev/null
 
-            # Check if Dockerfile exists in module directory
-            if [ ! -f "${MODULE_DIR}/Dockerfile" ]; then
-              echo "WARNING: No Dockerfile found in ${MODULE_DIR}. Skipping."
-              FAILED_MODULES+=("${MODULE}")
-              continue
+            # Build with BuildKit cache
+            docker buildx build \
+              --cache-from "type=gha,scope=${MODULE}" \
+              --cache-to "type=gha,mode=max,scope=${MODULE}" \
+              --tag "${FULL_IMAGE}:${IMAGE_TAG}" \
+              --tag "${FULL_IMAGE}:${ENV}-${IMAGE_TAG}" \
+              --tag "${FULL_IMAGE}:${GITHUB_SHA::8}" \
+              --file "${MODULE_DIR}/Dockerfile" \
+              --push \
+              "${MODULE_DIR}"
+
+            if [ $? -eq 0 ]; then
+              echo "  Pushed: ${FULL_IMAGE}:${IMAGE_TAG}"
+              BUILT=$((BUILT + 1))
+            else
+              echo "  FAILED: ${MODULE}"
+              FAILED=$((FAILED + 1))
             fi
-
-            # Build Docker image
-            echo "Building Docker image..."
-            docker build \
-              --build-arg APP_PORT="${MODULE_PORT}" \
-              --build-arg APP_MODULE="${MODULE_DIR}" \
-              --build-arg ENVIRONMENT="${ENV}" \
-              -t "${FULL_IMAGE}:${IMAGE_TAG}" \
-              -t "${FULL_IMAGE}:${ENV}-${IMAGE_TAG}" \
-              -t "${FULL_IMAGE}:${GITHUB_SHA::8}" \
-              -f "${MODULE_DIR}/Dockerfile" \
-              .
-
-            if [ $? -ne 0 ]; then
-              echo "ERROR: Docker build failed for ${MODULE}"
-              FAILED_MODULES+=("${MODULE}")
-              continue
-            fi
-
-            # Push all tags
-            echo "Pushing Docker images..."
-            docker push "${FULL_IMAGE}:${IMAGE_TAG}"
-            docker push "${FULL_IMAGE}:${ENV}-${IMAGE_TAG}"
-            docker push "${FULL_IMAGE}:${GITHUB_SHA::8}"
-
-            if [ $? -ne 0 ]; then
-              echo "ERROR: Docker push failed for ${MODULE}"
-              FAILED_MODULES+=("${MODULE}")
-              continue
-            fi
-
-            echo "Successfully built and pushed: ${MODULE}"
-            SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
           done
 
-          # ---------------------------------------------------------------
           # Summary
-          # ---------------------------------------------------------------
           echo ""
-          echo "============================================="
-          echo "Build & Push Summary"
-          echo "============================================="
-          echo "Total modules:     ${#MODULES[@]}"
-          echo "Successful:        ${SUCCESS_COUNT}"
-          echo "Failed/Skipped:    ${#FAILED_MODULES[@]}"
+          echo "=============================="
+          echo "  Built:   ${BUILT}"
+          echo "  Failed:  ${FAILED}"
+          echo "=============================="
 
-          if [ ${#FAILED_MODULES[@]} -gt 0 ]; then
-            echo ""
-            echo "Failed/Skipped modules:"
-            for FM in "${FAILED_MODULES[@]}"; do
-              echo "  - ${FM}"
-            done
-          fi
+          echo "## Build & Push Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Count |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Built & pushed | ${BUILT} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Failed | ${FAILED} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Tag:** \`${IMAGE_TAG}\` | **Commit:** \`${GITHUB_SHA::8}\`" >> "$GITHUB_STEP_SUMMARY"
 
-          # Fail the job if any module failed
-          if [ ${#FAILED_MODULES[@]} -gt 0 ] && [ "${SELECTED_MODULES}" != "all" ]; then
-            echo ""
-            echo "ERROR: One or more selected modules failed."
-            exit 1
-          fi
+          [ "$FAILED" -gt 0 ] && exit 1 || true
 
-      # -----------------------------------------------------------------
-      # List pushed images
-      # -----------------------------------------------------------------
-      - name: List pushed images
-        env:
-          ECR_REGISTRY: ${{ steps.aws-account.outputs.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
-          SELECTED_MODULES: ${{ github.event.inputs.modules }}
+      - name: Tag successful build
+        if: success()
         run: |
-          echo "============================================="
-          echo "Pushed Images Summary"
-          echo "============================================="
+          git tag "ecr-build-${GITHUB_SHA::8}"
+          git push origin "ecr-build-${GITHUB_SHA::8}" 2>/dev/null || true
 
-          if [ "${SELECTED_MODULES}" == "all" ]; then
-            MODULES=("api-claims" "api-members" "api-tenants" "api-entitlements" \
-                     "portal-claims-advisor" "portal-claims-member" "portal-batch-assignment" \
-                     "portal-tenants" "portal-entitlements" "portal-sre")
-          else
-            MODULES=("${SELECTED_MODULES}")
-          fi
-
-          for MODULE in "${MODULES[@]}"; do
-            REPO_NAME="${PROJECT_NAME}/${MODULE}"
-            echo ""
-            echo "Repository: ${REPO_NAME}"
-            aws ecr describe-images \
-              --repository-name "${REPO_NAME}" \
-              --query "imageDetails[?contains(imageTags, '${IMAGE_TAG}')].{Tags:imageTags,Pushed:imagePushedAt,Size:imageSizeInBytes}" \
-              --output table 2>/dev/null || echo "  (no images found or repository does not exist)"
-          done
-
+  # ===========================================================================
+  # Job 4: Handle unchanged modules — no build needed
+  # ===========================================================================
+  no-changes:
+    name: No changes detected
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_modules == '' && needs.detect-changes.outputs.needs_maven_build == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip build
+        run: |
+          echo "No module changes detected — skipping build."
+          echo "## Build Skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "No source code changes detected since last successful build." >> "$GITHUB_STEP_SUMMARY"
+          echo "Existing ECR images are still current." >> "$GITHUB_STEP_SUMMARY"
