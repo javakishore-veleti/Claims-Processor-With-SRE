@@ -23,17 +23,17 @@ on:
         required: true
         type: choice
         options:
-          - data-seed
-          - fargate
-          - eks
-          - secrets
-          - messaging-search
-          - observability
-          - core-infra
-          - vpc-sg
+          - "01-vpc-sg"
+          - "02-core-infra"
+          - "03-observability"
+          - "05-messaging-search"
+          - "06-secrets"
+          - "07-eks"
+          - "09-fargate"
+          - "10-data-seed"
 
       confirm_destroy:
-        description: 'Type the stack name to confirm (e.g. "fargate")'
+        description: 'Type the stack name from dropdown to confirm (e.g. "09-fargate")'
         required: true
         type: string
 
@@ -82,12 +82,24 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # -----------------------------------------------------------------
+      # Parse stack name (strip "01-" prefix → "vpc-sg")
+      # -----------------------------------------------------------------
+      - name: Parse stack selection
+        id: parse
+        run: |
+          RAW="${{ inputs.stack }}"
+          # Strip the "NN-" prefix to get the CloudFormation stack suffix
+          STACK_SUFFIX="${RAW#*-}"
+          echo "stack_suffix=${STACK_SUFFIX}" >> "$GITHUB_OUTPUT"
+          echo "Selected: ${RAW} → suffix: ${STACK_SUFFIX}"
+
+      # -----------------------------------------------------------------
       # Check stack exists
       # -----------------------------------------------------------------
       - name: Check stack status
         id: check
         run: |
-          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-${{ inputs.stack }}"
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-${{ steps.parse.outputs.stack_suffix }}"
           echo "stack_name=${STACK}" >> "$GITHUB_OUTPUT"
 
           STATUS=$(aws cloudformation describe-stacks \
@@ -106,7 +118,7 @@ jobs:
       # Pre-delete: Clean up resources that block stack deletion
       # -----------------------------------------------------------------
       - name: "Pre-delete cleanup: ECR images"
-        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'core-infra'
+        if: steps.check.outputs.status != 'NOT_FOUND' && steps.parse.outputs.stack_suffix == 'core-infra'
         continue-on-error: true
         run: |
           echo "Cleaning ECR images before core-infra deletion..."
@@ -125,7 +137,7 @@ jobs:
           done
 
       - name: "Pre-delete cleanup: S3 buckets"
-        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'core-infra'
+        if: steps.check.outputs.status != 'NOT_FOUND' && steps.parse.outputs.stack_suffix == 'core-infra'
         continue-on-error: true
         env:
           ENV: ${{ inputs.environment }}
@@ -142,7 +154,7 @@ jobs:
           done
 
       - name: "Pre-delete cleanup: Secrets Manager"
-        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'secrets'
+        if: steps.check.outputs.status != 'NOT_FOUND' && steps.parse.outputs.stack_suffix == 'secrets'
         continue-on-error: true
         env:
           ENV: ${{ inputs.environment }}
@@ -160,7 +172,7 @@ jobs:
           done
 
       - name: "Pre-delete cleanup: ECS services scale-down"
-        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'fargate'
+        if: steps.check.outputs.status != 'NOT_FOUND' && steps.parse.outputs.stack_suffix == 'fargate'
         continue-on-error: true
         env:
           ENV: ${{ inputs.environment }}
@@ -179,7 +191,7 @@ jobs:
           [[ -n "$SERVICES" ]] && echo "Waiting 30s for tasks to drain..." && sleep 30
 
       - name: "Pre-delete cleanup: CloudTrail S3 bucket"
-        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'observability'
+        if: steps.check.outputs.status != 'NOT_FOUND' && steps.parse.outputs.stack_suffix == 'observability'
         continue-on-error: true
         env:
           ENV: ${{ inputs.environment }}
@@ -215,7 +227,7 @@ jobs:
       # Post-delete: Clean up auto-created resources
       # -----------------------------------------------------------------
       - name: "Post-delete cleanup: CloudWatch log groups"
-        if: inputs.stack == 'fargate' || inputs.stack == 'data-seed' || inputs.stack == 'observability'
+        if: steps.parse.outputs.stack_suffix == 'fargate' || steps.parse.outputs.stack_suffix == 'data-seed' || steps.parse.outputs.stack_suffix == 'observability'
         continue-on-error: true
         env:
           ENV: ${{ inputs.environment }}
