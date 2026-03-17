@@ -560,21 +560,99 @@ jobs:
           aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: Clean up orphaned observability resources
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          STACK="${PRJ}-${ENV}-observability"
+          ACCT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          # Auto-heal broken stacks
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK" 2>/dev/null || true
+          elif [[ "$STATUS" =~ ^(CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)$ ]]; then
+            echo "Stack is active — skipping orphan cleanup."
+            exit 0
+          fi
+
+          echo "Cleaning up orphaned observability resources..."
+
+          # ── CloudWatch Log Groups ──
+          for SVC in api-claims api-members api-tenants api-entitlements \
+            portal-claims-advisor portal-claims-member portal-batch-assignment \
+            portal-tenants portal-entitlements portal-sre cloudtrail; do
+            LG="/${PRJ}/${ENV}/${SVC}"
+            if aws logs describe-log-groups --log-group-name-prefix "$LG" \
+              --query "logGroups[?logGroupName=='${LG}'].logGroupName" --output text 2>/dev/null | grep -q .; then
+              echo "::warning::Deleting orphaned log group: ${LG}"
+              aws logs delete-log-group --log-group-name "$LG" 2>/dev/null || true
+            fi
+          done
+
+          # ── SNS Topic ──
+          TOPIC_ARN="arn:aws:sns:${AWS_REGION}:${ACCT_ID}:${PRJ}-${ENV}-alerts"
+          if aws sns get-topic-attributes --topic-arn "$TOPIC_ARN" >/dev/null 2>&1; then
+            echo "::warning::Deleting orphaned SNS topic"
+            aws sns delete-topic --topic-arn "$TOPIC_ARN" 2>/dev/null || true
+          fi
+
+          # ── CloudTrail ──
+          TRAIL="${PRJ}-${ENV}-trail"
+          if aws cloudtrail describe-trails --trail-name-list "$TRAIL" \
+            --query "trailList[0].TrailARN" --output text 2>/dev/null | grep -q "arn:"; then
+            echo "::warning::Deleting orphaned CloudTrail: ${TRAIL}"
+            aws cloudtrail stop-logging --name "$TRAIL" 2>/dev/null || true
+            aws cloudtrail delete-trail --name "$TRAIL" 2>/dev/null || true
+          fi
+
+          # ── CloudTrail S3 Bucket ──
+          BUCKET="${PRJ}-${ENV}-cloudtrail-logs-${ACCT_ID}"
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "::warning::Emptying and deleting orphaned bucket: ${BUCKET}"
+            aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+            aws s3api delete-bucket --bucket "$BUCKET" 2>/dev/null || true
+          fi
+
+          # ── IAM Role ──
+          ROLE="${PRJ}-${ENV}-cloudtrail-cw-role"
+          if aws iam get-role --role-name "$ROLE" >/dev/null 2>&1; then
+            echo "::warning::Deleting orphaned IAM role: ${ROLE}"
+            for POL in $(aws iam list-role-policies --role-name "$ROLE" --query 'PolicyNames' --output text 2>/dev/null); do
+              aws iam delete-role-policy --role-name "$ROLE" --policy-name "$POL" 2>/dev/null || true
+            done
+            aws iam delete-role --role-name "$ROLE" 2>/dev/null || true
+          fi
+
+          # ── CloudWatch Dashboard ──
+          DASH="ClaimsProcessor-${ENV}-AppHealth"
+          if aws cloudwatch get-dashboard --dashboard-name "$DASH" >/dev/null 2>&1; then
+            echo "::warning::Deleting orphaned dashboard: ${DASH}"
+            aws cloudwatch delete-dashboards --dashboard-names "$DASH" 2>/dev/null || true
+          fi
+
+          # ── CloudWatch Alarms ──
+          ALARMS="${PRJ}-${ENV}-High5xxRate ${PRJ}-${ENV}-HighLatencyP99 ${PRJ}-${ENV}-LowAvailability ${PRJ}-${ENV}-RDS-CPUHigh ${PRJ}-${ENV}-RDS-FreeStorageLow"
+          EXISTING=$(aws cloudwatch describe-alarms --alarm-names $ALARMS \
+            --query 'MetricAlarms[].AlarmName' --output text 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "::warning::Deleting orphaned alarms: ${EXISTING}"
+            aws cloudwatch delete-alarms --alarm-names $EXISTING 2>/dev/null || true
+          fi
+
+          echo "Orphan cleanup complete."
+
       - name: Deploy Observability Stack
         env:
           ENV: ${{ inputs.environment }}
           PRJ: ${{ env.PROJECT_NAME }}
         run: |
           STACK="${PRJ}-${ENV}-observability"
-
-          # Auto-heal: delete broken stacks before redeploy
-          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
-            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
-          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
-            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
-            aws cloudformation delete-stack --stack-name "$STACK"
-            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
-          fi
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/observability.yaml \
@@ -585,7 +663,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 4  AUTH (Cognito)
