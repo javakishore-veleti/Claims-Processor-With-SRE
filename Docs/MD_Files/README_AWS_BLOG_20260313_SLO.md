@@ -34,21 +34,21 @@ The platform already has a full **local** SRE stack (Prometheus + Grafana + Aler
 
 ## Phase 0: Prerequisites (Enable Application Signals)
 
-| # | Task | Module(s) | Status | Notes |
-|---|---|---|---|---|
-| 0.1 | Add ADOT Java auto-instrumentation agent to Dockerfiles | All 10 Dockerfiles | NOT STARTED | `-javaagent:/opt/aws-opentelemetry-agent.jar` in ENTRYPOINT |
-| 0.2 | Add ADOT Collector as EKS DaemonSet / Fargate sidecar | DevOps/AWS/CloudFormation | NOT STARTED | Collects traces + metrics, exports to X-Ray + CloudWatch |
-| 0.3 | Enable Application Signals discovery in CloudFormation | observability.yaml | NOT STARTED | `AWS::ApplicationSignals::Discovery` resource |
-| 0.4 | Add IAM permissions for Application Signals | CloudFormation + IAM policies | NOT STARTED | `application-signals:*`, `xray:PutTraceSegments`, `xray:PutTelemetryRecords` |
-| 0.5 | Switch OTLP exporter to ADOT Collector endpoint (aws profile) | All application.yml | NOT STARTED | OTLP → ADOT → X-Ray + CloudWatch (Jaeger/Zipkin remain for local) |
-| 0.6 | Add `tenantId` as OTel resource attribute for per-tenant filtering | Common-Utils | NOT STARTED | Enables per-tenant SLO tracking in Application Signals |
-| 0.7 | Create `AWS::CloudWatch::ServiceLevelObjective` resources in CloudFormation | observability.yaml | NOT STARTED | Availability SLO (99.9%) + Latency P99 SLO (<500ms) per API service |
+| # | Task | Module(s) | Status | Est. | Notes |
+|---|---|---|---|---|---|
+| 0.1 | Add ADOT Java auto-instrumentation agent to Dockerfiles | All 10 Dockerfiles | NOT STARTED | 1h | Download ADOT agent in build stage, add `-javaagent:/opt/aws-opentelemetry-agent.jar` to ENTRYPOINT |
+| 0.2 | Add ADOT Collector as Fargate sidecar container | api-gateway-fargate.yaml | NOT STARTED | 2h | Add `aws-otel-collector` sidecar to all 10 task definitions; shared `awsvpc` networking makes localhost:4317 reachable |
+| 0.3 | Enable Application Signals discovery in CloudFormation | observability.yaml | NOT STARTED | 30m | `AWS::ApplicationSignals::Discovery` resource |
+| 0.4 | Add IAM permissions for Application Signals | CloudFormation + IAM policies | NOT STARTED | 30m | `application-signals:*` (X-Ray permissions already exist in task role) |
+| 0.5 | Create new `application-aws-signals.yml` Spring profile | All 10 modules | NOT STARTED | 1.5h | New profile activated as `dev,aws,aws-signals` or `prod,aws,aws-signals`; OTLP endpoint → `localhost:4317` (ADOT sidecar); env-specific sampling rates (dev=1.0, staging=0.5, prod=0.1); local/dev Jaeger/Zipkin unaffected |
+| 0.6 | Add `tenantId` as OTel resource attribute for per-tenant filtering | Common-Utils | NOT STARTED | 1h | OTel resource attribute via `TenantContextSpanProcessor`; enables per-tenant SLO tracking in Application Signals |
+| 0.7 | Create `AWS::CloudWatch::ServiceLevelObjective` resources in CloudFormation | observability.yaml | NOT STARTED | 1.5h | Availability SLO (99.9%) + Latency P99 SLO (<500ms) per API service (8 SLOs total) |
 
 ---
 
 ## Phase 1: Smoke Tests (Day 0 — Post-Deployment)
 
-Assumes GitHub Actions has deployed the EKS/Fargate cluster via CloudFormation (`AWS_99_Orchestrator_Full_Deploy.yml`).
+Assumes GitHub Actions has deployed the Fargate services via CloudFormation (`AWS_99_Orchestrator_Full_Deploy.yml`).
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
