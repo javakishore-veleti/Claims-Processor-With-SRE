@@ -1,0 +1,145 @@
+# ============================================================================
+# AWS_02c - Create ECR Repositories
+# ============================================================================
+name: "AWS_02c - Create ECR Repositories"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+
+jobs:
+  deploy-ecr:
+    name: Deploy ECR Repositories
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Configure AWS credentials
+      # -----------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------------
+      # 3. Pre-flight - Check existing stack state
+      # -----------------------------------------------------------------------
+      - name: Pre-flight stack state check
+        id: preflight
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENV}-ecr"
+
+          echo "--- Checking stack: ${STACK_NAME} ---"
+
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          echo "Stack status: ${STACK_STATUS}"
+          echo "stack_status=${STACK_STATUS}" >> "$GITHUB_OUTPUT"
+
+          # Handle stuck IN_PROGRESS states
+          if [[ "${STACK_STATUS}" == *"IN_PROGRESS"* ]]; then
+            echo "::error::Stack ${STACK_NAME} is currently in ${STACK_STATUS} state. Please wait for the operation to complete."
+            exit 1
+          fi
+
+          # Handle ROLLBACK_COMPLETE or CREATE_FAILED - must delete before re-creating
+          if [[ "${STACK_STATUS}" == "ROLLBACK_COMPLETE" || "${STACK_STATUS}" == "CREATE_FAILED" ]]; then
+            echo "::warning::Stack ${STACK_NAME} is in ${STACK_STATUS} state. Deleting before re-deploy..."
+            aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+            echo "Waiting for stack deletion..."
+            aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
+            echo "Stack deleted successfully."
+            echo "stack_status=DOES_NOT_EXIST" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 4. Pre-flight - Orphan ECR repository cleanup
+      # -----------------------------------------------------------------------
+      - name: Pre-flight orphan ECR cleanup
+        if: steps.preflight.outputs.stack_status == 'DOES_NOT_EXIST'
+        run: |
+          PRJ="${{ env.PROJECT_NAME }}"
+
+          REPOS=(
+            "${PRJ}/api-claims"
+            "${PRJ}/api-members"
+            "${PRJ}/api-tenants"
+            "${PRJ}/api-entitlements"
+            "${PRJ}/portal-claims-advisor"
+            "${PRJ}/portal-claims-member"
+            "${PRJ}/portal-batch-assignment"
+            "${PRJ}/portal-tenants"
+            "${PRJ}/portal-entitlements"
+            "${PRJ}/portal-sre"
+          )
+
+          echo "--- Checking for orphan ECR repositories ---"
+          for REPO in "${REPOS[@]}"; do
+            if aws ecr describe-repositories --repository-names "${REPO}" >/dev/null 2>&1; then
+              echo "::warning::Found orphan repository: ${REPO}. Deleting..."
+              aws ecr delete-repository --repository-name "${REPO}" --force
+              echo "Deleted: ${REPO}"
+            else
+              echo "No orphan found: ${REPO}"
+            fi
+          done
+          echo "--- Orphan cleanup complete ---"
+
+      # -----------------------------------------------------------------------
+      # 5. Deploy CloudFormation stack
+      # -----------------------------------------------------------------------
+      - name: Deploy ECR Repositories stack
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENV}-ecr"
+
+          echo "--- Deploying stack: ${STACK_NAME} ---"
+
+          aws cloudformation deploy \
+            --stack-name "${STACK_NAME}" \
+            --template-file DevOps/AWS/CloudFormation/ecr-repositories.yaml \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${{ env.PROJECT_NAME }}" \
+            --no-fail-on-empty-changeset
+
+          echo "--- Deployment complete ---"
+
+      # -----------------------------------------------------------------------
+      # 6. Print stack outputs
+      # -----------------------------------------------------------------------
+      - name: Print stack outputs
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENV}-ecr"
+
+          echo "--- Stack Outputs ---"
+          aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].Outputs[*].[OutputKey,OutputValue]" \
+            --output table

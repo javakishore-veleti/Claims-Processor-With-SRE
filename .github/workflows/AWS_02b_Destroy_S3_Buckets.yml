@@ -1,0 +1,155 @@
+name: "AWS_02b - Destroy S3 Buckets"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirm_destroy:
+        description: 'Type the environment name to confirm destruction'
+        required: true
+        type: string
+      retain_s3_data:
+        description: 'Retain S3 bucket data (skip emptying buckets before delete)'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  validate:
+    name: Validate destruction request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm environment matches
+        run: |
+          if [[ "${{ inputs.environment }}" != "${{ inputs.confirm_destroy }}" ]]; then
+            echo "::error::Confirmation mismatch. You entered '${{ inputs.confirm_destroy }}' but selected environment '${{ inputs.environment }}'."
+            echo "::error::Please type the exact environment name to confirm destruction."
+            exit 1
+          fi
+          echo "Destruction confirmed for environment: ${{ inputs.environment }}"
+
+  destroy:
+    name: Destroy S3 Buckets (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check stack exists
+        id: check_stack
+        run: |
+          STACK_NAME="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-s3"
+          echo "stack_name=${STACK_NAME}" >> "$GITHUB_OUTPUT"
+
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          echo "stack_status=${STACK_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "Stack '${STACK_NAME}' status: ${STACK_STATUS}"
+
+          if [[ "${STACK_STATUS}" == "DOES_NOT_EXIST" ]]; then
+            echo "::warning::Stack ${STACK_NAME} does not exist. Nothing to destroy."
+          fi
+
+      - name: Empty S3 buckets
+        if: inputs.retain_s3_data == false && steps.check_stack.outputs.stack_status != 'DOES_NOT_EXIST'
+        run: |
+          PRJ="${{ env.PROJECT_NAME }}"
+          ENV="${{ inputs.environment }}"
+          ACCT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          for SUFFIX in documents static; do
+            BUCKET="${PRJ}-${ENV}-${ACCT_ID}-${SUFFIX}"
+            echo "Emptying bucket: ${BUCKET}"
+
+            if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+              echo "Removing all current objects..."
+              aws s3 rm "s3://${BUCKET}" --recursive
+
+              echo "Removing all object versions and delete markers..."
+              python3 -c "
+          import subprocess, json
+
+          bucket = '${BUCKET}'
+          paginator_token = ''
+          while True:
+              cmd = ['aws', 's3api', 'list-object-versions', '--bucket', bucket, '--output', 'json']
+              if paginator_token:
+                  cmd += ['--key-marker', paginator_token]
+              result = json.loads(subprocess.check_output(cmd))
+
+              objects = []
+              for v in result.get('Versions', []):
+                  objects.append({'Key': v['Key'], 'VersionId': v['VersionId']})
+              for dm in result.get('DeleteMarkers', []):
+                  objects.append({'Key': dm['Key'], 'VersionId': dm['VersionId']})
+
+              if objects:
+                  for i in range(0, len(objects), 1000):
+                      batch = objects[i:i+1000]
+                      delete_payload = json.dumps({'Objects': batch, 'Quiet': True})
+                      subprocess.check_call([
+                          'aws', 's3api', 'delete-objects',
+                          '--bucket', bucket,
+                          '--delete', delete_payload
+                      ])
+                      print(f'Deleted {len(batch)} versioned objects')
+
+              if not result.get('IsTruncated', False):
+                  break
+              paginator_token = result.get('NextKeyMarker', '')
+          "
+              echo "Bucket ${BUCKET} emptied."
+            else
+              echo "Bucket ${BUCKET} does not exist, skipping."
+            fi
+          done
+
+      - name: Delete CloudFormation stack
+        if: steps.check_stack.outputs.stack_status != 'DOES_NOT_EXIST'
+        run: |
+          STACK_NAME="${{ steps.check_stack.outputs.stack_name }}"
+          echo "Deleting stack: ${STACK_NAME}"
+
+          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
+
+          echo "Stack ${STACK_NAME} deleted successfully."
+
+      - name: Summary
+        run: |
+          STACK_NAME="${{ steps.check_stack.outputs.stack_name }}"
+          STACK_STATUS="${{ steps.check_stack.outputs.stack_status }}"
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## S3 Buckets Stack Destruction Summary
+
+          | Property | Value |
+          |----------|-------|
+          | **Stack Name** | \`${STACK_NAME}\` |
+          | **Environment** | \`${{ inputs.environment }}\` |
+          | **Previous Status** | \`${STACK_STATUS}\` |
+          | **Retain S3 Data** | \`${{ inputs.retain_s3_data }}\` |
+          | **Result** | $(if [[ "${STACK_STATUS}" == "DOES_NOT_EXIST" ]]; then echo "Stack did not exist"; else echo "Stack deleted successfully"; fi) |
+          EOF

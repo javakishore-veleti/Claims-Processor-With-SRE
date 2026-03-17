@@ -1,0 +1,222 @@
+name: "AWS_02a - Create RDS PostgreSQL"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      rds_instance_class:
+        description: "RDS instance class"
+        required: false
+        type: string
+        default: "db.t3.medium"
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: claims-proc
+
+jobs:
+  deploy-rds:
+    name: Deploy RDS PostgreSQL
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # ----------------------------------------------------------------
+      # 1. Checkout
+      # ----------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------
+      # 2. Configure AWS credentials
+      # ----------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ----------------------------------------------------------------
+      # 3. Resolve VPC networking from vpc-sg stack outputs
+      # ----------------------------------------------------------------
+      - name: Resolve VPC networking
+        id: vpc
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          VPC_STACK="${PRJ}-${ENV}-vpc-sg"
+
+          echo "Looking up outputs from stack: ${VPC_STACK}"
+
+          get_output() {
+            aws cloudformation describe-stacks \
+              --stack-name "${VPC_STACK}" \
+              --query "Stacks[0].Outputs[?OutputKey=='${1}'].OutputValue" \
+              --output text
+          }
+
+          VPC_ID=$(get_output "VpcId")
+          PRIVATE_SUBNET_1=$(get_output "PrivateSubnet1Id")
+          PRIVATE_SUBNET_2=$(get_output "PrivateSubnet2Id")
+          APP_SG_ID=$(get_output "AppSecurityGroupId")
+
+          # Validate all resolved
+          MISSING=""
+          [[ -z "${VPC_ID}" || "${VPC_ID}" == "None" ]] && MISSING="${MISSING} VpcId"
+          [[ -z "${PRIVATE_SUBNET_1}" || "${PRIVATE_SUBNET_1}" == "None" ]] && MISSING="${MISSING} PrivateSubnet1Id"
+          [[ -z "${PRIVATE_SUBNET_2}" || "${PRIVATE_SUBNET_2}" == "None" ]] && MISSING="${MISSING} PrivateSubnet2Id"
+          [[ -z "${APP_SG_ID}" || "${APP_SG_ID}" == "None" ]] && MISSING="${MISSING} AppSecurityGroupId"
+
+          if [[ -n "${MISSING}" ]]; then
+            echo "::error::Missing outputs from ${VPC_STACK}:${MISSING}"
+            echo "Ensure the VPC/SG stack is deployed first."
+            exit 1
+          fi
+
+          echo "vpc_id=${VPC_ID}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_1=${PRIVATE_SUBNET_1}" >> "$GITHUB_OUTPUT"
+          echo "private_subnet_2=${PRIVATE_SUBNET_2}" >> "$GITHUB_OUTPUT"
+          echo "app_sg_id=${APP_SG_ID}" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved networking:"
+          echo "  VPC ID:           ${VPC_ID}"
+          echo "  Private Subnet 1: ${PRIVATE_SUBNET_1}"
+          echo "  Private Subnet 2: ${PRIVATE_SUBNET_2}"
+          echo "  App SG ID:        ${APP_SG_ID}"
+
+      # ----------------------------------------------------------------
+      # 4. Pre-flight stack state check
+      # ----------------------------------------------------------------
+      - name: Pre-flight stack state check
+        id: preflight
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          STACK_NAME="${PRJ}-${ENV}-rds"
+
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          echo "stack_status=${STACK_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "Stack ${STACK_NAME} status: ${STACK_STATUS}"
+
+          if [[ "${STACK_STATUS}" == "ROLLBACK_COMPLETE" || "${STACK_STATUS}" == "CREATE_FAILED" ]]; then
+            echo "::error::Stack ${STACK_NAME} is in ${STACK_STATUS} state."
+            echo "::error::Delete the stack manually or run the Destroy workflow first, then retry."
+            exit 1
+          fi
+
+          if [[ "${STACK_STATUS}" == *"_IN_PROGRESS"* ]]; then
+            echo "::error::Stack ${STACK_NAME} has an operation in progress (${STACK_STATUS}). Wait for it to complete."
+            exit 1
+          fi
+
+      # ----------------------------------------------------------------
+      # 5. Pre-flight cleanup of orphaned resources
+      # ----------------------------------------------------------------
+      - name: Pre-flight cleanup of orphaned resources
+        if: steps.preflight.outputs.stack_status == 'DOES_NOT_EXIST'
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          VPC_ID="${{ steps.vpc.outputs.vpc_id }}"
+
+          echo "=== Checking for orphaned resources ==="
+
+          # Check for orphaned RDS instance
+          RDS_ID="${PRJ}-${ENV}-postgres"
+          RDS_STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "${RDS_ID}" \
+            --query "DBInstances[0].DBInstanceStatus" \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [[ "${RDS_STATUS}" != "NOT_FOUND" ]]; then
+            echo "Found orphaned RDS instance ${RDS_ID} in status ${RDS_STATUS}. Deleting..."
+            aws rds delete-db-instance \
+              --db-instance-identifier "${RDS_ID}" \
+              --skip-final-snapshot \
+              --delete-automated-backups 2>/dev/null || true
+            echo "Waiting for RDS instance deletion..."
+            aws rds wait db-instance-deleted \
+              --db-instance-identifier "${RDS_ID}" 2>/dev/null || true
+            echo "RDS instance ${RDS_ID} deleted."
+          else
+            echo "No orphaned RDS instance found."
+          fi
+
+          # Check for orphaned DB subnet group
+          SUBNET_GROUP="${PRJ}-${ENV}-db-subnet-group"
+          if aws rds describe-db-subnet-groups \
+            --db-subnet-group-name "${SUBNET_GROUP}" >/dev/null 2>&1; then
+            echo "Found orphaned DB subnet group ${SUBNET_GROUP}. Deleting..."
+            aws rds delete-db-subnet-group \
+              --db-subnet-group-name "${SUBNET_GROUP}" 2>/dev/null || true
+            echo "DB subnet group deleted."
+          else
+            echo "No orphaned DB subnet group found."
+          fi
+
+          # Check for orphaned security group
+          SG_NAME="${PRJ}-${ENV}-sg-rds"
+          SG_ID=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+            --query "SecurityGroups[0].GroupId" \
+            --output text 2>/dev/null || echo "None")
+
+          if [[ "${SG_ID}" != "None" && -n "${SG_ID}" ]]; then
+            echo "Found orphaned security group ${SG_NAME} (${SG_ID}). Deleting..."
+            aws ec2 delete-security-group --group-id "${SG_ID}" 2>/dev/null || true
+            echo "Security group deleted."
+          else
+            echo "No orphaned security group found."
+          fi
+
+          echo "=== Pre-flight cleanup complete ==="
+
+      # ----------------------------------------------------------------
+      # 6. Deploy RDS stack
+      # ----------------------------------------------------------------
+      - name: Deploy RDS PostgreSQL stack
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+
+          aws cloudformation deploy \
+            --stack-name "${PRJ}-${ENV}-rds" \
+            --template-file DevOps/AWS/CloudFormation/rds-postgres.yaml \
+            --parameter-overrides \
+              Environment="${ENV}" \
+              ProjectName="${PRJ}" \
+              VpcId="${{ steps.vpc.outputs.vpc_id }}" \
+              PrivateSubnet1="${{ steps.vpc.outputs.private_subnet_1 }}" \
+              PrivateSubnet2="${{ steps.vpc.outputs.private_subnet_2 }}" \
+              AppSecurityGroupId="${{ steps.vpc.outputs.app_sg_id }}" \
+              RDSInstanceClass="${{ github.event.inputs.rds_instance_class }}" \
+              RDSMasterPassword="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      # ----------------------------------------------------------------
+      # 7. Print stack outputs
+      # ----------------------------------------------------------------
+      - name: Print stack outputs
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          STACK_NAME="${PRJ}-${ENV}-rds"
+
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].Outputs[*].[OutputKey, OutputValue, ExportName]" \
+            --output table

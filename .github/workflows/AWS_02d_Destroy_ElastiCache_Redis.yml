@@ -1,0 +1,112 @@
+name: "AWS_02d - Destroy ElastiCache Redis"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirm_destroy:
+        description: "Type the environment name to confirm destruction"
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  # ── Validate confirmation ──────────────────────────────────────────────
+  validate:
+    name: Validate confirmation (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm destruction
+        run: |
+          if [ "${{ inputs.confirm_destroy }}" != "${{ inputs.environment }}" ]; then
+            echo "::error::Confirmation mismatch. You entered '${{ inputs.confirm_destroy }}' but expected '${{ inputs.environment }}'."
+            echo "To confirm, type the environment name exactly: ${{ inputs.environment }}"
+            exit 1
+          fi
+          echo "Destruction confirmed for environment: ${{ inputs.environment }}"
+
+  # ── Destroy ElastiCache Redis stack ────────────────────────────────────
+  destroy:
+    name: Destroy ElastiCache Redis (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # ── Configure AWS credentials ─────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── Check stack exists ─────────────────────────────────────────────
+      - name: Check stack exists
+        id: check
+        run: |
+          ENV="${{ inputs.environment }}"
+          STACK="${{ env.PROJECT_NAME }}-${ENV}-redis"
+
+          echo "Checking stack: ${STACK}"
+
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK}" \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          echo "Stack status: ${STACK_STATUS}"
+          echo "stack_status=${STACK_STATUS}" >> "$GITHUB_OUTPUT"
+
+          if [ "${STACK_STATUS}" == "DOES_NOT_EXIST" ]; then
+            echo "::warning::Stack ${STACK} does not exist. Nothing to destroy."
+          fi
+
+      # ── Delete stack ───────────────────────────────────────────────────
+      - name: Delete ElastiCache Redis stack
+        if: steps.check.outputs.stack_status != 'DOES_NOT_EXIST'
+        run: |
+          ENV="${{ inputs.environment }}"
+          STACK="${{ env.PROJECT_NAME }}-${ENV}-redis"
+
+          echo "=== Deleting stack: ${STACK} ==="
+          echo "Note: Redis replication group deletion may take 5-10 minutes."
+
+          aws cloudformation delete-stack --stack-name "${STACK}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK}"
+
+          echo "Stack ${STACK} deleted successfully."
+
+      # ── Summary ────────────────────────────────────────────────────────
+      - name: Summary
+        run: |
+          ENV="${{ inputs.environment }}"
+          STACK="${{ env.PROJECT_NAME }}-${ENV}-redis"
+          STATUS="${{ steps.check.outputs.stack_status }}"
+
+          echo "========================================"
+          echo "  ElastiCache Redis Destroy Summary"
+          echo "========================================"
+          echo "  Environment : ${ENV}"
+          echo "  Stack       : ${STACK}"
+          echo "  Prior Status: ${STATUS}"
+
+          if [ "${STATUS}" == "DOES_NOT_EXIST" ]; then
+            echo "  Result      : Stack did not exist (no-op)"
+          else
+            echo "  Result      : Stack deleted successfully"
+          fi
+
+          echo "========================================"

@@ -15,7 +15,7 @@ All secrets/variables are prefixed with `CLAIMS_PROC_` to avoid conflicts.
 | `CLAIMS_PROC_SUBNET_PUBLIC_1` | Public subnet 1 ID | `subnet-0111...` |
 | `CLAIMS_PROC_SUBNET_PUBLIC_2` | Public subnet 2 ID | `subnet-0222...` |
 | `CLAIMS_PROC_RDS_MASTER_PASSWORD` | Master password for RDS PostgreSQL | (strong password) |
-| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token | (strong token) |
+| `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token (16-128 chars, no `/` `"` `@` or spaces) | (strong token) |
 | `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 key for EncryptionService | (32-byte base64 key) |
 
 ## GitHub Variables (Settings > Secrets and variables > Actions > Variables)
@@ -30,23 +30,30 @@ All secrets/variables are prefixed with `CLAIMS_PROC_` to avoid conflicts.
 Run workflows in this order for a fresh AWS deployment:
 
 ```
-AWS_01 → AWS_02 → AWS_03 → AWS_04 → AWS_05 → AWS_06 → AWS_08 → AWS_09 → AWS_10
+AWS_01 → AWS_02a/02b/02c/02d (parallel) → AWS_03 → AWS_04 → AWS_05 → AWS_06 → AWS_08 → AWS_09 → AWS_10
 ```
 
-| Step | Workflow | What It Creates |
-|---|---|---|
-| 1 | AWS_01 - VPC & Security Groups | VPC (or use existing), security groups |
-| 2 | AWS_02 - Core Infrastructure | RDS PostgreSQL, S3 buckets, ECR repos, ElastiCache Redis |
-| 3 | AWS_03 - Observability | CloudWatch log groups, dashboards, alarms, CloudTrail |
-| 4 | AWS_04 - Auth (Cognito) | Cognito User Pool, groups, app client |
-| 5 | AWS_05 - Messaging & Search | Kinesis streams (or MSK), OpenSearch domain |
-| 6 | AWS_06 - Secrets Manager | Secret entries with connection details |
-| 7 | AWS_07 - EKS Cluster | (Optional) EKS cluster + node groups |
-| 8 | AWS_08 - Build & Push ECR | Docker images for all 10 modules → ECR |
-| 9 | AWS_09 - API Gateway & Fargate | ECS/Fargate services, ALB, routing |
-| 10 | AWS_10 - Data Seed | Seed tenants, members, claims, users in RDS |
+Or use **AWS_99 — Full Environment Orchestrator** to deploy everything in one click.
 
-**To destroy everything:** Run `AWS_11 - Destroy All` (requires typing environment name to confirm).
+| Step | Workflow | What It Creates | VPC Required |
+|---|---|---|---|
+| 1 | AWS_01 - VPC & Security Groups | VPC (or use existing), security groups | — |
+| 2a | AWS_02a - RDS PostgreSQL | RDS PostgreSQL instance | Yes |
+| 2b | AWS_02b - S3 Buckets | S3 document & static asset buckets | No |
+| 2c | AWS_02c - ECR Repositories | ECR repos for all 10 microservices | No |
+| 2d | AWS_02d - ElastiCache Redis | Redis replication group with encryption | Yes |
+| 3 | AWS_03 - Observability | CloudWatch log groups, dashboards, alarms, CloudTrail | No |
+| 4 | AWS_04 - Auth (Cognito) | Cognito User Pool, groups, app client | No |
+| 5 | AWS_05 - Messaging & Search | Kinesis streams (or MSK), OpenSearch domain | Yes |
+| 6 | AWS_06 - Secrets Manager | Secret entries with connection details | No |
+| 7 | AWS_07 - EKS Cluster | (Optional) EKS cluster + node groups | Yes |
+| 8 | AWS_08 - Build & Push ECR | Docker images for all 10 modules → ECR | No |
+| 9 | AWS_09 - API Gateway & Fargate | ECS/Fargate services, ALB, routing | Yes |
+| 10 | AWS_10 - Data Seed | Seed tenants, members, claims, users in RDS | Yes |
+
+> Steps 2b and 2c have no VPC dependency and can run in parallel with step 1.
+
+**To destroy everything:** Run `AWS_98 - Destroy All` (requires typing environment name to confirm).
 
 ## IAM Policy for GitHub Actions User
 

@@ -122,6 +122,10 @@ jobs:
             "${PREFIX}-messaging-search"
             # "${PREFIX}-auth"  # COGNITO COMMENTED OUT
             "${PREFIX}-observability"
+            "${PREFIX}-redis"
+            "${PREFIX}-rds"
+            "${PREFIX}-s3"
+            "${PREFIX}-ecr"
             "${PREFIX}-core-infra"
             "${PREFIX}-vpc-sg"
           )
@@ -513,25 +517,67 @@ jobs:
           done
           echo "ECR images deleted."
 
-      # 12. Delete: core-infra (RDS, S3, ElastiCache, ECR)
+      # 12. Delete: individual core infrastructure stacks (split from monolithic core-infra)
       # -------------------------------------------------------------------
-      - name: "Delete stack: core-infra"
+      - name: "Delete stack: redis"
+        continue-on-error: true
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-redis"
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then echo "Stack ${STACK} not found. Skipping."; exit 0; fi
+          echo "--- Deleting: ${STACK} ---"
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion (Redis may take 5-10 minutes)..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      - name: "Delete stack: rds"
+        continue-on-error: true
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-rds"
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then echo "Stack ${STACK} not found. Skipping."; exit 0; fi
+          echo "--- Deleting: ${STACK} ---"
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion (RDS may take 5-10 minutes)..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      - name: "Delete stack: s3"
+        continue-on-error: true
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-s3"
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then echo "Stack ${STACK} not found. Skipping."; exit 0; fi
+          echo "--- Deleting: ${STACK} ---"
+          aws cloudformation delete-stack --stack-name "$STACK"
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      - name: "Delete stack: ecr"
+        continue-on-error: true
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-ecr"
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then echo "Stack ${STACK} not found. Skipping."; exit 0; fi
+          echo "--- Deleting: ${STACK} ---"
+          aws cloudformation delete-stack --stack-name "$STACK"
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      - name: "Delete stack: core-infra (legacy — if still exists)"
         continue-on-error: true
         run: |
           STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-core-infra"
-          echo "--- Deleting: ${STACK} ---"
-
-          STATUS=$(aws cloudformation describe-stacks \
-            --stack-name "$STACK" \
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
             --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
-
-          if [[ "$STATUS" == "NOT_FOUND" ]]; then
-            echo "Stack does not exist. Skipping."
-            exit 0
-          fi
-
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then echo "Legacy stack ${STACK} not found. Skipping."; exit 0; fi
+          echo "--- Deleting legacy stack: ${STACK} ---"
           aws cloudformation delete-stack --stack-name "$STACK"
-          echo "Waiting for deletion to complete (RDS may take 5-10 minutes)..."
           aws cloudformation wait stack-delete-complete --stack-name "$STACK"
           echo "Deleted: ${STACK}"
 
@@ -617,6 +663,10 @@ jobs:
             "${PREFIX}-messaging-search"
             # "${PREFIX}-auth"  # COGNITO COMMENTED OUT
             "${PREFIX}-observability"
+            "${PREFIX}-redis"
+            "${PREFIX}-rds"
+            "${PREFIX}-s3"
+            "${PREFIX}-ecr"
             "${PREFIX}-core-infra"
             "${PREFIX}-vpc-sg"
           )
@@ -685,8 +735,11 @@ jobs:
           echo "| 5 | \`${PREFIX}-messaging-search\` | MSK (Kafka) + OpenSearch |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 6 | \`${PREFIX}-auth\` | Cognito user pools |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 7 | \`${PREFIX}-observability\` | CloudWatch dashboards, alarms |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 8 | \`${PREFIX}-core-infra\` | RDS, S3, ElastiCache, ECR |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 9 | \`${PREFIX}-vpc-sg\` | VPC, subnets, NAT, security groups |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 8 | \`${PREFIX}-redis\` | ElastiCache Redis |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 9 | \`${PREFIX}-rds\` | RDS PostgreSQL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 10 | \`${PREFIX}-s3\` | S3 buckets |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 11 | \`${PREFIX}-ecr\` | ECR repositories |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 12 | \`${PREFIX}-vpc-sg\` | VPC, subnets, NAT, security groups |" >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "${{ steps.verify.outputs.remaining_count }}" -gt "0" ]]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"

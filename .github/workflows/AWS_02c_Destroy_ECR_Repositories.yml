@@ -1,0 +1,168 @@
+# ============================================================================
+# AWS_02c - Destroy ECR Repositories
+# ============================================================================
+name: "AWS_02c - Destroy ECR Repositories"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirm_destroy:
+        description: "Type the environment name to confirm destruction"
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  # =========================================================================
+  # Job 1: Validate confirmation
+  # =========================================================================
+  validate:
+    name: Validate Destroy Confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm environment matches
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          CONFIRM="${{ github.event.inputs.confirm_destroy }}"
+
+          if [[ "${CONFIRM}" != "${ENV}" ]]; then
+            echo "::error::Confirmation '${CONFIRM}' does not match environment '${ENV}'. Aborting."
+            exit 1
+          fi
+
+          echo "Confirmation validated. Proceeding with destruction of ${ENV} ECR repositories."
+
+  # =========================================================================
+  # Job 2: Destroy ECR stack
+  # =========================================================================
+  destroy:
+    name: Destroy ECR Repositories
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Configure AWS credentials
+      # -----------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------------
+      # 2. Check stack exists
+      # -----------------------------------------------------------------------
+      - name: Check stack exists
+        id: check_stack
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENV}-ecr"
+
+          echo "--- Checking stack: ${STACK_NAME} ---"
+
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          echo "Stack status: ${STACK_STATUS}"
+          echo "stack_status=${STACK_STATUS}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${STACK_STATUS}" == "DOES_NOT_EXIST" ]]; then
+            echo "::warning::Stack ${STACK_NAME} does not exist. Nothing to destroy."
+          fi
+
+      # -----------------------------------------------------------------------
+      # 3. Belt+suspenders - Delete all ECR images before stack deletion
+      # -----------------------------------------------------------------------
+      - name: Delete all ECR images
+        if: steps.check_stack.outputs.stack_status != 'DOES_NOT_EXIST'
+        run: |
+          PRJ="${{ env.PROJECT_NAME }}"
+
+          REPOS=(
+            "${PRJ}/api-claims"
+            "${PRJ}/api-members"
+            "${PRJ}/api-tenants"
+            "${PRJ}/api-entitlements"
+            "${PRJ}/portal-claims-advisor"
+            "${PRJ}/portal-claims-member"
+            "${PRJ}/portal-batch-assignment"
+            "${PRJ}/portal-tenants"
+            "${PRJ}/portal-entitlements"
+            "${PRJ}/portal-sre"
+          )
+
+          echo "--- Deleting all images from ECR repositories ---"
+          for REPO in "${REPOS[@]}"; do
+            echo "Processing: ${REPO}"
+
+            IMAGE_IDS=$(aws ecr list-images \
+              --repository-name "${REPO}" \
+              --query "imageIds[*]" \
+              --output json 2>/dev/null || echo "[]")
+
+            if [[ "${IMAGE_IDS}" != "[]" && -n "${IMAGE_IDS}" ]]; then
+              echo "  Deleting images from ${REPO}..."
+              aws ecr batch-delete-image \
+                --repository-name "${REPO}" \
+                --image-ids "${IMAGE_IDS}" || true
+              echo "  Images deleted."
+            else
+              echo "  No images found in ${REPO}."
+            fi
+          done
+          echo "--- Image cleanup complete ---"
+
+      # -----------------------------------------------------------------------
+      # 4. Delete CloudFormation stack
+      # -----------------------------------------------------------------------
+      - name: Delete CloudFormation stack
+        if: steps.check_stack.outputs.stack_status != 'DOES_NOT_EXIST'
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENV}-ecr"
+
+          echo "--- Deleting stack: ${STACK_NAME} ---"
+
+          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
+
+          echo "--- Stack ${STACK_NAME} deleted successfully ---"
+
+      # -----------------------------------------------------------------------
+      # 5. Summary
+      # -----------------------------------------------------------------------
+      - name: Summary
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENV}-ecr"
+          STACK_STATUS="${{ steps.check_stack.outputs.stack_status }}"
+
+          echo "============================================"
+          echo "  ECR Repositories Destroy Summary"
+          echo "============================================"
+          echo "  Environment : ${ENV}"
+          echo "  Stack Name  : ${STACK_NAME}"
+          if [[ "${STACK_STATUS}" == "DOES_NOT_EXIST" ]]; then
+            echo "  Result      : Stack did not exist (no action taken)"
+          else
+            echo "  Result      : Stack and all ECR repositories destroyed"
+          fi
+          echo "============================================"
