@@ -17,6 +17,7 @@ All secrets/variables are prefixed with `CLAIMS_PROC_` to avoid conflicts.
 | `CLAIMS_PROC_RDS_MASTER_PASSWORD` | Master password for RDS PostgreSQL | (strong password) |
 | `CLAIMS_PROC_REDIS_AUTH_TOKEN` | ElastiCache Redis auth token (16-128 chars, no `/` `"` `@` or spaces) | (strong token) |
 | `CLAIMS_PROC_ENCRYPTION_KEY` | AES-256 key for EncryptionService | (32-byte base64 key) |
+| `CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD` | OpenSearch master user password (8+ chars, upper+lower+digit+special) | (strong password) |
 
 ## GitHub Variables (Settings > Secrets and variables > Actions > Variables)
 

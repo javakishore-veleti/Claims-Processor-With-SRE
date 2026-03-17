@@ -139,6 +139,39 @@ jobs:
             fi
           fi
 
+          # ── OpenSearch Master Password (only if messaging is not skipped) ──
+          if [ "${{ inputs.skip_messaging }}" != "true" ]; then
+            OS_PASS="${{ secrets.CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD }}"
+            if [ -z "$OS_PASS" ]; then
+              echo "::error::CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD secret is not set (required when skip_messaging=false)."
+              echo "  OpenSearch requires: 8+ chars, at least one uppercase, lowercase, digit, and special character."
+              ERRORS=$((ERRORS + 1))
+            else
+              LEN=${#OS_PASS}
+              if [ "$LEN" -lt 8 ]; then
+                echo "::error::CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD must be at least 8 characters (current: ${LEN})."
+                ERRORS=$((ERRORS + 1))
+              fi
+              # OpenSearch requires: uppercase, lowercase, digit, special char
+              if ! echo "$OS_PASS" | grep -qP '[A-Z]'; then
+                echo "::error::CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD must contain at least one uppercase letter."
+                ERRORS=$((ERRORS + 1))
+              fi
+              if ! echo "$OS_PASS" | grep -qP '[a-z]'; then
+                echo "::error::CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD must contain at least one lowercase letter."
+                ERRORS=$((ERRORS + 1))
+              fi
+              if ! echo "$OS_PASS" | grep -qP '[0-9]'; then
+                echo "::error::CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD must contain at least one digit."
+                ERRORS=$((ERRORS + 1))
+              fi
+              if ! echo "$OS_PASS" | grep -qP '[^A-Za-z0-9]'; then
+                echo "::error::CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD must contain at least one special character."
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+          fi
+
           # ── JWT Signing Key ──
           if [ -z "${{ secrets.CLAIMS_PROC_JWT_SIGNING_KEY }}" ]; then
             echo "::warning::CLAIMS_PROC_JWT_SIGNING_KEY is not set (needed by Secrets Manager stack)."
@@ -754,10 +787,11 @@ jobs:
               PrivateSubnet1="${PRV1}" \
               PrivateSubnet2="${PRV2}" \
               AppSecurityGroupId="${APP_SG}" \
+              OpenSearchMasterPassword="${{ secrets.CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 6  SECRETS MANAGER

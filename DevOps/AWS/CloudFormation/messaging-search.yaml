@@ -46,6 +46,15 @@ Parameters:
     MaxValue: 10
     Description: Number of OpenSearch data nodes
 
+  OpenSearchMasterPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 128
+    Description: >
+      Master password for OpenSearch internal user database.
+      Must contain at least one uppercase, one lowercase, one digit, and one special character.
+
   # ---- MSK/KINESIS COMMENTED OUT — using embedded Kafka ----
   # UseMSK:
   # Type: String
@@ -306,7 +315,7 @@ Resources:
         InternalUserDatabaseEnabled: true
         MasterUserOptions:
           MasterUserName: claimsadmin
-          MasterUserPassword: '{{resolve:secretsmanager:claims-proc-opensearch-master:SecretString:password}}'
+          MasterUserPassword: !Ref OpenSearchMasterPassword
       AccessPolicies:
         Version: '2012-10-17'
         Statement:
