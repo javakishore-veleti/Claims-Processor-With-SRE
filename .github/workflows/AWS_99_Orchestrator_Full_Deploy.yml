@@ -46,6 +46,18 @@ on:
         type: string
         default: 'latest'
 
+      skip_rds:
+        description: 'Skip RDS PostgreSQL (Fargate services use H2 in-memory with local profile — enable only if you need a real database)'
+        required: false
+        type: boolean
+        default: false
+
+      skip_redis:
+        description: 'Skip ElastiCache Redis (caching disabled by default via feature toggles — enable only if you need AWS-managed Redis)'
+        required: false
+        type: boolean
+        default: true
+
       skip_messaging:
         description: 'Skip MSK + OpenSearch (using embedded Kafka — enable only if you need AWS-managed Kafka/OpenSearch)'
         required: false
@@ -105,38 +117,46 @@ jobs:
             ERRORS=$((ERRORS + 1))
           fi
 
-          # ── RDS Master Password ──
-          RDS_PASS="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}"
-          if [ -z "$RDS_PASS" ]; then
-            echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD secret is not set."
-            ERRORS=$((ERRORS + 1))
+          # ── RDS Master Password (only if RDS is not skipped) ──
+          if [ "${{ inputs.skip_rds }}" != "true" ]; then
+            RDS_PASS="${{ secrets.CLAIMS_PROC_RDS_MASTER_PASSWORD }}"
+            if [ -z "$RDS_PASS" ]; then
+              echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD secret is not set."
+              ERRORS=$((ERRORS + 1))
+            else
+              LEN=${#RDS_PASS}
+              if [ "$LEN" -lt 8 ] || [ "$LEN" -gt 128 ]; then
+                echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD must be 8-128 characters (current: ${LEN})."
+                ERRORS=$((ERRORS + 1))
+              fi
+              if echo "$RDS_PASS" | grep -qP '[/"@\s]'; then
+                echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD contains invalid characters (/, \", @, or spaces)."
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
           else
-            LEN=${#RDS_PASS}
-            if [ "$LEN" -lt 8 ] || [ "$LEN" -gt 128 ]; then
-              echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD must be 8-128 characters (current: ${LEN})."
-              ERRORS=$((ERRORS + 1))
-            fi
-            if echo "$RDS_PASS" | grep -qP '[/"@\s]'; then
-              echo "::error::CLAIMS_PROC_RDS_MASTER_PASSWORD contains invalid characters (/, \", @, or spaces)."
-              ERRORS=$((ERRORS + 1))
-            fi
+            echo "RDS skipped — skipping password validation."
           fi
 
-          # ── Redis Auth Token ──
-          REDIS_TOKEN="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}"
-          if [ -z "$REDIS_TOKEN" ]; then
-            echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN secret is not set."
-            ERRORS=$((ERRORS + 1))
+          # ── Redis Auth Token (only if Redis is not skipped) ──
+          if [ "${{ inputs.skip_redis }}" != "true" ]; then
+            REDIS_TOKEN="${{ secrets.CLAIMS_PROC_REDIS_AUTH_TOKEN }}"
+            if [ -z "$REDIS_TOKEN" ]; then
+              echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN secret is not set."
+              ERRORS=$((ERRORS + 1))
+            else
+              LEN=${#REDIS_TOKEN}
+              if [ "$LEN" -lt 16 ] || [ "$LEN" -gt 128 ]; then
+                echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN must be 16-128 characters (current: ${LEN})."
+                ERRORS=$((ERRORS + 1))
+              fi
+              if echo "$REDIS_TOKEN" | grep -qP '[/"@\s]'; then
+                echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN contains invalid characters (/, \", @, or spaces)."
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
           else
-            LEN=${#REDIS_TOKEN}
-            if [ "$LEN" -lt 16 ] || [ "$LEN" -gt 128 ]; then
-              echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN must be 16-128 characters (current: ${LEN})."
-              ERRORS=$((ERRORS + 1))
-            fi
-            if echo "$REDIS_TOKEN" | grep -qP '[/"@\s]'; then
-              echo "::error::CLAIMS_PROC_REDIS_AUTH_TOKEN contains invalid characters (/, \", @, or spaces)."
-              ERRORS=$((ERRORS + 1))
-            fi
+            echo "Redis skipped — skipping token validation."
           fi
 
           # ── OpenSearch Master Password (only if messaging is not skipped) ──
@@ -272,7 +292,10 @@ jobs:
             echo "| \`${PRJ}-${ENV}-${stack}\` | \`${raw}\` | ${action} |" >> "$GITHUB_STEP_SUMMARY"
           done
           echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "> **Environment:** \`$ENV\` | **Region:** \`${{ env.AWS_REGION }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Skip flags:** RDS=\`${{ inputs.skip_rds }}\` | Redis=\`${{ inputs.skip_redis }}\` | Messaging=\`${{ inputs.skip_messaging }}\` | EKS=\`${{ inputs.skip_eks }}\` | Build=\`${{ inputs.skip_build }}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 1  VPC & SECURITY GROUPS
@@ -330,7 +353,7 @@ jobs:
   deploy-02a-rds:
     name: "2a — RDS PostgreSQL"
     needs: [check, deploy-01-vpc]
-    if: always() && !failure() && needs.check.outputs.s02a == 'deploy'
+    if: always() && !failure() && needs.check.outputs.s02a == 'deploy' && inputs.skip_rds == false
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -511,7 +534,7 @@ jobs:
   deploy-02d-redis:
     name: "2d — ElastiCache Redis"
     needs: [check, deploy-01-vpc]
-    if: always() && !failure() && needs.check.outputs.s02d == 'deploy'
+    if: always() && !failure() && needs.check.outputs.s02d == 'deploy' && inputs.skip_redis == false
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -967,35 +990,114 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
-      - uses: docker/setup-buildx-action@v3
+          fetch-depth: 0
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get AWS Account ID
+        id: aws-info
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "registry=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_OUTPUT"
+
+      - name: Check if images already exist in ECR
+        id: ecr-check
+        env:
+          PRJ: ${{ env.PROJECT_NAME }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          EXISTING=$(aws ecr describe-images --repository-name "${PRJ}/api-claims" \
+            --image-ids imageTag="${IMAGE_TAG}" \
+            --query 'imageDetails[0].imagePushedAt' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [ "$EXISTING" != "NOT_FOUND" ] && [ -n "$EXISTING" ]; then
+            echo "Images already in ECR (pushed: ${EXISTING}) — skipping entire build."
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+            echo "needs_maven=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No images in ECR — build needed."
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Try to restore cached JARs from a previous Maven build ──
+      - name: Restore JAR cache
+        if: steps.ecr-check.outputs.needs_build == 'true'
+        id: jar-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            API-Claims/target
+            API-Members/target
+            API-Tenants/target
+            API-Entitlements/target
+            Portal-Claims-Advisor/target
+            Portal-Claims-Member/target
+            Portal-Batch-Assignment/target
+            Portal-Tenants/target
+            Portal-Entitlements/target
+            Portal-SRE/target
+          key: jars-${{ hashFiles('**/pom.xml', '**/src/**/*.java', '**/src/**/*.xml', '**/src/**/*.yml', '**/src/**/*.yaml', '**/src/**/*.properties') }}
+
+      - name: Check if cached JARs are usable
+        if: steps.ecr-check.outputs.needs_build == 'true'
+        id: jar-check
+        run: |
+          # Verify all 10 JARs exist from cache
+          MISSING=0
+          for DIR in API-Claims API-Members API-Tenants API-Entitlements \
+            Portal-Claims-Advisor Portal-Claims-Member Portal-Batch-Assignment \
+            Portal-Tenants Portal-Entitlements Portal-SRE; do
+            if ! ls "${DIR}/target/"*.jar >/dev/null 2>&1; then
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ "$MISSING" -eq 0 ]; then
+            echo "All 10 JARs found in cache — skipping Maven build."
+            echo "needs_maven=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "${MISSING} JARs missing — Maven build required."
+            echo "needs_maven=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Maven build (only if JARs not cached) ──
+      - uses: actions/setup-java@v4
+        if: steps.ecr-check.outputs.needs_build == 'true' && steps.jar-check.outputs.needs_maven == 'true'
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Cache Maven dependencies
+        if: steps.ecr-check.outputs.needs_build == 'true' && steps.jar-check.outputs.needs_maven == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
       - name: Build Java artifacts
-        run: mvn clean install -DskipTests -B -q
+        if: steps.ecr-check.outputs.needs_build == 'true' && steps.jar-check.outputs.needs_maven == 'true'
+        run: |
+          echo "Building all modules with Maven..."
+          mvn clean install -DskipTests -B -q
+          echo "Maven build completed."
+
+      # ── Docker build + push (only if ECR doesn't have images) ──
+      - uses: docker/setup-buildx-action@v3
+        if: steps.ecr-check.outputs.needs_build == 'true'
       - name: Build & push Docker images
+        if: steps.ecr-check.outputs.needs_build == 'true'
         env:
           ENV: ${{ inputs.environment }}
           PRJ: ${{ env.PROJECT_NAME }}
           IMAGE_TAG: ${{ inputs.image_tag }}
+          REGISTRY: ${{ steps.aws-info.outputs.registry }}
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
           MODULES=(
             "api-claims:API-Claims"
             "api-members:API-Members"
@@ -1030,9 +1132,15 @@ jobs:
               "${DIR}"
 
             BUILT=$((BUILT + 1))
-            echo "  Pushed ${NAME}:${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
           done
-          echo "Built and pushed ${BUILT} images." >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Build & Push: ${BUILT} images" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build skipped — images already in ECR
+        if: steps.ecr-check.outputs.needs_build == 'false'
+        run: |
+          echo "### Build Skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "Images with tag \`${{ inputs.image_tag }}\` already exist in ECR." >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 9  API GATEWAY + FARGATE SERVICES
@@ -1117,6 +1225,7 @@ jobs:
               ImageTag="${IMAGE_TAG}" \
               AWSAccountId="${ACCOUNT_ID}" \
               AWSRegion="${AWS_REGION}" \
+              ECRRepoPrefix="${PRJ}" \
               RDSSecretArn="${RDS_ARN}" \
               RedisSecretArn="${REDIS_ARN}" \
             --capabilities CAPABILITY_NAMED_IAM \
@@ -1130,7 +1239,7 @@ jobs:
   deploy-10-seed:
     name: "10 — Data Seed Lambda"
     needs: [check, deploy-09-fargate]
-    if: always() && !failure() && needs.check.outputs.s10 == 'deploy'
+    if: always() && !failure() && needs.check.outputs.s10 == 'deploy' && inputs.skip_rds == false
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
