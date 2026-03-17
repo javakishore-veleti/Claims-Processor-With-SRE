@@ -25,6 +25,13 @@ Parameters:
     Description: Number of days to retain CloudWatch log events
 
 # ---------------------------------------------------------------------------
+# Conditions
+# ---------------------------------------------------------------------------
+Conditions:
+  # CloudTrail is expensive and unnecessary in dev — only enable in staging/prod
+  EnableCloudTrail: !Not [!Equals [!Ref Environment, 'dev']]
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 Resources:
@@ -498,6 +505,7 @@ Resources:
   # =========================================================================
   TrailLogsBucket:
     Type: AWS::S3::Bucket
+    Condition: EnableCloudTrail
     Properties:
       BucketName: !Sub '${ProjectName}-${Environment}-cloudtrail-logs-${AWS::AccountId}'
       LifecycleConfiguration:
@@ -529,6 +537,7 @@ Resources:
 
   TrailLogsBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: EnableCloudTrail
     Properties:
       Bucket: !Ref TrailLogsBucket
       PolicyDocument:
@@ -556,6 +565,7 @@ Resources:
 
   TrailCloudWatchLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: EnableCloudTrail
     Properties:
       LogGroupName: !Sub '/${ProjectName}/${Environment}/cloudtrail'
       RetentionInDays: !Ref LogRetentionDays
@@ -571,6 +581,7 @@ Resources:
 
   TrailCloudWatchRole:
     Type: AWS::IAM::Role
+    Condition: EnableCloudTrail
     Properties:
       RoleName: !Sub '${ProjectName}-${Environment}-cloudtrail-cw-role'
       AssumeRolePolicyDocument:
@@ -602,6 +613,7 @@ Resources:
 
   CloudTrail:
     Type: AWS::CloudTrail::Trail
+    Condition: EnableCloudTrail
     DependsOn:
       - TrailLogsBucketPolicy
     Properties:
@@ -676,5 +688,6 @@ Outputs:
     Value: !Ref AlarmNotificationTopic
 
   TrailArn:
+    Condition: EnableCloudTrail
     Description: ARN of the CloudTrail trail
     Value: !GetAtt CloudTrail.Arn

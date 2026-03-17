@@ -182,7 +182,7 @@ Resources:
       Description: !Sub 'Seeds ${Environment} RDS PostgreSQL with tenants, members, claims, and entitlements data'
       Runtime: python3.12
       Handler: index.handler
-      Timeout: 300
+      Timeout: 120
       MemorySize: 256
       Role: !GetAtt DataSeedLambdaRole.Arn
       VpcConfig:

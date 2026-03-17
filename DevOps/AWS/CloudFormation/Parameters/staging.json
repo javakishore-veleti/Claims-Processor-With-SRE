@@ -1,7 +1,7 @@
 [
   { "ParameterKey": "Environment", "ParameterValue": "staging" },
   { "ParameterKey": "RDSInstanceClass", "ParameterValue": "db.t3.large" },
-  { "ParameterKey": "RDSMultiAZ", "ParameterValue": "true" },
+  { "ParameterKey": "RDSMultiAZ", "ParameterValue": "false" },
   { "ParameterKey": "RDSAllocatedStorage", "ParameterValue": "50" },
   { "ParameterKey": "RedisNodeType", "ParameterValue": "cache.t3.small" },
   { "ParameterKey": "RedisNumNodes", "ParameterValue": "2" },

@@ -116,7 +116,9 @@ Parameters:
 # Conditions
 # ===========================================================================
 Conditions:
-  HasCognitoUserPool: !Not [ !Equals [ !Ref CognitoUserPoolId, '' ] ]
+  HasCognitoUserPool: !Not [!Equals [!Ref CognitoUserPoolId, '']]
+  IsProd: !Equals [!Ref Environment, 'prod']
+  IsNotProd: !Not [!Equals [!Ref Environment, 'prod']]
 
 # ===========================================================================
 # Resources
@@ -132,7 +134,19 @@ Resources:
       ClusterName: !Sub '${ProjectName}-${Environment}'
       ClusterSettings:
         - Name: containerInsights
-          Value: enabled
+          # Container Insights costs ~$0.01/task/hour — disable in non-prod to save costs
+          Value: !If [IsProd, 'enabled', 'disabled']
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      DefaultCapacityProviderStrategy:
+        # Dev/staging: 100% Spot (70% cheaper). Prod: 50/50 mix for reliability
+        - CapacityProvider: FARGATE_SPOT
+          Weight: !If [IsProd, 1, 4]
+          Base: 0
+        - CapacityProvider: FARGATE
+          Weight: !If [IsProd, 1, 0]
+          Base: !If [IsProd, 1, 0]
       Configuration:
         ExecuteCommandConfiguration:
           Logging: DEFAULT
