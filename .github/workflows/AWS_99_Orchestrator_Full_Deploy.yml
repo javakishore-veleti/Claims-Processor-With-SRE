@@ -225,9 +225,10 @@ jobs:
                 ;;
               ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)
                 # Stack exists in a broken state — delete it first so deploy can recreate
-                echo "::warning::Stack $1 is in ${s} state — deleting before redeploy"
-                aws cloudformation delete-stack --stack-name "$1"
-                aws cloudformation wait stack-delete-complete --stack-name "$1" 2>/dev/null || true
+                # WARNING: echo to stderr so it doesn't corrupt GITHUB_OUTPUT capture
+                echo "::warning::Stack $1 is in ${s} state — deleting before redeploy" >&2
+                aws cloudformation delete-stack --stack-name "$1" >&2
+                aws cloudformation wait stack-delete-complete --stack-name "$1" 2>/dev/null >&2 || true
                 echo "deploy"
                 ;;
               *)
