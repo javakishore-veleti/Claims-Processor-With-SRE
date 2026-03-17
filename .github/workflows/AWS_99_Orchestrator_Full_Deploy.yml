@@ -183,9 +183,20 @@ jobs:
           CREATE_NEW="true"
           [[ "${USE_EXISTING}" == "true" && -n "${EXISTING_VPC}" ]] && CREATE_NEW="false"
 
+          STACK="${PRJ}-${ENV}-vpc-sg"
+
+          # Cleanup broken stack if exists
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/vpc-security-groups.yaml \
-            --stack-name "${PRJ}-${ENV}-vpc-sg" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -194,7 +205,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-vpc-sg\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 2  CORE INFRASTRUCTURE (RDS, Redis, S3, ECR)
