@@ -232,6 +232,18 @@ jobs:
             aws cloudformation describe-stacks --stack-name "$1" \
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
+
+          STACK="${PRJ}-${ENV}-core-infra"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           VPC="${PRJ}-${ENV}-vpc-sg"
           VPC_ID=$(get_out "$VPC" "VpcId")
           PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
@@ -240,7 +252,7 @@ jobs:
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/core-infrastructure.yaml \
-            --stack-name "${PRJ}-${ENV}-core-infra" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -253,7 +265,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-core-infra\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 3  OBSERVABILITY (CloudWatch, CloudTrail, SNS)
@@ -276,16 +288,27 @@ jobs:
           ENV: ${{ inputs.environment }}
           PRJ: ${{ env.PROJECT_NAME }}
         run: |
+          STACK="${PRJ}-${ENV}-observability"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/observability.yaml \
-            --stack-name "${PRJ}-${ENV}-observability" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-observability\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 4  AUTH (Cognito)
@@ -348,6 +371,18 @@ jobs:
             aws cloudformation describe-stacks --stack-name "$1" \
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
+
+          STACK="${PRJ}-${ENV}-messaging-search"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           VPC="${PRJ}-${ENV}-vpc-sg"
           VPC_ID=$(get_out "$VPC" "VpcId")
           PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
@@ -356,7 +391,7 @@ jobs:
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/messaging-search.yaml \
-            --stack-name "${PRJ}-${ENV}-messaging-search" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -367,7 +402,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-messaging-search\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 6  SECRETS MANAGER
@@ -391,16 +426,35 @@ jobs:
           ENV: ${{ inputs.environment }}
           PRJ: ${{ env.PROJECT_NAME }}
         run: |
+          STACK="${PRJ}-${ENV}-secrets"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            # Force-delete secrets first (they block stack deletion)
+            SECRETS=$(aws secretsmanager list-secrets \
+              --query "SecretList[?contains(Name, '${PRJ}/${ENV}') || contains(Name, '${PRJ}-${ENV}')].ARN" \
+              --output text 2>/dev/null || echo "")
+            for ARN in $SECRETS; do
+              aws secretsmanager delete-secret --secret-id "$ARN" \
+                --force-delete-without-recovery 2>/dev/null || true
+            done
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/secrets-manager.yaml \
-            --stack-name "${PRJ}-${ENV}-secrets" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-secrets\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Populate secrets with infrastructure values
         env:
@@ -476,6 +530,18 @@ jobs:
             aws cloudformation describe-stacks --stack-name "$1" \
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
+
+          STACK="${PRJ}-${ENV}-eks"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           VPC="${PRJ}-${ENV}-vpc-sg"
           VPC_ID=$(get_out "$VPC" "VpcId")
           PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
@@ -485,7 +551,7 @@ jobs:
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/eks-cluster.yaml \
-            --stack-name "${PRJ}-${ENV}-eks" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -497,7 +563,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-eks\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 8  BUILD & PUSH DOCKER IMAGES TO ECR  ── OPTIONAL (skip_build)
@@ -585,10 +651,29 @@ jobs:
             aws cloudformation describe-stacks --stack-name "$1" \
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
+
+          STACK="${PRJ}-${ENV}-fargate"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            # Scale down ECS services first
+            CLUSTER="${PRJ}-${ENV}"
+            SERVICES=$(aws ecs list-services --cluster "$CLUSTER" \
+              --query 'serviceArns[*]' --output text 2>/dev/null || echo "")
+            for SVC_ARN in $SERVICES; do
+              aws ecs update-service --cluster "$CLUSTER" --service "$SVC_ARN" \
+                --desired-count 0 --no-cli-pager 2>/dev/null || true
+            done
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           VPC="${PRJ}-${ENV}-vpc-sg"
           SEC="${PRJ}-${ENV}-secrets"
-          # AUTH="${PRJ}-${ENV}-auth"  # COGNITO COMMENTED OUT
 
           VPC_ID=$(get_out "$VPC" "VpcId")
           PUB1=$(get_out "$VPC" "PublicSubnet1Id")
@@ -599,11 +684,10 @@ jobs:
           ALB_SG=$(get_out "$VPC" "ALBSecurityGroupId")
           RDS_ARN=$(get_out "$SEC" "RDSCredentialsSecretArn")
           REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
-          # POOL_ID=$(get_out "$AUTH" "UserPoolId")  # COGNITO COMMENTED OUT
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
-            --stack-name "${PRJ}-${ENV}-fargate" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -619,11 +703,10 @@ jobs:
               AWSRegion="${AWS_REGION}" \
               RDSSecretArn="${RDS_ARN}" \
               RedisSecretArn="${REDIS_ARN}" \
-              # CognitoUserPoolId="${POOL_ID}" \  # COGNITO COMMENTED OUT
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-fargate\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 10  DATA SEED LAMBDA
@@ -650,6 +733,18 @@ jobs:
             aws cloudformation describe-stacks --stack-name "$1" \
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
+
+          STACK="${PRJ}-${ENV}-data-seed"
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          fi
+
           VPC="${PRJ}-${ENV}-vpc-sg"
           CORE="${PRJ}-${ENV}-core-infra"
 
@@ -662,7 +757,7 @@ jobs:
 
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/data-seed-lambda.yaml \
-            --stack-name "${PRJ}-${ENV}-data-seed" \
+            --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -678,7 +773,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${PRJ}-${ENV}-data-seed\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # SUMMARY — Full environment dashboard

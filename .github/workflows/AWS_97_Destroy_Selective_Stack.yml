@@ -1,0 +1,261 @@
+# =============================================================================
+# AWS_97 - Destroy Selective Stack
+# Pick one or more stacks from a dropdown and destroy only those.
+# Handles orphaned resources (ECR images, S3 objects, secrets, log groups)
+# before deleting the CloudFormation stack.
+# =============================================================================
+name: "AWS_97 - Destroy Selective Stack"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+      stack:
+        description: 'Stack to destroy'
+        required: true
+        type: choice
+        options:
+          - data-seed
+          - fargate
+          - eks
+          - secrets
+          - messaging-search
+          - observability
+          - core-infra
+          - vpc-sg
+
+      confirm_destroy:
+        description: 'Type the stack name to confirm (e.g. "fargate")'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+  # =========================================================================
+  # 1. Validate
+  # =========================================================================
+  validate:
+    name: "Validate destruction request"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm stack matches
+        run: |
+          REQUESTED="${{ inputs.confirm_destroy }}"
+          EXPECTED="${{ inputs.stack }}"
+
+          if [[ "$REQUESTED" != "$EXPECTED" ]]; then
+            echo "::error::Confirmation failed. You typed '${REQUESTED}' but selected stack is '${EXPECTED}'. They must match."
+            exit 1
+          fi
+
+          echo "============================================"
+          echo "  CONFIRMED: Destroy ${EXPECTED}"
+          echo "  Environment: ${{ inputs.environment }}"
+          echo "============================================"
+
+  # =========================================================================
+  # 2. Destroy the selected stack
+  # =========================================================================
+  destroy:
+    name: "Destroy ${{ inputs.stack }} (${{ inputs.environment }})"
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------
+      # Check stack exists
+      # -----------------------------------------------------------------
+      - name: Check stack status
+        id: check
+        run: |
+          STACK="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-${{ inputs.stack }}"
+          echo "stack_name=${STACK}" >> "$GITHUB_OUTPUT"
+
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "Stack: ${STACK}"
+          echo "Status: ${STATUS}"
+
+          if [[ "$STATUS" == "NOT_FOUND" ]]; then
+            echo "::notice::Stack does not exist. Nothing to destroy."
+          fi
+
+      # -----------------------------------------------------------------
+      # Pre-delete: Clean up resources that block stack deletion
+      # -----------------------------------------------------------------
+      - name: "Pre-delete cleanup: ECR images"
+        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'core-infra'
+        continue-on-error: true
+        run: |
+          echo "Cleaning ECR images before core-infra deletion..."
+          REPOS=$(aws ecr describe-repositories \
+            --query "repositories[?starts_with(repositoryName, '${{ env.PROJECT_NAME }}/')].repositoryName" \
+            --output text 2>/dev/null || echo "")
+          for REPO in $REPOS; do
+            echo "  Deleting images in: $REPO"
+            IMAGES=$(aws ecr list-images --repository-name "$REPO" \
+              --query 'imageIds[*]' --output json 2>/dev/null || echo "[]")
+            COUNT=$(echo "$IMAGES" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+            if [[ "$COUNT" -gt 0 ]]; then
+              aws ecr batch-delete-image --repository-name "$REPO" \
+                --image-ids "$IMAGES" 2>/dev/null || true
+            fi
+          done
+
+      - name: "Pre-delete cleanup: S3 buckets"
+        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'core-infra'
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          echo "Emptying S3 buckets before core-infra deletion..."
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          for SUFFIX in documents static artifacts logs; do
+            BUCKET="${PRJ}-${ENV}-${ACCOUNT_ID}-${SUFFIX}"
+            if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+              echo "  Emptying: ${BUCKET}"
+              aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+            fi
+          done
+
+      - name: "Pre-delete cleanup: Secrets Manager"
+        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'secrets'
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          echo "Force-deleting secrets (no recovery window)..."
+          SECRETS=$(aws secretsmanager list-secrets \
+            --query "SecretList[?contains(Name, '${PRJ}/${ENV}') || contains(Name, '${PRJ}-${ENV}')].ARN" \
+            --output text 2>/dev/null || echo "")
+          for ARN in $SECRETS; do
+            echo "  Deleting: $ARN"
+            aws secretsmanager delete-secret \
+              --secret-id "$ARN" \
+              --force-delete-without-recovery 2>/dev/null || true
+          done
+
+      - name: "Pre-delete cleanup: ECS services scale-down"
+        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'fargate'
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          CLUSTER="${PRJ}-${ENV}"
+          echo "Scaling down ECS services in cluster: ${CLUSTER}"
+          SERVICES=$(aws ecs list-services --cluster "$CLUSTER" \
+            --query 'serviceArns[*]' --output text 2>/dev/null || echo "")
+          for SVC_ARN in $SERVICES; do
+            SVC_NAME=$(echo "$SVC_ARN" | awk -F'/' '{print $NF}')
+            echo "  Scaling down: ${SVC_NAME}"
+            aws ecs update-service --cluster "$CLUSTER" --service "$SVC_ARN" \
+              --desired-count 0 --no-cli-pager 2>/dev/null || true
+          done
+          [[ -n "$SERVICES" ]] && echo "Waiting 30s for tasks to drain..." && sleep 30
+
+      - name: "Pre-delete cleanup: CloudTrail S3 bucket"
+        if: steps.check.outputs.status != 'NOT_FOUND' && inputs.stack == 'observability'
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          BUCKET=$(aws cloudformation describe-stack-resource \
+            --stack-name "${PRJ}-${ENV}-observability" \
+            --logical-resource-id TrailLogsBucket \
+            --query "StackResourceDetail.PhysicalResourceId" \
+            --output text 2>/dev/null || echo "")
+          if [[ -n "$BUCKET" && "$BUCKET" != "None" ]]; then
+            echo "Emptying CloudTrail bucket: $BUCKET"
+            aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+          fi
+
+      # -----------------------------------------------------------------
+      # Delete the stack
+      # -----------------------------------------------------------------
+      - name: "Delete stack: ${{ inputs.stack }}"
+        if: steps.check.outputs.status != 'NOT_FOUND'
+        run: |
+          STACK="${{ steps.check.outputs.stack_name }}"
+          STATUS="${{ steps.check.outputs.status }}"
+
+          echo "Deleting stack: ${STACK} (current status: ${STATUS})"
+
+          aws cloudformation delete-stack --stack-name "$STACK"
+          echo "Waiting for deletion..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+          echo "Deleted: ${STACK}"
+
+      # -----------------------------------------------------------------
+      # Post-delete: Clean up auto-created resources
+      # -----------------------------------------------------------------
+      - name: "Post-delete cleanup: CloudWatch log groups"
+        if: inputs.stack == 'fargate' || inputs.stack == 'data-seed' || inputs.stack == 'observability'
+        continue-on-error: true
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          PREFIXES=(
+            "/ecs/${PRJ}-${ENV}"
+            "/aws/lambda/${PRJ}-${ENV}"
+            "/claims-proc/${ENV}"
+          )
+          for PREFIX in "${PREFIXES[@]}"; do
+            GROUPS=$(aws logs describe-log-groups \
+              --log-group-name-prefix "$PREFIX" \
+              --query 'logGroups[*].logGroupName' \
+              --output text 2>/dev/null || echo "")
+            for GROUP in $GROUPS; do
+              echo "  Deleting log group: $GROUP"
+              aws logs delete-log-group --log-group-name "$GROUP" 2>/dev/null || true
+            done
+          done
+
+      # -----------------------------------------------------------------
+      # Summary
+      # -----------------------------------------------------------------
+      - name: Summary
+        if: always()
+        run: |
+          STACK="${{ steps.check.outputs.stack_name }}"
+          STATUS="${{ steps.check.outputs.status }}"
+
+          # Verify deletion
+          FINAL=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DELETED")
+
+          echo "## Selective Stack Destruction" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Stack** | \`${STACK}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Previous Status** | \`${STATUS}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Final Status** | \`${FINAL}\` |" >> "$GITHUB_STEP_SUMMARY"
