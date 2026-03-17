@@ -181,6 +181,8 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P11 | Documentation | 7 | **5** | 2 (deferred) |
 | | **TOTAL** | **101** | **79** | **22** |
 
+> **See also:** [README_AWS_BLOG_20260313_SLO.md](README_AWS_BLOG_20260313_SLO.md) — 34 tasks for CloudWatch Application Signals SLO testing (tracked separately)
+
 ---
 
 ## How to Use This File
