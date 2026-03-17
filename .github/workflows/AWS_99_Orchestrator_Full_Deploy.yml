@@ -105,7 +105,22 @@ jobs:
             local s
             s=$(aws cloudformation describe-stacks --stack-name "$1" \
               --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
-            [[ "$s" == "CREATE_COMPLETE" || "$s" == "UPDATE_COMPLETE" ]] && echo "skip" || echo "deploy"
+
+            case "$s" in
+              CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+                echo "skip"
+                ;;
+              ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)
+                # Stack exists in a broken state — delete it first so deploy can recreate
+                echo "::warning::Stack $1 is in ${s} state — deleting before redeploy"
+                aws cloudformation delete-stack --stack-name "$1"
+                aws cloudformation wait stack-delete-complete --stack-name "$1" 2>/dev/null || true
+                echo "deploy"
+                ;;
+              *)
+                echo "deploy"
+                ;;
+            esac
           }
 
           echo "s01=$(check_stack "${PRJ}-${ENV}-vpc-sg")"            >> "$GITHUB_OUTPUT"
@@ -127,11 +142,16 @@ jobs:
             raw=$(aws cloudformation describe-stacks \
               --stack-name "${PRJ}-${ENV}-${stack}" \
               --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
-            if [[ "$raw" == "CREATE_COMPLETE" || "$raw" == "UPDATE_COMPLETE" ]]; then
-              icon="⏭️"; action="Skip (already deployed)"
-            else
-              icon="🚀"; action="Deploy"
-            fi
+            case "$raw" in
+              CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+                icon="⏭️"; action="Skip (already deployed)" ;;
+              ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)
+                icon="🔄"; action="Cleanup + Redeploy (was ${raw})" ;;
+              NOT_FOUND)
+                icon="🚀"; action="Deploy (new)" ;;
+              *)
+                icon="🚀"; action="Deploy (status: ${raw})" ;;
+            esac
             echo "| \`${PRJ}-${ENV}-${stack}\` | \`${raw}\` | ${icon} ${action} |" >> "$GITHUB_STEP_SUMMARY"
           done
           echo "" >> "$GITHUB_STEP_SUMMARY"
