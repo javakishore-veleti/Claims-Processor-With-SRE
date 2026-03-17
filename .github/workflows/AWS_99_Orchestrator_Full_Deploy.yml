@@ -788,6 +788,7 @@ jobs:
               PrivateSubnet1="${PRV1}" \
               PrivateSubnet2="${PRV2}" \
               AppSecurityGroupId="${APP_SG}" \
+              EnableOpenSearch="true" \
               OpenSearchMasterPassword="${{ secrets.CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
