@@ -608,7 +608,21 @@ jobs:
       # 14. Verify all stacks are deleted
       # -------------------------------------------------------------------
       # -------------------------------------------------------------------
-      # 14. Post-destroy cleanup — resources auto-created outside CloudFormation
+      # 14a. Delete CloudFormation templates S3 bucket
+      # -------------------------------------------------------------------
+      - name: "Delete CFN templates bucket"
+        continue-on-error: true
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-cfn-templates-${ACCT}"
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "Emptying and deleting: $BUCKET"
+            aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+            aws s3api delete-bucket --bucket "$BUCKET" 2>/dev/null || true
+          fi
+
+      # -------------------------------------------------------------------
+      # 14b. Post-destroy cleanup — resources auto-created outside CloudFormation
       # -------------------------------------------------------------------
       - name: "Delete auto-created CloudWatch log groups"
         continue-on-error: true
