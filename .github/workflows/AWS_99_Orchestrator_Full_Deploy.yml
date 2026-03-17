@@ -223,6 +223,125 @@ jobs:
           aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: Clean up orphaned resources
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          STACK="${PRJ}-${ENV}-core-infra"
+          ACCT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          # Auto-heal: delete broken stacks before redeploy
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
+            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK" 2>/dev/null || true
+          elif [[ "$STATUS" =~ ^(CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)$ ]]; then
+            echo "Stack is active — skipping orphan cleanup."
+            exit 0
+          fi
+
+          echo "Cleaning up orphaned resources from previous failed deployment..."
+
+          # ── ECR Repositories ──
+          ECR_REPOS=(
+            "${PRJ}/api-claims" "${PRJ}/api-members" "${PRJ}/api-tenants"
+            "${PRJ}/api-entitlements" "${PRJ}/portal-claims-advisor"
+            "${PRJ}/portal-claims-member" "${PRJ}/portal-batch-assignment"
+            "${PRJ}/portal-tenants" "${PRJ}/portal-entitlements" "${PRJ}/portal-sre"
+          )
+          for REPO in "${ECR_REPOS[@]}"; do
+            if aws ecr describe-repositories --repository-names "${REPO}" >/dev/null 2>&1; then
+              echo "::warning::Deleting orphaned ECR repo: ${REPO}"
+              aws ecr delete-repository --repository-name "${REPO}" --force >/dev/null 2>&1 || true
+            fi
+          done
+
+          # ── S3 Buckets ──
+          for SUFFIX in documents static; do
+            BUCKET="${PRJ}-${ENV}-${ACCT_ID}-${SUFFIX}"
+            if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+              echo "::warning::Deleting orphaned S3 bucket: ${BUCKET}"
+              aws s3 rm "s3://${BUCKET}" --recursive 2>/dev/null || true
+              aws s3api list-object-versions --bucket "${BUCKET}" --output json 2>/dev/null | \
+                python3 -c "
+          import json, sys
+          try:
+              data = json.load(sys.stdin)
+              objects = []
+              for v in data.get('Versions', []):
+                  objects.append({'Key': v['Key'], 'VersionId': v['VersionId']})
+              for m in data.get('DeleteMarkers', []):
+                  objects.append({'Key': m['Key'], 'VersionId': m['VersionId']})
+              if objects:
+                  print(json.dumps({'Objects': objects, 'Quiet': True}))
+          except:
+              pass
+          " | while read -r batch; do
+                [ -n "$batch" ] && aws s3api delete-objects --bucket "${BUCKET}" --delete "$batch" 2>/dev/null || true
+              done
+              aws s3api delete-bucket --bucket "${BUCKET}" 2>/dev/null || true
+            fi
+          done
+
+          # ── RDS Instance ──
+          RDS_ID="${PRJ}-${ENV}-postgres"
+          RDS_STATUS=$(aws rds describe-db-instances --db-instance-identifier "${RDS_ID}" \
+            --query "DBInstances[0].DBInstanceStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+          if [ "${RDS_STATUS}" != "NOT_FOUND" ]; then
+            echo "::warning::Deleting orphaned RDS instance: ${RDS_ID} (status: ${RDS_STATUS})"
+            aws rds delete-db-instance --db-instance-identifier "${RDS_ID}" \
+              --skip-final-snapshot --delete-automated-backups 2>/dev/null || true
+            echo "Waiting for RDS deletion..."
+            aws rds wait db-instance-deleted --db-instance-identifier "${RDS_ID}" 2>/dev/null || true
+          fi
+
+          # ── DB Subnet Group ──
+          DB_SUBNET="${PRJ}-${ENV}-db-subnet-group"
+          if aws rds describe-db-subnet-groups --db-subnet-group-name "${DB_SUBNET}" >/dev/null 2>&1; then
+            echo "::warning::Deleting orphaned DB subnet group: ${DB_SUBNET}"
+            aws rds delete-db-subnet-group --db-subnet-group-name "${DB_SUBNET}" 2>/dev/null || true
+          fi
+
+          # ── ElastiCache Redis ──
+          REDIS_ID="${PRJ}-${ENV}-redis"
+          REDIS_STATUS=$(aws elasticache describe-replication-groups --replication-group-id "${REDIS_ID}" \
+            --query "ReplicationGroups[0].Status" --output text 2>/dev/null || echo "NOT_FOUND")
+          if [ "${REDIS_STATUS}" != "NOT_FOUND" ]; then
+            echo "::warning::Deleting orphaned Redis group: ${REDIS_ID} (status: ${REDIS_STATUS})"
+            aws elasticache delete-replication-group --replication-group-id "${REDIS_ID}" \
+              --no-retain-primary-cluster 2>/dev/null || true
+            echo "Waiting for Redis deletion..."
+            aws elasticache wait replication-group-deleted --replication-group-id "${REDIS_ID}" 2>/dev/null || true
+          fi
+
+          # ── Redis Subnet Group ──
+          REDIS_SUBNET="${PRJ}-${ENV}-redis-subnet-group"
+          if aws elasticache describe-cache-subnet-groups --cache-subnet-group-name "${REDIS_SUBNET}" >/dev/null 2>&1; then
+            echo "::warning::Deleting orphaned Redis subnet group: ${REDIS_SUBNET}"
+            aws elasticache delete-cache-subnet-group --cache-subnet-group-name "${REDIS_SUBNET}" 2>/dev/null || true
+          fi
+
+          # ── Security Groups ──
+          VPC="${PRJ}-${ENV}-vpc-sg"
+          VPC_ID=$(aws cloudformation describe-stacks --stack-name "$VPC" \
+            --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text 2>/dev/null || true)
+          if [ -n "${VPC_ID}" ] && [ "${VPC_ID}" != "None" ]; then
+            for SG_NAME in "${PRJ}-${ENV}-sg-rds" "${PRJ}-${ENV}-sg-redis"; do
+              SG_ID=$(aws ec2 describe-security-groups \
+                --filters "Name=group-name,Values=${SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+                --query "SecurityGroups[0].GroupId" --output text 2>/dev/null)
+              if [ -n "${SG_ID}" ] && [ "${SG_ID}" != "None" ]; then
+                echo "::warning::Deleting orphaned SG: ${SG_NAME} (${SG_ID})"
+                aws ec2 delete-security-group --group-id "${SG_ID}" 2>/dev/null || true
+              fi
+            done
+          fi
+
+          echo "Orphan cleanup complete."
+
       - name: Deploy Core Infrastructure
         env:
           ENV: ${{ inputs.environment }}
@@ -234,16 +353,6 @@ jobs:
           }
 
           STACK="${PRJ}-${ENV}-core-infra"
-
-          # Auto-heal: delete broken stacks before redeploy
-          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
-            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
-          if [[ "$STATUS" =~ ^(ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED)$ ]]; then
-            echo "::warning::Stack ${STACK} in ${STATUS} — deleting before redeploy"
-            aws cloudformation delete-stack --stack-name "$STACK"
-            aws cloudformation wait stack-delete-complete --stack-name "$STACK"
-          fi
-
           VPC="${PRJ}-${ENV}-vpc-sg"
           VPC_ID=$(get_out "$VPC" "VpcId")
           PRV1=$(get_out "$VPC" "PrivateSubnet1Id")
