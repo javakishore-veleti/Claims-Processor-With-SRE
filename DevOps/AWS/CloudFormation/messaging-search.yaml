@@ -46,13 +46,22 @@ Parameters:
     MaxValue: 10
     Description: Number of OpenSearch data nodes
 
+  EnableOpenSearch:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Set to 'true' to create the OpenSearch domain. OpenSearch takes 15-30 minutes
+      to create and costs ~$50-200/month. Leave 'false' for dev to save time and money.
+
   OpenSearchMasterPassword:
     Type: String
     NoEcho: true
+    Default: 'Placeholder1!'
     MinLength: 8
     MaxLength: 128
     Description: >
-      Master password for OpenSearch internal user database.
+      Master password for OpenSearch internal user database (only used when EnableOpenSearch=true).
       Must contain at least one uppercase, one lowercase, one digit, and one special character.
 
   # ---- MSK/KINESIS COMMENTED OUT — using embedded Kafka ----
@@ -65,16 +74,22 @@ Parameters:
   # Set to true for Kafka-native workloads; false for serverless Kinesis.
 
 # ============================================================
-# Conditions — MSK/Kinesis commented out (using embedded Kafka)
+# Conditions
 # ============================================================
-# Conditions:
-#   CreateMSK: !Equals [!Ref UseMSK, 'true']
-#   CreateKinesis: !Not [!Condition CreateMSK]
+Conditions:
+  CreateOpenSearch: !Equals [!Ref EnableOpenSearch, 'true']
+  # CreateMSK: !Equals [!Ref UseMSK, 'true']
+  # CreateKinesis: !Not [!Condition CreateMSK]
 
 # ============================================================
 # Resources
 # ============================================================
 Resources:
+
+  # CloudFormation requires at least one resource. This wait handle is free and
+  # ensures the stack deploys instantly when OpenSearch is disabled.
+  StackPlaceholder:
+    Type: AWS::CloudFormation::WaitConditionHandle
 
   # ----------------------------------------------------------
   # ---- KINESIS COMMENTED OUT — using embedded Kafka instead ----
@@ -253,6 +268,7 @@ Resources:
   # ----------------------------------------------------------
   OpenSearchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    Condition: CreateOpenSearch
     Properties:
       GroupDescription: !Sub '${ProjectName}-${Environment} OpenSearch security group'
       VpcId: !Ref VpcId
@@ -282,6 +298,7 @@ Resources:
 
   OpenSearchDomain:
     Type: AWS::OpenSearchService::Domain
+    Condition: CreateOpenSearch
     Properties:
       DomainName: !Sub '${ProjectName}-${Environment}-search'
       EngineVersion: OpenSearch_2.11
@@ -390,18 +407,21 @@ Outputs:
   # Name: !Sub '${ProjectName}-${Environment}-msk-bootstrap-brokers-tls'
   #   # OpenSearch outputs
   OpenSearchDomainEndpoint:
+    Condition: CreateOpenSearch
     Description: OpenSearch domain endpoint URL
     Value: !Sub 'https://${OpenSearchDomain.DomainEndpoint}'
     Export:
       Name: !Sub '${ProjectName}-${Environment}-opensearch-endpoint'
 
   OpenSearchDomainArn:
+    Condition: CreateOpenSearch
     Description: OpenSearch domain ARN
     Value: !GetAtt OpenSearchDomain.Arn
     Export:
       Name: !Sub '${ProjectName}-${Environment}-opensearch-arn'
 
   OpenSearchSecurityGroupId:
+    Condition: CreateOpenSearch
     Description: OpenSearch security group ID
     Value: !Ref OpenSearchSecurityGroup
     Export:

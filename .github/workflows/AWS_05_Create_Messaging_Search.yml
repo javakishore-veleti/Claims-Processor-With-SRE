@@ -21,6 +21,11 @@ on:
           - dev
           - staging
           - prod
+      enable_opensearch:
+        description: 'Enable OpenSearch domain (takes 15-30 min, costs ~$50-200/mo). Set false to deploy stack instantly.'
+        required: false
+        type: boolean
+        default: false
       use_msk:
         description: 'Use MSK (Managed Kafka) instead of Kinesis'
         required: false
@@ -115,6 +120,7 @@ jobs:
               AppSecurityGroupId="${{ steps.vpc.outputs.app_sg }}" \
               OpenSearchInstanceType="$(jq -r '.[] | select(.ParameterKey=="OpenSearchInstanceType") | .ParameterValue' ${PARAMETERS_FILE})" \
               OpenSearchInstanceCount="$(jq -r '.[] | select(.ParameterKey=="OpenSearchInstanceCount") | .ParameterValue' ${PARAMETERS_FILE})" \
+              EnableOpenSearch="${{ github.event.inputs.enable_opensearch }}" \
               OpenSearchMasterPassword="${{ secrets.CLAIMS_PROC_OPENSEARCH_MASTER_PASSWORD }}" \
             --capabilities CAPABILITY_IAM \
             --no-fail-on-empty-changeset
