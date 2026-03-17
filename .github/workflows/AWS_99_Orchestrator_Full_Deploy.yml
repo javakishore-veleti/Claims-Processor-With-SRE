@@ -1093,9 +1093,16 @@ jobs:
           RDS_ARN=$(get_out "$SEC" "RDSCredentialsSecretArn")
           REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
 
+          # Template >51KB — must upload to S3 first
+          CFN_BUCKET="${PRJ}-${ENV}-cfn-templates-${ACCOUNT_ID}"
+          aws s3api head-bucket --bucket "$CFN_BUCKET" 2>/dev/null || \
+            aws s3api create-bucket --bucket "$CFN_BUCKET" --region "${AWS_REGION}"
+
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
             --stack-name "$STACK" \
+            --s3-bucket "$CFN_BUCKET" \
+            --s3-prefix "cloudformation" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
@@ -1114,7 +1121,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
-          echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 10  DATA SEED LAMBDA

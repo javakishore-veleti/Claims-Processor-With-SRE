@@ -145,16 +145,31 @@ jobs:
           echo "  Cognito Pool : ${COGNITO_USER_POOL_ID:-'(not configured)'}"
 
       # -------------------------------------------------------------------
-      # 5. Validate CloudFormation template
+      # 5. Ensure S3 bucket for large CloudFormation templates (>51KB)
+      # -------------------------------------------------------------------
+      - name: Ensure CloudFormation templates S3 bucket
+        id: cfn-bucket
+        run: |
+          ACCOUNT_ID="${{ steps.app-params.outputs.aws_account_id }}"
+          BUCKET="${{ env.PROJECT_NAME }}-${{ inputs.environment }}-cfn-templates-${ACCOUNT_ID}"
+          aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || \
+            aws s3api create-bucket --bucket "$BUCKET" --region "${{ env.AWS_REGION }}"
+          echo "bucket=${BUCKET}" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------------
+      # 6. Validate CloudFormation template
       # -------------------------------------------------------------------
       - name: Validate CloudFormation template
         run: |
           aws cloudformation validate-template \
-            --template-body "file://${{ env.TEMPLATE_FILE }}"
+            --template-url "https://${{ steps.cfn-bucket.outputs.bucket }}.s3.amazonaws.com/validate-temp.yaml" 2>/dev/null || \
+          aws s3 cp "${{ env.TEMPLATE_FILE }}" "s3://${{ steps.cfn-bucket.outputs.bucket }}/validate-temp.yaml" && \
+          aws cloudformation validate-template \
+            --template-url "https://${{ steps.cfn-bucket.outputs.bucket }}.s3.amazonaws.com/validate-temp.yaml"
           echo "Template validation successful."
 
       # -------------------------------------------------------------------
-      # 6. Deploy CloudFormation stack
+      # 7. Deploy CloudFormation stack
       # -------------------------------------------------------------------
       - name: Deploy CloudFormation stack
         run: |
@@ -164,6 +179,8 @@ jobs:
           aws cloudformation deploy \
             --stack-name "${{ env.STACK_NAME }}" \
             --template-file "${{ env.TEMPLATE_FILE }}" \
+            --s3-bucket "${{ steps.cfn-bucket.outputs.bucket }}" \
+            --s3-prefix "cloudformation" \
             --parameter-overrides \
               "Environment=${{ inputs.environment }}" \
               "ProjectName=${{ env.PROJECT_NAME }}" \
