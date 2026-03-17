@@ -2,7 +2,7 @@
 
 Tracks all remaining work to make the platform fully functional end-to-end. Work through Priority 1 first, then 2, etc.
 
-> Last updated: 2026-03-14 (P1 through P11 completed, P10 pending)
+> Last updated: 2026-03-17 (P1–P11 substantially complete; P10 CI/CD now implemented)
 
 ---
 
@@ -141,14 +141,14 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 
 | # | Task | Module(s) | Status | Notes |
 |---|---|---|---|---|
-| 10.1 | Create GitHub Actions CI workflow | Root | NOT STARTED | Build → test → code quality → security scan |
-| 10.2 | Create Dockerfiles for all 10 services | All | NOT STARTED | Multi-stage builds |
-| 10.3 | Create docker-compose for full application stack | Root | NOT STARTED | All services + infrastructure |
+| 10.1 | Create GitHub Actions CI/CD workflows | Root | COMPLETED | 34 workflows: VPC, Core Infra, RDS, S3, ECR, ElastiCache, Observability, Cognito, MSK/OpenSearch, Secrets Manager, EKS, Build+Push ECR, Fargate, Seed Data, Orchestrator, Destroy workflows, Cost Report |
+| 10.2 | Create Dockerfiles for all 10 services | All | COMPLETED | Multi-stage builds, Eclipse Temurin 17-jre-alpine, non-root user, health checks, G1GC tuning |
+| 10.3 | Create docker-compose for full application stack | Root | COMPLETED | 13 compose files in DevOps/Local/ (Postgres, Redis, Kafka, Prometheus, Grafana, Alertmanager, ES, Filebeat, Kibana, Jaeger, Zipkin, Wiremock, Ollama) + docker-all-up/down/status scripts |
 | 10.4 | Create Kubernetes manifests (Deployment, Service, ConfigMap) | All | NOT STARTED | Helm charts or Kustomize |
-| 10.5 | Create AWS deployment (CloudFormation/Terraform) | Root | NOT STARTED | RDS, MSK, ElastiCache, ECS/EKS |
-| 10.6 | Create Azure deployment (ARM/Bicep) | Root | NOT STARTED | Azure SQL, Event Hub, Redis, AKS |
-| 10.7 | Create GCP deployment (Terraform) | Root | NOT STARTED | Cloud SQL, Pub/Sub, Memorystore, GKE |
-| 10.8 | Create GitHub Actions CD workflow | Root | NOT STARTED | Deploy to staging → smoke test → prod |
+| 10.5 | Create AWS deployment (CloudFormation) | Root | COMPLETED | 13 CloudFormation templates (VPC, ALB/IAM, RDS, S3, ECR, ElastiCache, Observability, Cognito, MSK/OpenSearch, Secrets Manager, EKS, API Gateway+Fargate, Data Seed Lambda) + 6 IAM policy files |
+| 10.6 | Create Azure deployment (ARM/Bicep) | Root | NOT STARTED | Azure SQL, Event Hub, Redis, AKS — app profiles exist, IaC templates not yet created |
+| 10.7 | Create GCP deployment (Terraform) | Root | NOT STARTED | Cloud SQL, Pub/Sub, Memorystore, GKE — app profiles exist, IaC templates not yet created |
+| 10.8 | Create GitHub Actions CD workflow | Root | COMPLETED | AWS_99_Orchestrator_Full_Deploy.yml: smart stack detection, skip flags, cross-stack dependency resolution, env selection (dev/staging/prod) |
 
 ## Priority 11: Documentation & Polish
 
@@ -177,9 +177,9 @@ Tracks all remaining work to make the platform fully functional end-to-end. Work
 | P7 | Security & Auth | 8 | **3** | 5 (deferred) |
 | P8 | Claim Processing Workflow | 9 | **9** | 0 |
 | P9 | Testing | 8 | **3** | 5 (deferred) |
-| P10 | CI/CD & Deployment | 8 | 0 | 8 |
+| P10 | CI/CD & Deployment | 8 | **5** | 3 (2 not started, 1 needs AWS testing) |
 | P11 | Documentation | 7 | **5** | 2 (deferred) |
-| | **TOTAL** | **101** | **74** | **27** |
+| | **TOTAL** | **101** | **79** | **22** |
 
 ---
 
