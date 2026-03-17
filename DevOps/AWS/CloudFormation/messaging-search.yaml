@@ -56,11 +56,11 @@ Parameters:
   # Set to true for Kafka-native workloads; false for serverless Kinesis.
 
 # ============================================================
-# Conditions
+# Conditions — MSK/Kinesis commented out (using embedded Kafka)
 # ============================================================
-Conditions:
-# CreateMSK: !Equals [!Ref UseMSK, 'true']
-# CreateKinesis: !Not [!Condition CreateMSK]
+# Conditions:
+#   CreateMSK: !Equals [!Ref UseMSK, 'true']
+#   CreateKinesis: !Not [!Condition CreateMSK]
 
 # ============================================================
 # Resources
