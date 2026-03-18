@@ -1056,17 +1056,25 @@ jobs:
           PRJ: ${{ env.PROJECT_NAME }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          EXISTING=$(aws ecr describe-images --repository-name "${PRJ}/api-claims" \
-            --image-ids imageTag="${IMAGE_TAG}" \
-            --query 'imageDetails[0].imagePushedAt' --output text 2>/dev/null || echo "NOT_FOUND")
-
-          if [ "$EXISTING" != "NOT_FOUND" ] && [ -n "$EXISTING" ]; then
-            echo "Images already in ECR (pushed: ${EXISTING}) — skipping entire build."
-            echo "needs_build=false" >> "$GITHUB_OUTPUT"
-            echo "needs_maven=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "No images in ECR — build needed."
+          # Always rebuild if image_tag is 'latest' — stale images cause deployment failures
+          # (e.g., config changes in application.yml won't take effect without rebuild).
+          # For versioned tags (e.g., v1.2.3), skip build if image already exists.
+          if [ "${IMAGE_TAG}" = "latest" ]; then
+            echo "Image tag is 'latest' — always rebuilding to pick up latest code changes."
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          else
+            EXISTING=$(aws ecr describe-images --repository-name "${PRJ}/api-claims" \
+              --image-ids imageTag="${IMAGE_TAG}" \
+              --query 'imageDetails[0].imagePushedAt' --output text 2>/dev/null || echo "NOT_FOUND")
+
+            if [ "$EXISTING" != "NOT_FOUND" ] && [ -n "$EXISTING" ]; then
+              echo "Images with tag ${IMAGE_TAG} already in ECR (pushed: ${EXISTING}) — skipping build."
+              echo "needs_build=false" >> "$GITHUB_OUTPUT"
+              echo "needs_maven=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "No images in ECR with tag ${IMAGE_TAG} — build needed."
+              echo "needs_build=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       # ── Try to restore cached JARs from a previous Maven build ──
