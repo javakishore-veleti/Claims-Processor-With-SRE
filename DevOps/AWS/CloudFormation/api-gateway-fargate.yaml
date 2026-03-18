@@ -1442,6 +1442,8 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8087'
+            - Name: SPRING_FLYWAY_ENABLED
+              Value: 'true'
             - !If
               - IsAppSignalsEnabled
               - Name: JAVA_TOOL_OPTIONS
@@ -1543,6 +1545,8 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8088'
+            - Name: SPRING_FLYWAY_ENABLED
+              Value: 'true'
             - !If
               - IsAppSignalsEnabled
               - Name: JAVA_TOOL_OPTIONS
@@ -1644,6 +1648,8 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8089'
+            - Name: SPRING_FLYWAY_ENABLED
+              Value: 'true'
             - !If
               - IsAppSignalsEnabled
               - Name: JAVA_TOOL_OPTIONS
@@ -1745,6 +1751,8 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8090'
+            - Name: SPRING_FLYWAY_ENABLED
+              Value: 'true'
             - !If
               - IsAppSignalsEnabled
               - Name: JAVA_TOOL_OPTIONS
