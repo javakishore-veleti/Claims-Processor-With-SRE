@@ -19,6 +19,140 @@ Testing plan for validating the three new CloudWatch Application Signals SLO fea
 
 ---
 
+## Architecture — Application Signals Integration
+
+### Data Flow: How Telemetry Reaches CloudWatch
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        AWS Fargate Task                             │
+│                       (awsvpc networking)                           │
+│                                                                     │
+│  ┌──────────────────────────────┐   ┌────────────────────────────┐ │
+│  │    Application Container     │   │   ADOT Collector Sidecar   │ │
+│  │                              │   │                            │ │
+│  │  Spring Boot + ADOT Agent    │   │  aws-otel-collector:latest │ │
+│  │  -javaagent:/opt/aws-otel..  │   │                            │ │
+│  │                              │   │  Receives:                 │ │
+│  │  Profiles:                   │   │    OTLP gRPC :4317         │ │
+│  │    dev,aws,aws-signals       │   │    OTLP HTTP :4318         │ │
+│  │                              │   │                            │ │
+│  │  Emits via OTLP:            │──▶│  Exports to:               │ │
+│  │    Traces (spans)            │   │    → CloudWatch Metrics    │ │
+│  │    Metrics (counters,histo)  │   │    → X-Ray Traces          │ │
+│  │    Logs (structured JSON)    │   │    → Application Signals   │ │
+│  │                              │   │                            │ │
+│  │  OTel Attributes:            │   │  Config:                   │ │
+│  │    service.name              │   │    ecs-default-config.yaml │ │
+│  │    service.namespace         │   │                            │ │
+│  │    deployment.environment    │   │  Essential: false          │ │
+│  │    tenant.id (from header)   │   │  (app runs without it)    │ │
+│  └──────────────────────────────┘   └─────────────┬──────────────┘ │
+└───────────────────────────────────────────────────┼────────────────┘
+                                                    │
+                         ┌──────────────────────────┘
+                         ▼
+        ┌────────────────────────────────────────┐
+        │     CloudWatch Application Signals     │
+        │                                        │
+        │  ┌──────────────┐  ┌────────────────┐  │
+        │  │   Services   │  │  Service Map   │  │
+        │  │  (10 found)  │  │  Portal→API→DB │  │
+        │  └──────────────┘  └────────────────┘  │
+        │                                        │
+        │  ┌──────────────────────────────────┐  │
+        │  │         SLO Engine               │  │
+        │  │                                  │  │
+        │  │  8 SLOs (CloudFormation):        │  │
+        │  │    Availability 99.9% × 4 APIs   │  │
+        │  │    Latency P99 <500ms × 4 APIs   │  │
+        │  │                                  │  │
+        │  │  Error Budget Tracking:          │  │
+        │  │    Fast burn: 14.4x / 1h         │  │
+        │  │    Slow burn: 6x / 6h            │  │
+        │  └──────────────────────────────────┘  │
+        │                                        │
+        │  ┌──────────────────────────────────┐  │
+        │  │    Blog Features (Day 0–30+)     │  │
+        │  │                                  │  │
+        │  │  1. Service-Level SLOs           │  │
+        │  │     Holistic per-service view    │  │
+        │  │                                  │  │
+        │  │  2. SLO Performance Reports      │  │
+        │  │     Daily/weekly/monthly trends  │  │
+        │  │                                  │  │
+        │  │  3. SLO Recommendations (Day30+) │  │
+        │  │     Data-driven target proposals │  │
+        │  └──────────────────────────────────┘  │
+        │                                        │
+        │  ┌──────────────────────────────────┐  │
+        │  │    Per-Tenant Filtering           │  │
+        │  │    tenant.id dimension from       │  │
+        │  │    X-Tenant-Id request header     │  │
+        │  │    via TenantContextSpanProcessor │  │
+        │  └──────────────────────────────────┘  │
+        └────────────────────────────────────────┘
+                         │
+                         ▼
+        ┌────────────────────────────────────────┐
+        │           SNS Alert Topic              │
+        │    SLO breach → email/webhook/Slack    │
+        └────────────────────────────────────────┘
+```
+
+### Feature Toggle Flow: How It Gets Enabled
+
+```
+Developer runs AWS_100 workflow (GitHub Actions UI)
+         │
+         ▼
+┌─ AWS_100_Blog_SLO_20260313.yml ─────────────────────┐
+│                                                       │
+│  1. Pre-flight: verify AWS_99 stacks exist            │
+│  2. Human-in-the-loop approval (GitHub Environment)   │
+│  3. Update observability stack:                       │
+│       EnableApplicationSignals = true                 │
+│       → Creates 8 AWS::CloudWatch::SLO resources      │
+│  4. Update Fargate stack:                             │
+│       EnableApplicationSignals = true                 │
+│       → SPRING_PROFILES_ACTIVE += aws-signals         │
+│       → JAVA_TOOL_OPTIONS = -javaagent:adot.jar       │
+│       → ADOT Collector sidecar added (Essential:false)│
+│       → Rolling deploy of all 10 services             │
+│  5. Verify: check Application Signals metrics         │
+│                                                       │
+│  Disable: re-run with action=disable                  │
+│       → Reverses all above (sidecar removed via       │
+│         AWS::NoValue, agent deactivated, SLOs deleted)│
+└───────────────────────────────────────────────────────┘
+         │
+         │  On destroy:
+         ▼
+┌─ AWS_98_Destroy_All.yml ─────────────────────────────┐
+│  FEATURE_TOGGLES array auto-detects:                  │
+│    "observability:EnableApplicationSignals"            │
+│    "fargate:EnableApplicationSignals"                  │
+│  Disables all toggles → then deletes stacks           │
+│  (Extensible: add future blog toggles to the array)   │
+└───────────────────────────────────────────────────────┘
+```
+
+### Component Map: What Changes Per Module
+
+| Layer | Component | Without Signals (default) | With Signals (AWS_100 enabled) |
+|---|---|---|---|
+| **Docker Image** | ADOT agent JAR | Present but inert (17MB) | Activated via `JAVA_TOOL_OPTIONS` |
+| **Fargate Task** | Containers | 1 (app only) | 2 (app + ADOT Collector sidecar) |
+| **Fargate Task** | Env vars | `SPRING_PROFILES_ACTIVE=dev,aws` | `+ aws-signals`, `JAVA_TOOL_OPTIONS`, `OTEL_RESOURCE_ATTRIBUTES` |
+| **Spring Profile** | `application-aws-signals.yml` | Not activated | OTLP → localhost:4317 (sidecar), resource attributes |
+| **Common-Utils** | `TenantContextSpanProcessor` | Loaded (adds `tenant.id=unknown`) | Adds real `tenant.id` from `X-Tenant-Id` header |
+| **CloudFormation** | observability.yaml | Log groups, alarms, dashboard | + 8 SLO resources (conditioned) |
+| **CloudFormation** | api-gateway-fargate.yaml | Single container tasks | + sidecar, env vars (conditioned) |
+| **IAM** | ECS Task Role | X-Ray, CloudWatch | + `application-signals:*` |
+| **IAM** | Deployer Policy | CloudWatch, logs | + `application-signals:*` |
+
+---
+
 ## What We Have Today (Local Observability)
 
 The platform already has a full **local** SRE stack (Prometheus + Grafana + Alertmanager) with:
