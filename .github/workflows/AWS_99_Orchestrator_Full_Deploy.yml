@@ -28,6 +28,12 @@ on:
         type: string
         default: ''
 
+      enable_nat_gateway:
+        description: 'Use NAT Gateway instead of VPC Endpoints for private subnet internet access (~$32/month). Default: off (VPC Endpoints used — cheaper, AWS-only access)'
+        required: false
+        type: boolean
+        default: false
+
       # ---- COGNITO COMMENTED OUT — uncomment to re-enable ----
       # callback_url:
       #   description: 'Cognito OAuth2 callback URL'
@@ -296,6 +302,7 @@ jobs:
           echo "> **Environment:** \`$ENV\` | **Region:** \`${{ env.AWS_REGION }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Skip flags:** RDS=\`${{ inputs.skip_rds }}\` | Redis=\`${{ inputs.skip_redis }}\` | Messaging=\`${{ inputs.skip_messaging }}\` | EKS=\`${{ inputs.skip_eks }}\` | Build=\`${{ inputs.skip_build }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Networking:** NAT Gateway=\`${{ inputs.enable_nat_gateway }}\` (false = VPC Endpoints, true = NAT Gateway)" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 1  VPC & SECURITY GROUPS
@@ -319,9 +326,14 @@ jobs:
           PRJ: ${{ env.PROJECT_NAME }}
           USE_EXISTING: ${{ inputs.use_existing_vpc }}
           EXISTING_VPC: ${{ inputs.existing_vpc_id }}
+          NAT_GW: ${{ inputs.enable_nat_gateway }}
         run: |
           CREATE_NEW="true"
           [[ "${USE_EXISTING}" == "true" && -n "${EXISTING_VPC}" ]] && CREATE_NEW="false"
+
+          # Map boolean to CloudFormation string parameter
+          CREATE_NAT="false"
+          [[ "${NAT_GW}" == "true" ]] && CREATE_NAT="true"
 
           STACK="${PRJ}-${ENV}-vpc-sg"
 
@@ -334,6 +346,12 @@ jobs:
             aws cloudformation wait stack-delete-complete --stack-name "$STACK"
           fi
 
+          if [[ "${CREATE_NAT}" == "true" ]]; then
+            echo "::notice::Using NAT Gateway for private subnet internet access"
+          else
+            echo "::notice::Using VPC Endpoints for private subnet AWS service access (Secrets Manager, ECR, CloudWatch Logs, S3)"
+          fi
+
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/vpc-security-groups.yaml \
             --stack-name "$STACK" \
@@ -341,11 +359,17 @@ jobs:
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
               CreateNewVpc="${CREATE_NEW}" \
+              CreateNatGateway="${CREATE_NAT}" \
               ExistingVpcId="${EXISTING_VPC}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 
           echo "### ✅ Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${CREATE_NAT}" == "true" ]]; then
+            echo "🔗 **Networking:** NAT Gateway (full internet access from private subnets)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "🔗 **Networking:** VPC Endpoints (Secrets Manager, ECR, CloudWatch Logs, S3)" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   # ───────────────────────────────────────────────────────────────────────────
   # 2a  RDS POSTGRESQL (needs VPC)

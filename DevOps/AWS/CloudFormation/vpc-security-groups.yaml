@@ -43,9 +43,10 @@ Parameters:
       - 'false'
     Description: >
       Whether to create a NAT Gateway for private subnet outbound internet access.
-      Set to 'false' for dev/test environments to save cost (~$32/month) and avoid
-      Elastic IP limits. Private subnets will have no outbound internet access when false.
-      Set to 'true' for staging/prod where services need outbound internet from private subnets.
+      When false (default), VPC Endpoints are created instead for AWS service access
+      (ECR, Secrets Manager, CloudWatch Logs, S3) — cheaper and more secure.
+      Set to 'true' for staging/prod where services need general outbound internet
+      from private subnets (~$32/month + data processing charges).
 
   ExistingVpcId:
     Type: String
@@ -92,6 +93,11 @@ Conditions:
   ShouldCreateNatGateway: !And
     - !Condition ShouldCreateVpc
     - !Equals [ !Ref CreateNatGateway, 'true' ]
+  # VPC Endpoints are created when: new VPC AND no NAT Gateway
+  # (NAT Gateway provides full internet access, making endpoints redundant)
+  ShouldCreateVpcEndpoints: !And
+    - !Condition ShouldCreateVpc
+    - !Not [ !Equals [ !Ref CreateNatGateway, 'true' ] ]
 
 # ===========================================================================
 # Resources
@@ -476,6 +482,167 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-${Environment}-sg-opensearch'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # -------------------------------------------------------------------------
+  # VPC Endpoints (created when no NAT Gateway — provides AWS service access
+  # from private subnets without internet access)
+  # ECS Fargate in private subnets needs these to:
+  #   - Pull secrets from Secrets Manager
+  #   - Pull Docker images from ECR
+  #   - Push logs to CloudWatch Logs
+  #   - Pull image layers from S3 (ECR uses S3 for layer storage)
+  # -------------------------------------------------------------------------
+
+  # Security Group for VPC Interface Endpoints (allows HTTPS from App tier)
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      GroupDescription: !Sub '${ProjectName}-${Environment} - VPC Endpoint security group (HTTPS from App and private subnets)'
+      GroupName: !Sub '${ProjectName}-${Environment}-sg-vpce'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: Allow HTTPS from application tier to VPC Endpoints
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.10.0/24
+          Description: Allow HTTPS from private subnet 1
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.20.0/24
+          Description: Allow HTTPS from private subnet 2
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-sg-vpce'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # --- Secrets Manager Endpoint (Interface) ---
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      VpcId: !Ref VPC
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-vpce-secretsmanager'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # --- ECR API Endpoint (Interface) ---
+  ECRApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      VpcId: !Ref VPC
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-vpce-ecr-api'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # --- ECR Docker Endpoint (Interface) ---
+  ECRDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      VpcId: !Ref VPC
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-vpce-ecr-dkr'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # --- CloudWatch Logs Endpoint (Interface) ---
+  CloudWatchLogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
+      VpcId: !Ref VPC
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-vpce-logs'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # --- S3 Endpoint (Gateway — free, no per-hour charge) ---
+  # ECR stores Docker image layers in S3; Fargate needs this to pull images
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcEndpointType: Gateway
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcId: !Ref VPC
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-vpce-s3'
         - Key: Project
           Value: !Ref ProjectName
         - Key: Environment
