@@ -36,6 +36,7 @@ spring:
   flyway:
     enabled: ${FLYWAY_ENABLED:false}
     baseline-on-migrate: true
+    baseline-version: 0
     locations: classpath:db/migration
     table: flyway_schema_history_tenants
   security:
