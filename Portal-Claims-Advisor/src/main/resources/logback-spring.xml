@@ -45,7 +45,7 @@
     </springProfile>
 
     <!-- Dev profile: JSON console + JSON file for local ES shipping via Filebeat -->
-    <springProfile name="dev & !aws & !azure & !gcp">
+    <springProfile name="dev &amp; !aws &amp; !azure &amp; !gcp">
         <root level="INFO">
             <appender-ref ref="JSON_CONSOLE"/>
             <appender-ref ref="JSON_FILE"/>
