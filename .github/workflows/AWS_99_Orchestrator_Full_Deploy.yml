@@ -1288,16 +1288,54 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --disable-rollback
 
-          echo "Waiting for stack creation (this may take 10-15 minutes)..."
-          aws cloudformation wait stack-create-complete --stack-name "$STACK" 2>/dev/null || true
+          # Poll stack status every 30s with a 20-minute timeout
+          # (much faster feedback than `aws cloudformation wait` which has a 60-min fixed timeout)
+          MAX_WAIT=1200  # 20 minutes
+          ELAPSED=0
+          INTERVAL=30
 
-          # Check final status
+          echo "Waiting for stack creation (polling every ${INTERVAL}s, timeout ${MAX_WAIT}s)..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+              --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "UNKNOWN")
+
+            case "$STATUS" in
+              CREATE_COMPLETE)
+                echo "Stack creation complete! (${ELAPSED}s)"
+                break
+                ;;
+              CREATE_FAILED|ROLLBACK_IN_PROGRESS|ROLLBACK_COMPLETE)
+                echo "::error::Stack ${STACK} failed with status: ${STATUS} (${ELAPSED}s)"
+
+                # Show which resources failed
+                aws cloudformation describe-stack-events --stack-name "$STACK" \
+                  --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].[LogicalResourceId,ResourceStatusReason]" \
+                  --output table 2>/dev/null || true
+
+                exit 1
+                ;;
+              CREATE_IN_PROGRESS)
+                # Show progress: count completed vs total resources
+                DONE=$(aws cloudformation describe-stack-events --stack-name "$STACK" \
+                  --query "length(StackEvents[?ResourceStatus=='CREATE_COMPLETE'])" --output text 2>/dev/null || echo "?")
+                echo "  [${ELAPSED}s] ${STATUS} — ${DONE} resources created so far..."
+                ;;
+              *)
+                echo "  [${ELAPSED}s] Unexpected status: ${STATUS}"
+                ;;
+            esac
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          # Final check
           FINAL_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
             --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "UNKNOWN")
-          echo "Stack status: ${FINAL_STATUS}"
 
           if [[ "$FINAL_STATUS" != "CREATE_COMPLETE" ]]; then
-            echo "::error::Stack ${STACK} ended in ${FINAL_STATUS} (--disable-rollback keeps resources for inspection)"
+            echo "::error::Stack ${STACK} timed out or failed (status: ${FINAL_STATUS} after ${ELAPSED}s)"
+            echo "::notice::Stack left with --disable-rollback for inspection. Delete manually before next deploy."
             exit 1
           fi
 
