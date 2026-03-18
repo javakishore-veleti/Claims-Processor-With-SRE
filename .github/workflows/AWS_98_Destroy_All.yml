@@ -13,7 +13,7 @@
 #   6. auth             (Cognito)
 #   7. observability    (CloudWatch dashboards, alarms, log groups)
 #   8. core-infra       (RDS, S3, ElastiCache, ECR)
-#   9. vpc-sg           (VPC, subnets, NAT, security groups)
+#   9. vpc-sg           (VPC, subnets, NAT/VPC Endpoints, security groups)
 # =============================================================================
 name: "AWS_98 - Destroy All AWS Resources"
 
@@ -823,7 +823,7 @@ jobs:
           echo "| 9 | \`${PREFIX}-rds\` | RDS PostgreSQL |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 10 | \`${PREFIX}-s3\` | S3 buckets |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 11 | \`${PREFIX}-ecr\` | ECR repositories |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 12 | \`${PREFIX}-vpc-sg\` | VPC, subnets, NAT, security groups |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 12 | \`${PREFIX}-vpc-sg\` | VPC, subnets, NAT/VPC Endpoints, security groups |" >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "${{ steps.verify.outputs.remaining_count }}" -gt "0" ]]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
