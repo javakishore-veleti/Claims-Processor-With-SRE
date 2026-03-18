@@ -34,15 +34,18 @@ The platform already has a full **local** SRE stack (Prometheus + Grafana + Aler
 
 ## Phase 0: Prerequisites (Enable Application Signals)
 
-| # | Task | Module(s) | Status | Est. | Notes |
-|---|---|---|---|---|---|
-| 0.1 | Add ADOT Java auto-instrumentation agent to Dockerfiles | All 10 Dockerfiles | NOT STARTED | 1h | Download ADOT agent in build stage, add `-javaagent:/opt/aws-opentelemetry-agent.jar` to ENTRYPOINT |
-| 0.2 | Add ADOT Collector as Fargate sidecar container | api-gateway-fargate.yaml | NOT STARTED | 2h | Add `aws-otel-collector` sidecar to all 10 task definitions; shared `awsvpc` networking makes localhost:4317 reachable |
-| 0.3 | Enable Application Signals discovery in CloudFormation | observability.yaml | NOT STARTED | 30m | `AWS::ApplicationSignals::Discovery` resource |
-| 0.4 | Add IAM permissions for Application Signals | CloudFormation + IAM policies | NOT STARTED | 30m | `application-signals:*` (X-Ray permissions already exist in task role) |
-| 0.5 | Create new `application-aws-signals.yml` Spring profile | All 10 modules | NOT STARTED | 1.5h | New profile activated as `dev,aws,aws-signals` or `prod,aws,aws-signals`; OTLP endpoint → `localhost:4317` (ADOT sidecar); env-specific sampling rates (dev=1.0, staging=0.5, prod=0.1); local/dev Jaeger/Zipkin unaffected |
-| 0.6 | Add `tenantId` as OTel resource attribute for per-tenant filtering | Common-Utils | NOT STARTED | 1h | OTel resource attribute via `TenantContextSpanProcessor`; enables per-tenant SLO tracking in Application Signals |
-| 0.7 | Create `AWS::CloudWatch::ServiceLevelObjective` resources in CloudFormation | observability.yaml | NOT STARTED | 1.5h | Availability SLO (99.9%) + Latency P99 SLO (<500ms) per API service (8 SLOs total) |
+All Phase 0 tasks are implemented as **feature toggles** — nothing is hardcoded. Enable via `AWS_100_Blog_SLO_20260313.yml` workflow (human-in-the-loop approval). Disable at any time by re-running with `action=disable`. Dockerfiles are fully reusable without Application Signals (ADOT agent is inert unless `JAVA_TOOL_OPTIONS` env var is set).
+
+| # | Task | Module(s) | Status | Notes |
+|---|---|---|---|---|
+| 0.1 | Add ADOT Java auto-instrumentation agent to Dockerfiles | All 10 Dockerfiles | COMPLETED | Agent downloaded at build time, activated only via `JAVA_TOOL_OPTIONS` env var in Fargate |
+| 0.2 | Add ADOT Collector as Fargate sidecar container | api-gateway-fargate.yaml | COMPLETED | Feature-toggled via `EnableApplicationSignals` param; `!If`+`AWS::NoValue` pattern — sidecar removed when disabled |
+| 0.3 | Enable Application Signals SLO resources in CloudFormation | observability.yaml | COMPLETED | 8 `AWS::CloudWatch::ServiceLevelObjective` resources, conditioned on `IsAppSignalsEnabled` |
+| 0.4 | Add IAM permissions for Application Signals | CloudFormation + IAM policies | COMPLETED | `application-signals:*` in ECS Task Role + deployer IAM policy (X-Ray already existed) |
+| 0.5 | Create new `application-aws-signals.yml` Spring profile | All 10 modules | COMPLETED | Activated as `dev,aws,aws-signals`; OTLP → `localhost:4317` (ADOT sidecar); env-specific sampling via `TRACING_SAMPLING_PROBABILITY` |
+| 0.6 | Add `tenantId` as OTel resource attribute for per-tenant filtering | Common-Utils | COMPLETED | `TenantContextSpanProcessor` reads `X-Tenant-Id` header → low-cardinality `tenant.id` span attribute |
+| 0.7 | Create `AWS_100_Blog_SLO_20260313.yml` GitHub Actions workflow | .github/workflows | COMPLETED | Human-in-the-loop approval, enable/disable toggle, updates both observability + Fargate stacks, verifies metrics |
+| 0.8 | Update AWS_98 to detect and clean up blog feature toggles | .github/workflows | COMPLETED | Dynamic `FEATURE_TOGGLES` array — disables all blog toggles before stack deletion; extensible for future blogs |
 
 ---
 
@@ -134,14 +137,14 @@ Assumes GitHub Actions has deployed the Fargate services via CloudFormation (`AW
 
 | Phase | Tasks | Completed | Remaining |
 |---|---|---|---|
-| Phase 0 — Prerequisites | 7 | 0 | 7 |
+| Phase 0 — Prerequisites | 8 | **8** | 0 |
 | Phase 1 — Smoke Tests | 5 | 0 | 5 |
 | Phase 2 — SLO Definition | 5 | 0 | 5 |
 | Phase 3 — Breach Testing | 5 | 0 | 5 |
 | Phase 4 — Performance Reports | 4 | 0 | 4 |
 | Phase 5 — SLO Recommendations | 4 | 0 | 4 |
 | Phase 6 — Multi-Tenant SLOs | 4 | 0 | 4 |
-| **TOTAL** | **34** | **0** | **34** |
+| **TOTAL** | **35** | **8** | **27** |
 
 ---
 

@@ -711,12 +711,20 @@ jobs:
         run: |
           STACK="${PRJ}-${ENV}-observability"
 
+          # Preserve EnableApplicationSignals if previously set by AWS_100
+          SIGNALS_STATE=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query "Stacks[0].Parameters[?ParameterKey=='EnableApplicationSignals'].ParameterValue | [0]" \
+            --output text 2>/dev/null || echo "false")
+          [[ "$SIGNALS_STATE" == "None" || -z "$SIGNALS_STATE" ]] && SIGNALS_STATE="false"
+
           aws cloudformation deploy \
             --template-file DevOps/AWS/CloudFormation/observability.yaml \
             --stack-name "$STACK" \
             --parameter-overrides \
               Environment="${ENV}" \
               ProjectName="${PRJ}" \
+              EnableApplicationSignals="${SIGNALS_STATE}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
 

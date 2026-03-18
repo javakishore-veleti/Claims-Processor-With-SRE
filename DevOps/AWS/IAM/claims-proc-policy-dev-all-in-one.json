@@ -42,7 +42,9 @@
         "cloudwatch:*",
         "logs:*",
         "sns:*",
-        "cloudtrail:*"
+        "cloudtrail:*",
+        "application-signals:*",
+        "xray:*"
       ],
       "Resource": "*"
     },

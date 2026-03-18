@@ -330,6 +330,76 @@ jobs:
         run: echo "::notice::Cognito disabled — uncomment step 8 to re-enable."
 
       # -------------------------------------------------------------------
+      # 8a. Disable blog/extension features before stack deletion
+      #     Blog workflows (AWS_100+) may have enabled feature toggles on
+      #     existing stacks.  We check each known toggle and disable it
+      #     so that conditional CloudFormation resources are removed cleanly
+      #     before the stack itself is deleted.
+      #
+      #     To add a new blog workflow:
+      #       1. Add an entry to FEATURE_TOGGLES array below
+      #       2. Format: "stack_suffix:parameter_name"
+      # -------------------------------------------------------------------
+      - name: "Disable blog/extension feature toggles"
+        continue-on-error: true
+        run: |
+          ENV="${{ inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+
+          # ── Register all blog/extension feature toggles here ──
+          # Format: "stack-suffix:ParameterName"
+          FEATURE_TOGGLES=(
+            "observability:EnableApplicationSignals"    # AWS_100 — Blog SLO 2026-03-13
+            "fargate:EnableApplicationSignals"          # AWS_100 — Blog SLO 2026-03-13
+            # Add future blog toggles below:
+            # "fargate:EnableChaosEngineering"          # AWS_101 — example
+          )
+
+          for TOGGLE in "${FEATURE_TOGGLES[@]}"; do
+            STACK_SUFFIX="${TOGGLE%%:*}"
+            PARAM_NAME="${TOGGLE##*:}"
+            STACK="${PRJ}-${ENV}-${STACK_SUFFIX}"
+
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+            if [[ "$STATUS" == "NOT_FOUND" ]]; then
+              echo "[SKIP] ${STACK} not found"
+              continue
+            fi
+
+            CURRENT=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query "Stacks[0].Parameters[?ParameterKey=='${PARAM_NAME}'].ParameterValue | [0]" \
+              --output text 2>/dev/null || echo "false")
+            [[ "$CURRENT" == "None" || -z "$CURRENT" ]] && CURRENT="false"
+
+            if [[ "$CURRENT" == "true" ]]; then
+              echo "[DISABLE] ${STACK} → ${PARAM_NAME}=false"
+              aws cloudformation update-stack \
+                --stack-name "$STACK" \
+                --use-previous-template \
+                --capabilities CAPABILITY_NAMED_IAM \
+                --parameters \
+                  ParameterKey="${PARAM_NAME}",ParameterValue=false \
+                  $(aws cloudformation describe-stacks --stack-name "$STACK" \
+                    --query "Stacks[0].Parameters[?ParameterKey!='${PARAM_NAME}'].{ParameterKey:ParameterKey}" \
+                    --output text 2>/dev/null | while read KEY; do
+                      echo "ParameterKey=${KEY},UsePreviousValue=true"
+                    done | tr '\n' ' ') \
+                2>/dev/null || true
+              echo "  Waiting for update..."
+              aws cloudformation wait stack-update-complete --stack-name "$STACK" 2>/dev/null || true
+              echo "  Done."
+            else
+              echo "[OK]   ${STACK} → ${PARAM_NAME} already false"
+            fi
+          done
+
+          echo "Blog/extension feature toggles disabled."
+
+      # -------------------------------------------------------------------
       # 8b. Empty CloudTrail S3 bucket before observability stack deletion
       # -------------------------------------------------------------------
       - name: "Empty CloudTrail S3 bucket"

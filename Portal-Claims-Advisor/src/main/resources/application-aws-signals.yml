@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# AWS CloudWatch Application Signals profile
+# Activated as: dev,aws,aws-signals  OR  prod,aws,aws-signals
+# Configures OTLP export to the ADOT Collector sidecar running in the same
+# Fargate task (localhost:4317).  Local Jaeger/Zipkin remain unaffected.
+#
+# Ref: https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/
+# ---------------------------------------------------------------------------
+
+management:
+  tracing:
+    sampling:
+      # Override per environment via TRACING_SAMPLING_PROBABILITY env var
+      # dev=1.0 (all traces), staging=0.5 (half), prod=0.1 (10%)
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: w3c
+  otlp:
+    tracing:
+      # ADOT Collector sidecar in the same Fargate task (awsvpc → localhost)
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+    metrics:
+      # ADOT Collector also receives metrics via OTLP
+      endpoint: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://localhost:4317}
+
+# OpenTelemetry resource attributes for Application Signals
+otel:
+  service:
+    name: ${spring.application.name}
+  resource:
+    attributes:
+      # Required for Application Signals service discovery
+      aws.log.group.names: ${AWS_LOG_GROUP:/${PROJECT_NAME:claims-proc}/${ENVIRONMENT:dev}/ecs}
+      deployment.environment: ${ENVIRONMENT:dev}
+      service.namespace: ${PROJECT_NAME:claims-proc}
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      protocol: grpc

@@ -112,6 +112,15 @@ Parameters:
     Default: ''
     Description: Cognito User Pool ID for authentication (optional)
 
+  EnableApplicationSignals:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Enable CloudWatch Application Signals (ADOT agent + collector sidecar).
+      Adds aws-signals Spring profile, ADOT Java agent, and ADOT Collector sidecar.
+      Ref: https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/
+
 # ===========================================================================
 # Conditions
 # ===========================================================================
@@ -119,6 +128,7 @@ Conditions:
   HasCognitoUserPool: !Not [!Equals [!Ref CognitoUserPoolId, '']]
   IsProd: !Equals [!Ref Environment, 'prod']
   IsNotProd: !Not [!Equals [!Ref Environment, 'prod']]
+  IsAppSignalsEnabled: !Equals [!Ref EnableApplicationSignals, 'true']
 
 # ===========================================================================
 # Resources
@@ -296,6 +306,22 @@ Resources:
               - Effect: Allow
                 Action:
                   - cloudwatch:PutMetricData
+                Resource: '*'
+        - PolicyName: ApplicationSignals
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - application-signals:BatchGetServiceLevelObjectiveBudgetReport
+                  - application-signals:CreateServiceLevelObjective
+                  - application-signals:DeleteServiceLevelObjective
+                  - application-signals:GetService
+                  - application-signals:GetServiceLevelObjective
+                  - application-signals:ListServiceLevelObjectives
+                  - application-signals:ListServices
+                  - application-signals:UpdateServiceLevelObjective
+                  - application-signals:StartDiscovery
                 Resource: '*'
       Tags:
         - Key: Project
@@ -795,9 +821,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8081'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=portal-claims-advisor,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -821,6 +870,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: portal-claims-advisor
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: portal-claims-advisor
@@ -855,9 +922,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8082'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=portal-claims-member,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -881,6 +971,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: portal-claims-member
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: portal-claims-member
@@ -915,9 +1023,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8083'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=api-claims,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -941,6 +1072,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: api-claims
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: api-claims
@@ -975,9 +1124,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8084'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=api-members,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1001,6 +1173,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: api-members
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: api-members
@@ -1035,9 +1225,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8085'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=portal-batch-assignment,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1061,6 +1274,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: portal-batch-assignment
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: portal-batch-assignment
@@ -1095,9 +1326,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8086'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=api-tenants,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1121,6 +1375,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: api-tenants
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: api-tenants
@@ -1155,9 +1427,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8087'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=api-entitlements,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1181,6 +1476,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: api-entitlements
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: api-entitlements
@@ -1215,9 +1528,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8088'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=portal-tenants,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1241,6 +1577,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: portal-tenants
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: portal-tenants
@@ -1275,9 +1629,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8089'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=portal-entitlements,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1301,6 +1678,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: portal-entitlements
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: portal-entitlements
@@ -1335,9 +1730,32 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Sub '${Environment},aws'
+              Value: !If
+                - IsAppSignalsEnabled
+                - !Sub '${Environment},aws,aws-signals'
+                - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8090'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: JAVA_TOOL_OPTIONS
+                Value: '-javaagent:/opt/aws-opentelemetry-agent.jar'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: OTEL_RESOURCE_ATTRIBUTES
+                Value: !Sub 'service.name=portal-sre,service.namespace=${ProjectName},deployment.environment=${Environment}'
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - !Ref 'AWS::NoValue'
+            - !If
+              - IsAppSignalsEnabled
+              - Name: PROJECT_NAME
+                Value: !Ref ProjectName
+              - !Ref 'AWS::NoValue'
           Secrets:
             - Name: SPRING_DATASOURCE_URL
               ValueFrom: !Sub '${RDSSecretArn}:jdbc_url::'
@@ -1361,6 +1779,24 @@ Resources:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref AWSRegion
               awslogs-stream-prefix: portal-sre
+        - !If
+          - IsAppSignalsEnabled
+          - Name: adot-collector
+            Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+            Essential: false
+            Command: ['--config=/etc/ecs/ecs-default-config.yaml']
+            PortMappings:
+              - ContainerPort: 4317
+                Protocol: tcp
+              - ContainerPort: 4318
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref ECSLogGroup
+                awslogs-region: !Ref AWSRegion
+                awslogs-stream-prefix: adot-collector
+          - !Ref 'AWS::NoValue'
       Tags:
         - Key: Module
           Value: portal-sre

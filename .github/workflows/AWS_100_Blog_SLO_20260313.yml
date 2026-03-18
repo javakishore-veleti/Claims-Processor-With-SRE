@@ -1,0 +1,384 @@
+# =============================================================================
+# AWS_100 — CloudWatch Application Signals SLO (Blog: 2026-03-13)
+#
+# Standalone workflow to enable CloudWatch Application Signals on an existing
+# Fargate deployment.  NOT included in AWS_99 (create) — run independently
+# when you want Application Signals.  AWS_98 (destroy) and AWS_99 are aware
+# of this stack and will clean it up / detect it.
+#
+# Blog: https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/
+#
+# What this does:
+#   1. Updates the observability stack with EnableApplicationSignals=true
+#      → Creates 8 SLOs (Availability + Latency P99 × 4 API services)
+#   2. Updates the Fargate stack with EnableApplicationSignals=true
+#      → Adds ADOT sidecar, activates ADOT agent, adds aws-signals profile
+#   3. Verifies Application Signals metrics are flowing
+#
+# Human-in-the-loop: Requires manual approval before applying changes.
+# =============================================================================
+name: "AWS_100 — Blog: Application Signals SLO (2026-03-13)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+
+      action:
+        description: 'Enable or disable Application Signals'
+        required: true
+        type: choice
+        options:
+          - enable
+          - disable
+
+env:
+  AWS_REGION: ${{ vars.CLAIMS_PROC_AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.CLAIMS_PROC_PROJECT_NAME || 'claims-proc' }}
+
+jobs:
+
+  # =========================================================================
+  # Job 1: Pre-flight checks
+  # =========================================================================
+  preflight:
+    name: "Pre-flight — verify prerequisites"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      observability_exists: ${{ steps.check.outputs.observability_exists }}
+      fargate_exists: ${{ steps.check.outputs.fargate_exists }}
+      current_signals_state: ${{ steps.check.outputs.current_signals_state }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check prerequisite stacks
+        id: check
+        run: |
+          ENV="${{ inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+
+          # Check observability stack
+          OBS_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${PRJ}-${ENV}-observability" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          # Check fargate stack
+          FG_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "${PRJ}-${ENV}-fargate" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          # Check current Application Signals state from observability stack
+          CURRENT_STATE="false"
+          if [[ "$OBS_STATUS" != "NOT_FOUND" ]]; then
+            CURRENT_STATE=$(aws cloudformation describe-stacks \
+              --stack-name "${PRJ}-${ENV}-observability" \
+              --query "Stacks[0].Parameters[?ParameterKey=='EnableApplicationSignals'].ParameterValue | [0]" \
+              --output text 2>/dev/null || echo "false")
+            [[ "$CURRENT_STATE" == "None" ]] && CURRENT_STATE="false"
+          fi
+
+          echo "observability_exists=$( [[ $OBS_STATUS != 'NOT_FOUND' ]] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "fargate_exists=$( [[ $FG_STATUS != 'NOT_FOUND' ]] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "current_signals_state=${CURRENT_STATE}" >> "$GITHUB_OUTPUT"
+
+          echo "=== Pre-flight Summary ==="
+          echo "  Observability stack: ${OBS_STATUS}"
+          echo "  Fargate stack:       ${FG_STATUS}"
+          echo "  Current signals:     ${CURRENT_STATE}"
+          echo "  Requested action:    ${{ inputs.action }}"
+
+          if [[ "$OBS_STATUS" == "NOT_FOUND" || "$FG_STATUS" == "NOT_FOUND" ]]; then
+            echo "::error::Both observability and fargate stacks must exist. Run AWS_99 first."
+            exit 1
+          fi
+
+          if [[ "${{ inputs.action }}" == "enable" && "$CURRENT_STATE" == "true" ]]; then
+            echo "::notice::Application Signals is already enabled. Stack update will be a no-op."
+          fi
+
+          if [[ "${{ inputs.action }}" == "disable" && "$CURRENT_STATE" == "false" ]]; then
+            echo "::notice::Application Signals is already disabled. Stack update will be a no-op."
+          fi
+
+  # =========================================================================
+  # Job 2: Human-in-the-loop approval
+  # =========================================================================
+  approve:
+    name: "Approve — ${{ inputs.action }} Application Signals on ${{ inputs.environment }}"
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}-approval
+
+    steps:
+      - name: Approval gate
+        run: |
+          echo "============================================"
+          echo "  APPROVED: ${{ inputs.action }} Application Signals"
+          echo "  Environment: ${{ inputs.environment }}"
+          echo "  Current state: ${{ needs.preflight.outputs.current_signals_state }}"
+          echo "============================================"
+
+  # =========================================================================
+  # Job 3: Update observability stack (SLO resources)
+  # =========================================================================
+  update-observability:
+    name: "Update observability stack"
+    needs: [preflight, approve]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update observability stack with Application Signals toggle
+        run: |
+          ENV="${{ inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          STACK="${PRJ}-${ENV}-observability"
+          ENABLE_FLAG=$( [[ "${{ inputs.action }}" == "enable" ]] && echo "true" || echo "false" )
+          RETENTION=$( [[ "$ENV" == "prod" ]] && echo 90 || echo 30 )
+
+          echo "Updating ${STACK} — EnableApplicationSignals=${ENABLE_FLAG}"
+
+          aws cloudformation update-stack \
+            --stack-name "$STACK" \
+            --template-body file://DevOps/AWS/CloudFormation/observability.yaml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameters \
+              ParameterKey=Environment,ParameterValue="${ENV}" \
+              ParameterKey=ProjectName,ParameterValue="${PRJ}" \
+              ParameterKey=LogRetentionDays,ParameterValue="${RETENTION}" \
+              ParameterKey=EnableApplicationSignals,ParameterValue="${ENABLE_FLAG}" \
+            2>&1 || {
+              MSG=$(cat)
+              if echo "$MSG" | grep -q "No updates are to be performed"; then
+                echo "::notice::No changes needed for observability stack."
+              else
+                echo "::error::${MSG}"
+                exit 1
+              fi
+            }
+
+          echo "Waiting for stack update to complete..."
+          aws cloudformation wait stack-update-complete --stack-name "$STACK" 2>/dev/null || true
+          echo "Observability stack updated."
+
+  # =========================================================================
+  # Job 4: Update Fargate stack (ADOT sidecar + agent + profile)
+  # =========================================================================
+  update-fargate:
+    name: "Update Fargate stack"
+    needs: [preflight, approve, update-observability]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Read current Fargate stack parameters
+        id: params
+        run: |
+          ENV="${{ inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          STACK="${PRJ}-${ENV}-fargate"
+
+          # Read all existing parameters to preserve them
+          aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query 'Stacks[0].Parameters' \
+            --output json > /tmp/current-params.json
+
+          echo "Current Fargate parameters:"
+          cat /tmp/current-params.json | python3 -c "
+          import json, sys
+          params = json.load(sys.stdin)
+          for p in params:
+              print(f\"  {p['ParameterKey']}: {p.get('ParameterValue', '(resolved)')}\")
+          "
+
+      - name: Update Fargate stack with Application Signals toggle
+        run: |
+          ENV="${{ inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+          STACK="${PRJ}-${ENV}-fargate"
+          ENABLE_FLAG=$( [[ "${{ inputs.action }}" == "enable" ]] && echo "true" || echo "false" )
+
+          echo "Updating ${STACK} — EnableApplicationSignals=${ENABLE_FLAG}"
+
+          # Use existing parameter values for everything except the toggle
+          aws cloudformation update-stack \
+            --stack-name "$STACK" \
+            --template-body file://DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameters \
+              ParameterKey=Environment,UsePreviousValue=true \
+              ParameterKey=ProjectName,UsePreviousValue=true \
+              ParameterKey=VpcId,UsePreviousValue=true \
+              ParameterKey=PublicSubnet1,UsePreviousValue=true \
+              ParameterKey=PublicSubnet2,UsePreviousValue=true \
+              ParameterKey=PrivateSubnet1,UsePreviousValue=true \
+              ParameterKey=PrivateSubnet2,UsePreviousValue=true \
+              ParameterKey=AppSecurityGroupId,UsePreviousValue=true \
+              ParameterKey=ALBSecurityGroupId,UsePreviousValue=true \
+              ParameterKey=FargateTaskCpu,UsePreviousValue=true \
+              ParameterKey=FargateTaskMemory,UsePreviousValue=true \
+              ParameterKey=DesiredServiceCount,UsePreviousValue=true \
+              ParameterKey=ImageTag,UsePreviousValue=true \
+              ParameterKey=ECRRepoPrefix,UsePreviousValue=true \
+              ParameterKey=AWSAccountId,UsePreviousValue=true \
+              ParameterKey=AWSRegion,UsePreviousValue=true \
+              ParameterKey=RDSSecretArn,UsePreviousValue=true \
+              ParameterKey=RedisSecretArn,UsePreviousValue=true \
+              ParameterKey=CognitoUserPoolId,UsePreviousValue=true \
+              ParameterKey=EnableApplicationSignals,ParameterValue="${ENABLE_FLAG}" \
+            2>&1 || {
+              MSG=$(cat)
+              if echo "$MSG" | grep -q "No updates are to be performed"; then
+                echo "::notice::No changes needed for Fargate stack."
+              else
+                echo "::error::${MSG}"
+                exit 1
+              fi
+            }
+
+          echo "Waiting for Fargate stack update (this will trigger rolling deploys)..."
+          aws cloudformation wait stack-update-complete --stack-name "$STACK" 2>/dev/null || true
+          echo "Fargate stack updated. Services are redeploying with new task definitions."
+
+  # =========================================================================
+  # Job 5: Verify Application Signals
+  # =========================================================================
+  verify:
+    name: "Verify Application Signals"
+    needs: [update-fargate]
+    if: inputs.action == 'enable'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CLAIMS_PROC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CLAIMS_PROC_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Wait for services to stabilize
+        run: |
+          echo "Waiting 120s for Fargate services to finish rolling deploy..."
+          sleep 120
+
+      - name: Check Application Signals metrics
+        continue-on-error: true
+        run: |
+          echo "=== Checking Application Signals Metrics ==="
+
+          METRICS=$(aws cloudwatch list-metrics \
+            --namespace "ApplicationSignals" \
+            --query 'Metrics[*].MetricName' \
+            --output text 2>/dev/null || echo "NONE")
+
+          if [[ "$METRICS" == "NONE" || -z "$METRICS" ]]; then
+            echo "::warning::No Application Signals metrics found yet."
+            echo "This is expected — it may take 5-10 minutes for the first metrics to appear."
+            echo "Check CloudWatch Console → Application Signals → Services manually."
+          else
+            echo "Application Signals metrics detected:"
+            echo "$METRICS" | tr '\t' '\n' | sort -u | head -20
+          fi
+
+      - name: Check SLO resources
+        continue-on-error: true
+        run: |
+          ENV="${{ inputs.environment }}"
+          PRJ="${{ env.PROJECT_NAME }}"
+
+          echo "=== Checking SLO Resources ==="
+
+          SLOS=$(aws cloudwatch describe-service-level-objectives \
+            --query 'SloSummaries[*].Name' \
+            --output text 2>/dev/null || echo "NONE")
+
+          if [[ "$SLOS" == "NONE" || -z "$SLOS" ]]; then
+            echo "::warning::No SLOs found via API. They may still be provisioning."
+            echo "Check CloudWatch Console → Application Signals → SLOs."
+          else
+            echo "SLOs found:"
+            echo "$SLOS" | tr '\t' '\n' | grep "${PRJ}" | while read -r SLO; do
+              echo "  - ${SLO}"
+            done
+          fi
+
+  # =========================================================================
+  # Summary
+  # =========================================================================
+  summary:
+    name: "Summary"
+    needs: [preflight, update-observability, update-fargate]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write summary
+        run: |
+          ENV="${{ inputs.environment }}"
+          ACTION="${{ inputs.action }}"
+          PREV="${{ needs.preflight.outputs.current_signals_state }}"
+
+          echo "## AWS_100 — Application Signals SLO" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Setting | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Environment** | \`${ENV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Action** | \`${ACTION}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Previous state** | \`${PREV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$ACTION" == "enable" ]]; then
+            echo "### What was enabled" >> "$GITHUB_STEP_SUMMARY"
+            echo "- ADOT Java auto-instrumentation agent on all 10 Fargate services" >> "$GITHUB_STEP_SUMMARY"
+            echo "- ADOT Collector sidecar in each task definition" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`aws-signals\` Spring profile for OTLP → ADOT routing" >> "$GITHUB_STEP_SUMMARY"
+            echo "- 8 SLOs: Availability (99.9%) + Latency P99 (<500ms) × 4 API services" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Next steps" >> "$GITHUB_STEP_SUMMARY"
+            echo "1. Check CloudWatch Console → Application Signals → Services (allow 5-10 min)" >> "$GITHUB_STEP_SUMMARY"
+            echo "2. Check Application Signals → SLOs for the 8 SLO definitions" >> "$GITHUB_STEP_SUMMARY"
+            echo "3. After 30 days → check SLO Recommendations (blog headline feature)" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "> [Blog post](https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### What was disabled" >> "$GITHUB_STEP_SUMMARY"
+            echo "- ADOT agent deactivated (no JAVA_TOOL_OPTIONS)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- ADOT Collector sidecar removed" >> "$GITHUB_STEP_SUMMARY"
+            echo "- SLO resources removed from CloudFormation" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Services continue running with standard profiles" >> "$GITHUB_STEP_SUMMARY"
+          fi

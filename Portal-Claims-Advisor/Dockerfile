@@ -9,7 +9,11 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY target/*.jar app.jar
 
-RUN chown appuser:appgroup app.jar
+# AWS ADOT Java auto-instrumentation agent (activated via JAVA_TOOL_OPTIONS env var in Fargate)
+RUN wget -q -O /opt/aws-opentelemetry-agent.jar \
+    https://github.com/aws-observability/aws-otel-java-instrumentation/releases/latest/download/aws-opentelemetry-agent.jar
+
+RUN chown appuser:appgroup app.jar /opt/aws-opentelemetry-agent.jar
 
 USER appuser
 

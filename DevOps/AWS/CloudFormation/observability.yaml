@@ -24,12 +24,23 @@ Parameters:
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
     Description: Number of days to retain CloudWatch log events
 
+  EnableApplicationSignals:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Enable CloudWatch Application Signals SLO resources.
+      Creates Availability and Latency SLOs for all 4 API services.
+      Ref: https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/
+
 # ---------------------------------------------------------------------------
 # Conditions
 # ---------------------------------------------------------------------------
 Conditions:
   # CloudTrail is expensive and unnecessary in dev — only enable in staging/prod
   EnableCloudTrail: !Not [!Equals [!Ref Environment, 'dev']]
+  # Application Signals SLOs — toggle via parameter
+  IsAppSignalsEnabled: !Equals [!Ref EnableApplicationSignals, 'true']
 
 # ---------------------------------------------------------------------------
 # Resources
@@ -635,6 +646,272 @@ Resources:
         - Key: Component
           Value: observability
 
+  # =========================================================================
+  # CloudWatch Application Signals — SLO Definitions (feature-toggled)
+  # Ref: https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/
+  # Creates Availability (99.9%) and Latency P99 (<500ms) SLOs for each API service.
+  # =========================================================================
+
+  # --- API-Claims SLOs ---
+  SloApiClaimsAvailability:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-claims-availability'
+      Description: 'API-Claims availability SLO — 99.9% success rate (error rate < 0.1%)'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-claims
+            Environment: !Ref Environment
+          MetricType: AVAILABILITY
+      Goal:
+        AttainmentGoal: 99.9
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: availability
+        - Key: Service
+          Value: api-claims
+        - Key: ManagedBy
+          Value: github-actions
+
+  SloApiClaimsLatencyP99:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-claims-latency-p99'
+      Description: 'API-Claims latency SLO — P99 response time < 500ms'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-claims
+            Environment: !Ref Environment
+          MetricType: LATENCY
+          Statistic: p99
+      Goal:
+        AttainmentGoal: 99.0
+        WarningThreshold: 500
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: latency
+        - Key: Service
+          Value: api-claims
+        - Key: ManagedBy
+          Value: github-actions
+
+  # --- API-Members SLOs ---
+  SloApiMembersAvailability:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-members-availability'
+      Description: 'API-Members availability SLO — 99.9% success rate'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-members
+            Environment: !Ref Environment
+          MetricType: AVAILABILITY
+      Goal:
+        AttainmentGoal: 99.9
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: availability
+        - Key: Service
+          Value: api-members
+        - Key: ManagedBy
+          Value: github-actions
+
+  SloApiMembersLatencyP99:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-members-latency-p99'
+      Description: 'API-Members latency SLO — P99 response time < 500ms'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-members
+            Environment: !Ref Environment
+          MetricType: LATENCY
+          Statistic: p99
+      Goal:
+        AttainmentGoal: 99.0
+        WarningThreshold: 500
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: latency
+        - Key: Service
+          Value: api-members
+        - Key: ManagedBy
+          Value: github-actions
+
+  # --- API-Tenants SLOs ---
+  SloApiTenantsAvailability:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-tenants-availability'
+      Description: 'API-Tenants availability SLO — 99.9% success rate'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-tenants
+            Environment: !Ref Environment
+          MetricType: AVAILABILITY
+      Goal:
+        AttainmentGoal: 99.9
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: availability
+        - Key: Service
+          Value: api-tenants
+        - Key: ManagedBy
+          Value: github-actions
+
+  SloApiTenantsLatencyP99:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-tenants-latency-p99'
+      Description: 'API-Tenants latency SLO — P99 response time < 500ms'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-tenants
+            Environment: !Ref Environment
+          MetricType: LATENCY
+          Statistic: p99
+      Goal:
+        AttainmentGoal: 99.0
+        WarningThreshold: 500
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: latency
+        - Key: Service
+          Value: api-tenants
+        - Key: ManagedBy
+          Value: github-actions
+
+  # --- API-Entitlements SLOs ---
+  SloApiEntitlementsAvailability:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-entitlements-availability'
+      Description: 'API-Entitlements availability SLO — 99.9% success rate'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-entitlements
+            Environment: !Ref Environment
+          MetricType: AVAILABILITY
+      Goal:
+        AttainmentGoal: 99.9
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: availability
+        - Key: Service
+          Value: api-entitlements
+        - Key: ManagedBy
+          Value: github-actions
+
+  SloApiEntitlementsLatencyP99:
+    Type: AWS::CloudWatch::ServiceLevelObjective
+    Condition: IsAppSignalsEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-api-entitlements-latency-p99'
+      Description: 'API-Entitlements latency SLO — P99 response time < 500ms'
+      SliConfig:
+        SliMetricConfig:
+          KeyAttributes:
+            Type: Service
+            Name: api-entitlements
+            Environment: !Ref Environment
+          MetricType: LATENCY
+          Statistic: p99
+      Goal:
+        AttainmentGoal: 99.0
+        WarningThreshold: 500
+        Interval:
+          RollingInterval:
+            DurationUnit: DAY
+            Duration: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: SloType
+          Value: latency
+        - Key: Service
+          Value: api-entitlements
+        - Key: ManagedBy
+          Value: github-actions
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
@@ -691,3 +968,32 @@ Outputs:
     Condition: EnableCloudTrail
     Description: ARN of the CloudTrail trail
     Value: !GetAtt CloudTrail.Arn
+
+  SloApiClaimsAvailabilityArn:
+    Condition: IsAppSignalsEnabled
+    Description: ARN of the API-Claims availability SLO
+    Value: !GetAtt SloApiClaimsAvailability.Arn
+
+  SloApiClaimsLatencyArn:
+    Condition: IsAppSignalsEnabled
+    Description: ARN of the API-Claims latency P99 SLO
+    Value: !GetAtt SloApiClaimsLatencyP99.Arn
+
+  SloApiMembersAvailabilityArn:
+    Condition: IsAppSignalsEnabled
+    Description: ARN of the API-Members availability SLO
+    Value: !GetAtt SloApiMembersAvailability.Arn
+
+  SloApiTenantsAvailabilityArn:
+    Condition: IsAppSignalsEnabled
+    Description: ARN of the API-Tenants availability SLO
+    Value: !GetAtt SloApiTenantsAvailability.Arn
+
+  SloApiEntitlementsAvailabilityArn:
+    Condition: IsAppSignalsEnabled
+    Description: ARN of the API-Entitlements availability SLO
+    Value: !GetAtt SloApiEntitlementsAvailability.Arn
+
+  ApplicationSignalsEnabled:
+    Description: Whether Application Signals SLOs are enabled
+    Value: !Ref EnableApplicationSignals

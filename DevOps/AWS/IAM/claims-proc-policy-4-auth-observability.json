@@ -93,6 +93,24 @@
       "Resource": "*"
     },
     {
+      "Sid": "ApplicationSignals",
+      "Effect": "Allow",
+      "Action": [
+        "application-signals:CreateServiceLevelObjective",
+        "application-signals:UpdateServiceLevelObjective",
+        "application-signals:DeleteServiceLevelObjective",
+        "application-signals:GetServiceLevelObjective",
+        "application-signals:ListServiceLevelObjectives",
+        "application-signals:BatchGetServiceLevelObjectiveBudgetReport",
+        "application-signals:GetService",
+        "application-signals:ListServices",
+        "application-signals:StartDiscovery",
+        "application-signals:TagResource",
+        "application-signals:UntagResource"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "CostExplorer",
       "Effect": "Allow",
       "Action": [
