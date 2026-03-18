@@ -1259,30 +1259,47 @@ jobs:
           aws s3api head-bucket --bucket "$CFN_BUCKET" 2>/dev/null || \
             aws s3api create-bucket --bucket "$CFN_BUCKET" --region "${AWS_REGION}"
 
-          aws cloudformation deploy \
-            --template-file DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
+          # Upload template to S3 (required for >51KB templates)
+          TEMPLATE_URL="https://${CFN_BUCKET}.s3.amazonaws.com/cloudformation/api-gateway-fargate.yaml"
+          aws s3 cp DevOps/AWS/CloudFormation/api-gateway-fargate.yaml \
+            "s3://${CFN_BUCKET}/cloudformation/api-gateway-fargate.yaml"
+
+          # Use create-stack with --disable-rollback so we can inspect logs on failure
+          # (aws cloudformation deploy silently ignores --disable-rollback)
+          aws cloudformation create-stack \
             --stack-name "$STACK" \
-            --s3-bucket "$CFN_BUCKET" \
-            --s3-prefix "cloudformation" \
-            --parameter-overrides \
-              Environment="${ENV}" \
-              ProjectName="${PRJ}" \
-              VpcId="${VPC_ID}" \
-              PublicSubnet1="${PUB1}" \
-              PublicSubnet2="${PUB2}" \
-              PrivateSubnet1="${PRV1}" \
-              PrivateSubnet2="${PRV2}" \
-              AppSecurityGroupId="${APP_SG}" \
-              ALBSecurityGroupId="${ALB_SG}" \
-              ImageTag="${IMAGE_TAG}" \
-              AWSAccountId="${ACCOUNT_ID}" \
-              AWSRegion="${AWS_REGION}" \
-              ECRRepoPrefix="${PRJ}" \
-              RDSSecretArn="${RDS_ARN}" \
-              RedisSecretArn="${REDIS_ARN}" \
+            --template-url "$TEMPLATE_URL" \
+            --parameters \
+              ParameterKey=Environment,ParameterValue="${ENV}" \
+              ParameterKey=ProjectName,ParameterValue="${PRJ}" \
+              ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
+              ParameterKey=PublicSubnet1,ParameterValue="${PUB1}" \
+              ParameterKey=PublicSubnet2,ParameterValue="${PUB2}" \
+              ParameterKey=PrivateSubnet1,ParameterValue="${PRV1}" \
+              ParameterKey=PrivateSubnet2,ParameterValue="${PRV2}" \
+              ParameterKey=AppSecurityGroupId,ParameterValue="${APP_SG}" \
+              ParameterKey=ALBSecurityGroupId,ParameterValue="${ALB_SG}" \
+              ParameterKey=ImageTag,ParameterValue="${IMAGE_TAG}" \
+              ParameterKey=AWSAccountId,ParameterValue="${ACCOUNT_ID}" \
+              ParameterKey=AWSRegion,ParameterValue="${AWS_REGION}" \
+              ParameterKey=ECRRepoPrefix,ParameterValue="${PRJ}" \
+              ParameterKey=RDSSecretArn,ParameterValue="${RDS_ARN}" \
+              ParameterKey=RedisSecretArn,ParameterValue="${REDIS_ARN}" \
             --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset \
             --disable-rollback
+
+          echo "Waiting for stack creation (this may take 10-15 minutes)..."
+          aws cloudformation wait stack-create-complete --stack-name "$STACK" 2>/dev/null || true
+
+          # Check final status
+          FINAL_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "UNKNOWN")
+          echo "Stack status: ${FINAL_STATUS}"
+
+          if [[ "$FINAL_STATUS" != "CREATE_COMPLETE" ]]; then
+            echo "::error::Stack ${STACK} ended in ${FINAL_STATUS} (--disable-rollback keeps resources for inspection)"
+            exit 1
+          fi
 
           echo "### Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
 

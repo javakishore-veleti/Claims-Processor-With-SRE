@@ -862,7 +862,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -965,7 +965,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1068,7 +1068,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1171,7 +1171,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1274,7 +1274,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1377,7 +1377,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1480,7 +1480,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1583,7 +1583,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1686,7 +1686,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1789,7 +1789,7 @@ Resources:
             Interval: 30
             Timeout: 10
             Retries: 3
-            StartPeriod: 120
+            StartPeriod: 240
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1851,7 +1851,7 @@ Resources:
         - ContainerName: portal-claims-advisor
           ContainerPort: 8081
           TargetGroupArn: !Ref TGPortalClaimsAdvisor
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -1894,7 +1894,7 @@ Resources:
         - ContainerName: portal-claims-member
           ContainerPort: 8082
           TargetGroupArn: !Ref TGPortalClaimsMember
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -1937,7 +1937,7 @@ Resources:
         - ContainerName: api-claims
           ContainerPort: 8083
           TargetGroupArn: !Ref TGApiClaims
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -1980,7 +1980,7 @@ Resources:
         - ContainerName: api-members
           ContainerPort: 8084
           TargetGroupArn: !Ref TGApiMembers
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -2023,7 +2023,7 @@ Resources:
         - ContainerName: portal-batch-assignment
           ContainerPort: 8085
           TargetGroupArn: !Ref TGPortalBatchAssignment
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -2066,7 +2066,7 @@ Resources:
         - ContainerName: api-tenants
           ContainerPort: 8086
           TargetGroupArn: !Ref TGApiTenants
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -2109,7 +2109,7 @@ Resources:
         - ContainerName: api-entitlements
           ContainerPort: 8087
           TargetGroupArn: !Ref TGApiEntitlements
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -2152,7 +2152,7 @@ Resources:
         - ContainerName: portal-tenants
           ContainerPort: 8088
           TargetGroupArn: !Ref TGPortalTenants
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -2195,7 +2195,7 @@ Resources:
         - ContainerName: portal-entitlements
           ContainerPort: 8089
           TargetGroupArn: !Ref TGPortalEntitlements
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
@@ -2238,7 +2238,7 @@ Resources:
         - ContainerName: portal-sre
           ContainerPort: 8090
           TargetGroupArn: !Ref TGPortalSRE
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: 300
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
         MaximumPercent: 200
