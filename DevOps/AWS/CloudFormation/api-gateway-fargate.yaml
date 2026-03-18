@@ -177,10 +177,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/${ProjectName}/${Environment}/ecs'
-      RetentionInDays: !If
-        - !Equals [ !Ref Environment, 'prod' ]
-        - 90
-        - 14
+      RetentionInDays: !If [IsProd, 90, 14]
       Tags:
         - Key: Project
           Value: !Ref ProjectName
