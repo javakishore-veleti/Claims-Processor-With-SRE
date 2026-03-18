@@ -63,7 +63,18 @@ npm run devops:status:all      # Check status
 - `local` -- H2 in-memory, no Docker needed (default for `services:start:*`)
 - `dev` -- PostgreSQL + full observability stack
 - `dev,aws` / `dev,azure` / `dev,gcp` -- Cloud-specific config
+- `dev,aws,aws-signals` -- AWS + CloudWatch Application Signals (ADOT agent + sidecar)
 - Environments: local, dev, test, staging, pre-prod, prod
+
+## AWS Blog Feature Toggles
+
+Blog-driven features are opt-in via CloudFormation parameters and standalone GitHub Actions workflows. They don't affect core infrastructure and can be enabled/disabled independently.
+
+| Workflow | Blog | Parameter | What It Toggles |
+|---|---|---|---|
+| `AWS_100_Blog_SLO_20260313.yml` | [Application Signals SLO](https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/) | `EnableApplicationSignals` | ADOT sidecar, `aws-signals` profile, 8 SLOs, `TenantContextSpanProcessor` |
+
+`AWS_98` auto-detects and disables all blog toggles before destroying stacks.
 
 ## Feature Toggles (API modules)
 

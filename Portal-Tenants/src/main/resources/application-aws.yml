@@ -1,0 +1,29 @@
+# AWS-specific configuration
+# Values injected from AWS Secrets Manager / SSM Parameter Store / K8s ConfigMap
+# Compose with environment profile: --spring.profiles.active=dev,aws
+spring:
+  datasource:
+    url: ${AWS_RDS_URL}
+    username: ${AWS_RDS_USERNAME}
+    password: ${AWS_RDS_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${AWS_ELASTICACHE_HOST}
+      port: ${AWS_ELASTICACHE_PORT:6379}
+      password: ${AWS_ELASTICACHE_PASSWORD}
+  kafka:
+    bootstrap-servers: ${AWS_MSK_BOOTSTRAP_SERVERS}
+
+# AWS-specific properties
+aws:
+  region: ${AWS_REGION:us-east-1}
+  s3:
+    bucket: ${AWS_S3_BUCKET}
+  secrets-manager:
+    enabled: true
+  bedrock:
+    enabled: true
+    region: ${AWS_BEDROCK_REGION:us-east-1}
+  cloudwatch:
+    enabled: true

@@ -160,6 +160,9 @@ Add manual approval step before production deployment.
 
 None of the Github workflow actions are automatic and all are manually triggered.
 
+## Instruction 41: CloudWatch Application Signals — Phase 0 Implementation
+Implement Phase 0 prerequisites for CloudWatch Application Signals SLO blog post (2026-03-13). All changes must be feature-toggled via `EnableApplicationSignals` CloudFormation parameter — not hardcoded. Dockerfiles must be reusable without signals (ADOT agent inert unless JAVA_TOOL_OPTIONS env var set). Create new `application-aws-signals.yml` Spring profile (not modify existing profiles) with granularity for dev through prod environments. Create standalone `AWS_100_Blog_SLO_20260313.yml` workflow with human-in-the-loop approval — NOT included in AWS_99. AWS_98 must detect and disable blog feature toggles before destroying stacks, using a dynamic FEATURE_TOGGLES array extensible for future blog implementations. Keep blog tasks in separate `README_AWS_BLOG_20260313_SLO.md` — do not mix with `README_PENDING_TASKS.md`.
+
 AWS GitHub Actions Design:
 1. We will have multiple workflows for different environments: dev, staging, prod. 
    1. Each workflow will have the same stages but different deployment targets and configurations.

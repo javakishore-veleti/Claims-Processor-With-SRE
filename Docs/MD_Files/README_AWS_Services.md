@@ -38,13 +38,21 @@ This repository serves as a **reference implementation** demonstrating these cap
 │  Disabled: AWS_04 (Cognito)                             │
 └─────────────────────────────────────────────────────────┘
 
+         ↕  Optional Blog Extensions (run independently)  ↕
+
+┌─────────────────────────────────────────────────────────┐
+│  AWS_100 — Application Signals SLO (Blog 2026-03-13)   │
+│  Human-in-the-loop approval → enable/disable toggle    │
+│  Adds: ADOT sidecar, aws-signals profile, 8 SLOs      │
+└─────────────────────────────────────────────────────────┘
+
              ↕  Research Window (10-12 hours)  ↕
 
 ┌─────────────────────────────────────────────────────────┐
 │                AWS_98 (Destroy All)                      │
 │                                                         │
-│  Reverse order: data-seed → fargate → eks → secrets →  │
-│  messaging-search → observability → core-infra → vpc   │
+│  Auto-detects blog extensions (FEATURE_TOGGLES array)  │
+│  Disables toggles → then destroys stacks in reverse    │
 │                                                         │
 │  Result: $0.00 residual — zero resources remain         │
 └─────────────────────────────────────────────────────────┘
@@ -52,7 +60,7 @@ This repository serves as a **reference implementation** demonstrating these cap
 
 ---
 
-## CloudFormation Stacks (9 Total)
+## CloudFormation Stacks (10 Total)
 
 ### Stack 1: VPC & Security Groups (`vpc-sg`)
 
@@ -285,6 +293,33 @@ Each image is tagged with: `latest`, `{env}-latest`, `{commit-sha}`.
 
 ---
 
+### Stack 11: Application Signals SLOs (`observability` update via AWS_100)
+
+**Workflow:** `AWS_100_Blog_SLO_20260313.yml` (standalone, not part of AWS_99)
+**Template:** `DevOps/AWS/CloudFormation/observability.yaml` (updated with `EnableApplicationSignals` toggle)
+**Blog:** [Amazon CloudWatch Application Signals adds new SLO capabilities](https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/)
+
+| Resource | Type | Details |
+|---|---|---|
+| API-Claims Availability SLO | `AWS::CloudWatch::ServiceLevelObjective` | 99.9% availability over 30-day rolling window |
+| API-Claims Latency P99 SLO | `AWS::CloudWatch::ServiceLevelObjective` | P99 < 500ms over 30-day rolling window |
+| API-Members Availability SLO | `AWS::CloudWatch::ServiceLevelObjective` | 99.9% availability |
+| API-Members Latency P99 SLO | `AWS::CloudWatch::ServiceLevelObjective` | P99 < 500ms |
+| API-Tenants Availability SLO | `AWS::CloudWatch::ServiceLevelObjective` | 99.9% availability |
+| API-Tenants Latency P99 SLO | `AWS::CloudWatch::ServiceLevelObjective` | P99 < 500ms |
+| API-Entitlements Availability SLO | `AWS::CloudWatch::ServiceLevelObjective` | 99.9% availability |
+| API-Entitlements Latency P99 SLO | `AWS::CloudWatch::ServiceLevelObjective` | P99 < 500ms |
+
+**Fargate changes** (via `api-gateway-fargate.yaml` with `EnableApplicationSignals=true`):
+| Change | Details |
+|---|---|
+| ADOT Collector sidecar | `public.ecr.aws/aws-observability/aws-otel-collector:latest` in each task definition |
+| ADOT Java agent | `-javaagent:/opt/aws-opentelemetry-agent.jar` via `JAVA_TOOL_OPTIONS` |
+| Spring profile | `aws-signals` added to `SPRING_PROFILES_ACTIVE` |
+| OTel resource attributes | `service.name`, `service.namespace`, `deployment.environment` |
+
+---
+
 ## Operational Workflows (No Infrastructure)
 
 | Workflow | Purpose |
@@ -498,6 +533,7 @@ All CloudFormation stacks, ECR images, secrets, log groups, and S3 data are dest
 | **AWS_10** | `AWS_10_Destroy_Data_Seed.yml` | Destroy data-seed Lambda |
 | **AWS_98** | `AWS_98_Destroy_All.yml` | Destroy ALL stacks (reverse order, safety confirmation) |
 | **AWS_99** | `AWS_99_Orchestrator_Full_Deploy.yml` | One-click full environment deploy |
+| **AWS_100** | `AWS_100_Blog_SLO_20260313.yml` | Enable/disable Application Signals SLOs (standalone blog extension) |
 
 ---
 
@@ -517,12 +553,12 @@ Total unique AWS services used across all stacks:
 | 8 | **Elastic Load Balancing** (ALB) | Path-based routing to 10 microservices |
 | 9 | **AWS Secrets Manager** | Credentials and encryption keys |
 | 10 | **Amazon CloudWatch** (Logs, Alarms, Dashboards) | Centralized logging and monitoring |
-| 11 | **Amazon CloudWatch Application Signals** | SLO tracking, service metrics, reliability targets |
+| 11 | **Amazon CloudWatch Application Signals** | Service discovery, SLO recommendations, service-level SLOs, performance reports — feature-toggled via `EnableApplicationSignals` parameter |
 | 12 | **AWS CloudTrail** | API audit logging with S3 archival |
 | 13 | **Amazon SNS** | Alert notifications |
 | 14 | **AWS Lambda** | Database seeding (Python 3.12) |
 | 15 | **AWS IAM** | Roles and policies for ECS, Lambda, CloudTrail |
-| 16 | **Amazon CloudFormation** | Infrastructure as Code (9 stacks) |
+| 16 | **Amazon CloudFormation** | Infrastructure as Code (10 stacks) |
 | 17 | **Amazon EKS** | Kubernetes orchestration (optional, disabled) |
 | 18 | **Amazon MSK** | Managed Kafka (optional, disabled — uses embedded) |
 | 19 | **Amazon Kinesis** | Event streaming (optional, disabled — uses embedded) |

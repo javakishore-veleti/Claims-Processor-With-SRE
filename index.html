@@ -677,6 +677,36 @@
         </div>
     </div>
 
+    <!-- AWS Blog Extensions -->
+    <div class="section" id="aws-blog">
+        <div class="section-header">
+            <div class="section-icon indigo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <span class="section-title">AWS Blog Feature Extensions</span>
+            <span class="section-badge badge-infra">Feature-Toggled</span>
+        </div>
+        <div class="card">
+            <table class="ref-table">
+                <thead>
+                    <tr><th>Workflow</th><th>Blog Post</th><th>Toggle</th><th>What It Enables</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono">AWS_100_Blog_SLO_20260313.yml</td>
+                        <td><a href="https://aws.amazon.com/about-aws/whats-new/2026/03/cloudwatch-application-signals-adds-slo-capabilities/" target="_blank">Application Signals SLO (2026-03-13)</a></td>
+                        <td class="mono">EnableApplicationSignals</td>
+                        <td>ADOT sidecar + agent, <code>aws-signals</code> Spring profile, 8 SLOs (Availability 99.9% + Latency P99 &lt;500ms &times; 4 API services), per-tenant <code>tenant.id</code> OTel attribute</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 0.75rem; font-size: 0.8rem; color: #64748b;">
+                Run <code>AWS_100</code> independently from <code>AWS_99</code>. Human-in-the-loop approval required. <code>AWS_98</code> auto-detects and cleans up all blog toggles.
+                See: <a href="Docs/MD_Files/README_AWS_BLOG_20260313_SLO.md">README_AWS_BLOG_20260313_SLO.md</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Credentials -->
     <div class="section" id="credentials">
         <div class="section-header">
