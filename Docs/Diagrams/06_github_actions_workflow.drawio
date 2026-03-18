@@ -1,0 +1,277 @@
+<mxfile host="draw.io" modified="2026-03-17T00:00:00.000Z" agent="draw.io" version="24.0.0" type="device">
+  <diagram id="github-actions" name="GitHub Actions Workflows">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="&lt;b&gt;GitHub Actions — Deployment &amp; Blog Extension Workflows&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;AWS_99 (core) → AWS_100 (blog toggle) → AWS_98 (destroy)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="400" y="10" width="700" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;AWS_99 — Full Deploy&lt;/b&gt;" style="shape=swimlane;startSize=35;fillColor=#E3F2FD;strokeColor=#1565C0;fontStyle=1;fontSize=13;horizontal=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="500" height="1700" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="3">
+          <mxGeometry x="225" y="50" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" value="Developer triggers&lt;br&gt;workflow_dispatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="3">
+          <mxGeometry x="130" y="100" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" value="Select environment&lt;br&gt;(dev / staging / prod)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="3">
+          <mxGeometry x="130" y="170" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" value="Job 0: Check stack statuses&lt;br&gt;(skip if CREATE_COMPLETE,&lt;br&gt;auto-delete if ROLLBACK_COMPLETE)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="3">
+          <mxGeometry x="110" y="240" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Infrastructure Stacks&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#3F51B5;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="3">
+          <mxGeometry x="30" y="330" width="440" height="430" as="geometry"/>
+        </mxCell>
+        <mxCell id="9" value="Step 1: VPC + Security Groups" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="50" y="35" width="340" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" value="Step 2a: RDS PostgreSQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="20" y="100" width="190" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="Step 2b: S3 Buckets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="230" y="100" width="190" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="Step 2c: ECR Repositories" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="20" y="165" width="190" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" value="Step 2d: ElastiCache Redis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="230" y="165" width="190" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" value="Step 3: Observability&lt;br&gt;(logs, alarms, dashboard)&lt;br&gt;&lt;b&gt;preserves EnableApplicationSignals&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="50" y="240" width="340" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" value="Step 6: Secrets Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="50" y="330" width="340" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="16" style="strokeColor=#3F51B5;" edge="1" source="9" target="10" parent="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="17" style="strokeColor=#3F51B5;" edge="1" source="9" target="11" parent="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="18" style="strokeColor=#3F51B5;" edge="1" source="10" target="12" parent="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="19" style="strokeColor=#3F51B5;" edge="1" source="11" target="13" parent="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" style="strokeColor=#3F51B5;" edge="1" source="12" target="14" parent="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" style="strokeColor=#3F51B5;" edge="1" source="14" target="15" parent="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" value="&lt;b&gt;Application Deployment&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#3F51B5;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="3">
+          <mxGeometry x="30" y="790" width="440" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" value="Step 8: Build + Push Docker&lt;br&gt;images to ECR (10 services)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="22">
+          <mxGeometry x="50" y="40" width="340" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" value="Step 9: API Gateway + Fargate&lt;br&gt;(ALB + 10 ECS services)&lt;br&gt;&lt;b&gt;EnableApplicationSignals=false&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="22">
+          <mxGeometry x="50" y="120" width="340" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" value="Step 10: Seed Data (Lambda)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="22">
+          <mxGeometry x="50" y="205" width="340" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="26" style="strokeColor=#3F51B5;" edge="1" source="23" target="24" parent="22">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="27" style="strokeColor=#3F51B5;" edge="1" source="24" target="25" parent="22">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="28" value="All 10 services running&lt;br&gt;on Fargate behind ALB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90CAF9;strokeColor=#1565C0;fontSize=10;fontStyle=1;" vertex="1" parent="3">
+          <mxGeometry x="130" y="1100" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="29" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="3">
+          <mxGeometry x="225" y="1180" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" style="strokeColor=#1565C0;" edge="1" source="4" target="5" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" style="strokeColor=#1565C0;" edge="1" source="5" target="6" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" style="strokeColor=#1565C0;" edge="1" source="6" target="7" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" style="strokeColor=#1565C0;" edge="1" source="7" target="8" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" style="strokeColor=#1565C0;" edge="1" source="8" target="22" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" style="strokeColor=#1565C0;" edge="1" source="22" target="28" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" style="strokeColor=#1565C0;" edge="1" source="28" target="29" parent="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" value="&lt;b&gt;AWS_100 — Blog Extension&lt;/b&gt;" style="shape=swimlane;startSize=35;fillColor=#E8F5E9;strokeColor=#2E7D32;fontStyle=1;fontSize=13;horizontal=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="580" y="70" width="500" height="1700" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="37">
+          <mxGeometry x="225" y="50" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" value="Developer triggers&lt;br&gt;(independent of AWS_99)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="130" y="100" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="40" value="Select: &lt;b&gt;enable&lt;/b&gt; or &lt;b&gt;disable&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="130" y="170" width="220" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value="Pre-flight: verify stacks exist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="130" y="240" width="220" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="42" value="&lt;b&gt;APPROVAL GATE&lt;/b&gt;&lt;br&gt;(GitHub Environment)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90EE90;strokeColor=#2E7D32;fontSize=11;fontStyle=1;" vertex="1" parent="37">
+          <mxGeometry x="120" y="310" width="240" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="43" value="action?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="190" y="400" width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="44" value="Update observability stack&lt;br&gt;Signals=&lt;b&gt;true&lt;/b&gt; → 8 SLOs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="30" y="520" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="45" value="Update Fargate stack&lt;br&gt;ADOT sidecar + agent&lt;br&gt;aws-signals profile&lt;br&gt;Rolling deploy (10 svcs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="30" y="610" width="200" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="46" value="Verify metrics flowing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="30" y="720" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="47" value="Update both stacks&lt;br&gt;Signals=&lt;b&gt;false&lt;/b&gt;&lt;br&gt;Remove SLOs + sidecar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#D32F2F;fontSize=10;" vertex="1" parent="37">
+          <mxGeometry x="260" y="520" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="48" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="37">
+          <mxGeometry x="225" y="810" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="49" style="strokeColor=#2E7D32;" edge="1" source="38" target="39" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="50" style="strokeColor=#2E7D32;" edge="1" source="39" target="40" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="51" style="strokeColor=#2E7D32;" edge="1" source="40" target="41" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="52" style="strokeColor=#2E7D32;" edge="1" source="41" target="42" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="53" style="strokeColor=#2E7D32;" edge="1" source="42" target="43" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="54" value="enable" style="strokeColor=#2E7D32;fontColor=#2E7D32;fontSize=9;" edge="1" source="43" target="44" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="55" value="disable" style="strokeColor=#D32F2F;fontColor=#D32F2F;fontSize=9;" edge="1" source="43" target="47" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="56" style="strokeColor=#2E7D32;" edge="1" source="44" target="45" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="57" style="strokeColor=#2E7D32;" edge="1" source="45" target="46" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="58" style="strokeColor=#2E7D32;" edge="1" source="46" target="48" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="59" style="strokeColor=#D32F2F;" edge="1" source="47" target="48" parent="37">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="60" value="&lt;b&gt;AWS_98 — Destroy All&lt;/b&gt;" style="shape=swimlane;startSize=35;fillColor=#FCE4EC;strokeColor=#C62828;fontStyle=1;fontSize=13;horizontal=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="70" width="500" height="1700" as="geometry"/>
+        </mxCell>
+        <mxCell id="61" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="60">
+          <mxGeometry x="225" y="50" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="62" value="Developer triggers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="60">
+          <mxGeometry x="140" y="100" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="63" value="Type environment name&lt;br&gt;to confirm (safety check)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="60">
+          <mxGeometry x="130" y="170" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="64" value="&lt;b&gt;Auto-detect blog toggles&lt;/b&gt;&lt;br&gt;FEATURE_TOGGLES array:&lt;br&gt;&quot;observability:EnableApplicationSignals&quot;&lt;br&gt;&quot;fargate:EnableApplicationSignals&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F08080;strokeColor=#C62828;fontSize=10;" vertex="1" parent="60">
+          <mxGeometry x="90" y="250" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="65" value="Disable all active toggles&lt;br&gt;(update stacks to false first)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="60">
+          <mxGeometry x="120" y="360" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="66" value="&lt;b&gt;Destroy in Reverse Order&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#C62828;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="60">
+          <mxGeometry x="30" y="440" width="440" height="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="67" value="1. Data Seed (Lambda)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="35" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="68" value="2. Fargate (ALB + ECS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="85" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="69" value="3. EKS (if exists)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="135" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="70" value="4. Secrets Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="185" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="71" value="5. Messaging / Search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="235" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="72" value="6. Observability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="285" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="73" value="7. Redis / RDS / S3 / ECR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="335" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="74" value="8. VPC + Security Groups" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#C62828;fontSize=10;" vertex="1" parent="66">
+          <mxGeometry x="50" y="385" width="340" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="75" style="strokeColor=#C62828;" edge="1" source="67" target="68" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="76" style="strokeColor=#C62828;" edge="1" source="68" target="69" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="77" style="strokeColor=#C62828;" edge="1" source="69" target="70" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="78" style="strokeColor=#C62828;" edge="1" source="70" target="71" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="79" style="strokeColor=#C62828;" edge="1" source="71" target="72" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="80" style="strokeColor=#C62828;" edge="1" source="72" target="73" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="81" style="strokeColor=#C62828;" edge="1" source="73" target="74" parent="66">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="82" value="Verify: all stacks deleted&lt;br&gt;&lt;b&gt;$0.00 residual&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=10;fontStyle=1;" vertex="1" parent="60">
+          <mxGeometry x="130" y="920" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="83" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="60">
+          <mxGeometry x="225" y="1000" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="84" style="strokeColor=#C62828;" edge="1" source="61" target="62" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="85" style="strokeColor=#C62828;" edge="1" source="62" target="63" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="86" style="strokeColor=#C62828;" edge="1" source="63" target="64" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="87" style="strokeColor=#C62828;" edge="1" source="64" target="65" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="88" style="strokeColor=#C62828;" edge="1" source="65" target="66" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="89" style="strokeColor=#C62828;" edge="1" source="66" target="82" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="90" style="strokeColor=#C62828;" edge="1" source="82" target="83" parent="60">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

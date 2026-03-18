@@ -1,0 +1,133 @@
+<mxfile host="draw.io" modified="2026-03-17T00:00:00.000Z" agent="draw.io" version="24.0.0" type="device">
+  <diagram id="fargate-signals" name="AWS Fargate With Application Signals">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="&lt;b&gt;AWS Fargate Architecture — With AWS_100 (Application Signals Enabled)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;ADOT sidecar + agent + 8 SLOs added via EnableApplicationSignals=true&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="700" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Fargate Task (e.g., API-Claims)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;verticalAlign=top;fontStyle=1;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="620" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;App Container&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="3">
+          <mxGeometry x="20" y="35" width="280" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Spring Boot App&lt;/b&gt;&lt;br&gt;api-claims:8083" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;" vertex="1" parent="4">
+          <mxGeometry x="15" y="35" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;ADOT Java Agent&lt;/b&gt;&lt;br&gt;-javaagent:/opt/aws-otel.jar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;" vertex="1" parent="4">
+          <mxGeometry x="15" y="95" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;TenantContextSpanProcessor&lt;/b&gt;&lt;br&gt;(tenant.id from X-Tenant-Id)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;" vertex="1" parent="4">
+          <mxGeometry x="15" y="155" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;ADOT Collector Sidecar&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="3">
+          <mxGeometry x="320" y="35" width="280" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="9" value="&lt;b&gt;aws-otel-collector&lt;/b&gt;&lt;br&gt;:4317 (gRPC) :4318 (HTTP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="15" y="35" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" value="&lt;b&gt;ecs-default-config.yaml&lt;/b&gt;&lt;br&gt;Exporters: X-Ray + CW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;fontSize=10;" vertex="1" parent="8">
+          <mxGeometry x="15" y="95" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="&lt;b&gt;awsvpc networking&lt;/b&gt;&lt;br&gt;App reaches sidecar at localhost:4317&lt;br&gt;&lt;br&gt;&lt;b&gt;Profiles:&lt;/b&gt; dev,aws,aws-signals&lt;br&gt;&lt;b&gt;Essential:&lt;/b&gt; sidecar=false" style="shape=note;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;spacingLeft=5;size=12;" vertex="1" parent="3">
+          <mxGeometry x="320" y="215" width="280" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="&lt;b&gt;CloudWatch Application Signals&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;verticalAlign=top;fontStyle=1;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="700" y="80" width="860" height="420" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" value="&lt;b&gt;Service Discovery&lt;/b&gt;&lt;br&gt;(10 services auto-detected)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="12">
+          <mxGeometry x="20" y="40" width="240" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" value="&lt;b&gt;Service Map&lt;/b&gt;&lt;br&gt;Portal → API → DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="12">
+          <mxGeometry x="290" y="40" width="240" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" value="&lt;b&gt;Operations&lt;/b&gt;&lt;br&gt;GET/POST/PUT per endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="12">
+          <mxGeometry x="560" y="40" width="270" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="16" value="&lt;b&gt;SLO Engine (8 SLOs)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="12">
+          <mxGeometry x="20" y="110" width="510" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="17" value="&lt;b&gt;Availability SLOs&lt;/b&gt;&lt;br&gt;99.9% × 4 APIs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="16">
+          <mxGeometry x="15" y="35" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="18" value="&lt;b&gt;Latency P99 SLOs&lt;/b&gt;&lt;br&gt;&lt;500ms × 4 APIs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="16">
+          <mxGeometry x="265" y="35" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="19" value="&lt;b&gt;Blog Features (New)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#2E7D32;verticalAlign=top;fontStyle=1;fontSize=11;container=1;collapsible=0;" vertex="1" parent="12">
+          <mxGeometry x="20" y="255" width="810" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" value="&lt;b&gt;SLO Recommendations&lt;/b&gt;&lt;br&gt;(after 30 days)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="19">
+          <mxGeometry x="15" y="35" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" value="&lt;b&gt;Service-Level SLOs&lt;/b&gt;&lt;br&gt;(holistic per service)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="19">
+          <mxGeometry x="280" y="35" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" value="&lt;b&gt;Performance Reports&lt;/b&gt;&lt;br&gt;(daily/weekly/monthly)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#2E7D32;fontSize=10;" vertex="1" parent="19">
+          <mxGeometry x="545" y="35" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" value="&lt;b&gt;AWS X-Ray&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;verticalAlign=top;fontStyle=1;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="440" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" value="&lt;b&gt;Distributed Traces&lt;/b&gt;&lt;br&gt;Portal → Feign → API → DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="23">
+          <mxGeometry x="15" y="35" width="270" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" value="&lt;b&gt;CloudWatch&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;verticalAlign=top;fontStyle=1;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="380" y="440" width="560" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="26" value="&lt;b&gt;Metrics&lt;/b&gt;&lt;br&gt;Latency, Fault, Error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="15" y="35" width="160" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="27" value="&lt;b&gt;Logs&lt;/b&gt;&lt;br&gt;(awslogs driver)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="195" y="35" width="160" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="28" value="&lt;b&gt;Alarms&lt;/b&gt;&lt;br&gt;5xx, P99, Availability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="375" y="35" width="160" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="29" value="&lt;b&gt;SNS Alert Topic&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;" vertex="1" parent="1">
+          <mxGeometry x="990" y="460" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" value="&lt;b&gt;Per-Tenant SLO Tracking&lt;/b&gt;&lt;br&gt;X-Tenant-Id → tenant.id&lt;br&gt;OTel low-cardinality attribute&lt;br&gt;Filterable in Application Signals" style="shape=note;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;spacingLeft=5;size=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="570" width="260" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" value="auto-instrumented" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;fontColor=#E65100;fontSize=9;" edge="1" source="5" target="6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" value="adds tenant.id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;fontColor=#E65100;fontSize=9;" edge="1" source="6" target="7" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" value="OTLP gRPC localhost:4317" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6A1B9A;fontColor=#6A1B9A;fontSize=9;" edge="1" source="7" target="9" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" value="traces" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;fontColor=#1565C0;fontSize=9;" edge="1" source="9" target="23" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" value="metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;fontColor=#1565C0;fontSize=9;" edge="1" source="9" target="26" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" value="service telemetry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;fontColor=#2E7D32;fontSize=9;" edge="1" source="9" target="13" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;" edge="1" source="13" target="14" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;" edge="1" source="13" target="15" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;" edge="1" source="13" target="16" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="40" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;" edge="1" source="16" target="19" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value="breach alerts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;fontColor=#D32F2F;fontSize=9;" edge="1" source="16" target="28" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="42" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D32F2F;" edge="1" source="28" target="29" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

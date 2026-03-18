@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-03-17T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram id="43" name="AWS Services Inventory">
+    <mxGraphModel dx="2200" dy="2000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2400" pageHeight="2000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ============================================================ -->
+        <!-- TITLE -->
+        <!-- ============================================================ -->
+        <mxCell id="97" value="Claims Processor With SRE &amp;mdash; Complete AWS Services Map" style="text;html=1;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="400" y="10" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="98" value="All AWS services used across CloudFormation stacks, grouped by function" style="text;html=1;fontSize=13;fontStyle=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="500" y="50" width="1000" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- ACTORS (top row) -->
+        <!-- ============================================================ -->
+        <mxCell id="38" value="Claims Staff&lt;br&gt;(Browser)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="90" width="30" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="39" value="Member / Customer&lt;br&gt;(Browser)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="90" width="30" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="40" value="SRE / DevOps&lt;br&gt;(Console + CLI)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="90" width="30" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="GitHub Actions&lt;br&gt;(CI/CD)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="90" width="30" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 1. NETWORKING & SECURITY (#E8EAF6) -->
+        <!-- ============================================================ -->
+        <mxCell id="25" value="Networking &amp; Security" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#7986CB;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="210" width="560" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="41" value="&lt;b&gt;Amazon VPC&lt;/b&gt;&lt;br&gt;10.0.0.0/16&lt;br&gt;2 public + 2 private subnets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#7986CB;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="15" y="35" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="&lt;b&gt;Internet Gateway&lt;/b&gt;&lt;br&gt;Public internet access" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#7986CB;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="200" y="35" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="&lt;b&gt;NAT Gateway&lt;/b&gt;&lt;br&gt;+ Elastic IP&lt;br&gt;Private subnet outbound" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#7986CB;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="375" y="35" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="33" value="&lt;b&gt;Security Groups (6)&lt;/b&gt;&lt;br&gt;ALB, App, RDS, Redis&lt;br&gt;Kafka, OpenSearch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#7986CB;fontSize=10;" vertex="1" parent="25">
+          <mxGeometry x="15" y="115" width="170" height="70" as="geometry" />
+        </mxCell>
+        <!-- Internal networking arrows -->
+        <mxCell id="76" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="41" target="19" parent="25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="77" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="41" target="24" parent="25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 2. COMPUTE (#FFF3E0) -->
+        <!-- ============================================================ -->
+        <mxCell id="9" value="Compute" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FFB74D;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="600" y="210" width="620" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="&lt;b&gt;Amazon ECS&lt;/b&gt;&lt;br&gt;Cluster: claims-proc-{env}&lt;br&gt;Fargate + Fargate Spot" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#FFB74D;fontSize=10;" vertex="1" parent="9">
+          <mxGeometry x="15" y="35" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="&lt;b&gt;AWS Fargate&lt;/b&gt;&lt;br&gt;10 tasks (1 per service)&lt;br&gt;512 CPU / 1024 MiB each" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#FFB74D;fontSize=10;" vertex="1" parent="9">
+          <mxGeometry x="210" y="35" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Elastic Load Balancer&lt;/b&gt;&lt;br&gt;Application LB&lt;br&gt;Path-based routing&lt;br&gt;10 target groups" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#FFB74D;fontSize=10;" vertex="1" parent="9">
+          <mxGeometry x="415" y="35" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="&lt;b&gt;AWS Lambda&lt;/b&gt;&lt;br&gt;Data seed function&lt;br&gt;RDS initial data population" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#FFB74D;fontSize=10;" vertex="1" parent="9">
+          <mxGeometry x="15" y="115" width="180" height="70" as="geometry" />
+        </mxCell>
+        <!-- Internal compute arrows -->
+        <mxCell id="55" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="16" target="15" parent="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="48" value="path routing" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="5" target="16" parent="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 3. CONTAINER REGISTRY (#F3E5F5) -->
+        <!-- ============================================================ -->
+        <mxCell id="30" value="Container Registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#CE93D8;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="210" width="280" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="&lt;b&gt;Amazon ECR&lt;/b&gt;&lt;br&gt;10 repositories (1 per microservice)&lt;br&gt;Image scanning on push&lt;br&gt;Lifecycle: retain last 10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#CE93D8;fontSize=10;" vertex="1" parent="30">
+          <mxGeometry x="15" y="30" width="250" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 4. DATA STORES (#E3F2FD) -->
+        <!-- ============================================================ -->
+        <mxCell id="13" value="Data Stores" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#64B5F6;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="440" width="580" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="&lt;b&gt;Amazon RDS&lt;/b&gt;&lt;br&gt;PostgreSQL 16&lt;br&gt;db.t3.micro (dev)&lt;br&gt;GP3, AES256 encryption&lt;br&gt;Multi-AZ (prod)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#64B5F6;fontSize=10;" vertex="1" parent="13">
+          <mxGeometry x="15" y="35" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="&lt;b&gt;Amazon ElastiCache&lt;/b&gt;&lt;br&gt;Redis 7.x&lt;br&gt;cache.t3.micro&lt;br&gt;Transit encryption&lt;br&gt;Auth token" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#64B5F6;fontSize=10;" vertex="1" parent="13">
+          <mxGeometry x="200" y="35" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="31" value="&lt;b&gt;Amazon S3&lt;/b&gt;&lt;br&gt;Claim documents bucket&lt;br&gt;Static assets bucket&lt;br&gt;CFN templates bucket&lt;br&gt;CloudTrail logs bucket&lt;br&gt;Versioning + encryption" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#64B5F6;fontSize=10;" vertex="1" parent="13">
+          <mxGeometry x="385" y="35" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 5. MESSAGING & SEARCH (#FFF9C4) -->
+        <!-- ============================================================ -->
+        <mxCell id="22" value="Messaging &amp; Search (optional)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#FDD835;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="620" y="440" width="440" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="&lt;b&gt;Amazon MSK&lt;/b&gt;&lt;br&gt;(Managed Kafka)&lt;br&gt;Claim events, 7 topics + DLQ&lt;br&gt;(skip_messaging=true default)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF176;strokeColor=#FDD835;fontSize=10;" vertex="1" parent="22">
+          <mxGeometry x="15" y="35" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="&lt;b&gt;Amazon OpenSearch&lt;/b&gt;&lt;br&gt;Claim + member indexes&lt;br&gt;Kibana dashboards, Log analytics&lt;br&gt;(skip_messaging=true default)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF176;strokeColor=#FDD835;fontSize=10;" vertex="1" parent="22">
+          <mxGeometry x="225" y="35" width="200" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 6. SECURITY & SECRETS (#FCE4EC) -->
+        <!-- ============================================================ -->
+        <mxCell id="32" value="Security &amp; Secrets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#EF9A9A;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="440" width="470" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="36" value="&lt;b&gt;AWS Secrets Manager&lt;/b&gt;&lt;br&gt;RDS credentials&lt;br&gt;Redis connection URL&lt;br&gt;Rotation capable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#EF9A9A;fontSize=10;" vertex="1" parent="32">
+          <mxGeometry x="15" y="35" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="&lt;b&gt;AWS IAM&lt;/b&gt;&lt;br&gt;ECS Task Execution Role&lt;br&gt;ECS Task Role&lt;br&gt;CloudTrail Role&lt;br&gt;GitHub Actions OIDC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#EF9A9A;fontSize=10;" vertex="1" parent="32">
+          <mxGeometry x="165" y="35" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Amazon Cognito&lt;/b&gt;&lt;br&gt;User Pool + App Client&lt;br&gt;(disabled &amp;mdash; feature-toggled)&lt;br&gt;OAuth2 / OIDC ready" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#EF9A9A;fontSize=10;" vertex="1" parent="32">
+          <mxGeometry x="315" y="35" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 7. OBSERVABILITY & MONITORING (#E8F5E9) -->
+        <!-- ============================================================ -->
+        <mxCell id="26" value="Observability &amp; Monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#81C784;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="670" width="680" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="&lt;b&gt;Amazon CloudWatch&lt;/b&gt;&lt;br&gt;11 Log Groups&lt;br&gt;5 Alarms (5xx, P99, avail, RDS)&lt;br&gt;App Health Dashboard&lt;br&gt;Metrics (PutMetricData)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#81C784;fontSize=10;" vertex="1" parent="26">
+          <mxGeometry x="15" y="35" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="37" value="&lt;b&gt;Amazon SNS&lt;/b&gt;&lt;br&gt;Alert notification topic&lt;br&gt;Alarm &amp;rarr; email / webhook" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#81C784;fontSize=10;" vertex="1" parent="26">
+          <mxGeometry x="210" y="35" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="&lt;b&gt;AWS CloudTrail&lt;/b&gt;&lt;br&gt;API audit logging&lt;br&gt;S3 + CloudWatch Logs&lt;br&gt;(staging + prod only)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#81C784;fontSize=10;" vertex="1" parent="26">
+          <mxGeometry x="375" y="35" width="145" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="42" value="&lt;b&gt;AWS X-Ray&lt;/b&gt;&lt;br&gt;Distributed tracing&lt;br&gt;Service map&lt;br&gt;Trace segments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#81C784;fontSize=10;" vertex="1" parent="26">
+          <mxGeometry x="535" y="35" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 8. APPLICATION SIGNALS (#DCEDC8) -->
+        <!-- ============================================================ -->
+        <mxCell id="34" value="Application Signals (AWS_100 &amp;mdash; feature-toggled)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEDC8;strokeColor=#AED581;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="900" width="960" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="&lt;b&gt;CloudWatch Application Signals&lt;/b&gt;&lt;br&gt;Service discovery (10 services)&lt;br&gt;Service map (Portal&amp;rarr;API&amp;rarr;DB)&lt;br&gt;Per-operation metrics&lt;br&gt;Per-tenant filtering (tenant.id)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5E1A5;strokeColor=#AED581;fontSize=10;" vertex="1" parent="34">
+          <mxGeometry x="15" y="35" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="35" value="&lt;b&gt;8 SLOs (CloudFormation)&lt;/b&gt;&lt;br&gt;Availability 99.9% x 4 APIs&lt;br&gt;Latency P99 &amp;lt;500ms x 4 APIs&lt;br&gt;30-day rolling window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5E1A5;strokeColor=#AED581;fontSize=10;" vertex="1" parent="34">
+          <mxGeometry x="240" y="35" width="190" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="2" value="&lt;b&gt;ADOT Collector&lt;/b&gt;&lt;br&gt;(Fargate sidecar)&lt;br&gt;aws-otel-collector:latest&lt;br&gt;OTLP &amp;rarr; X-Ray + CloudWatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5E1A5;strokeColor=#AED581;fontSize=10;" vertex="1" parent="34">
+          <mxGeometry x="445" y="35" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;ADOT Java Agent&lt;/b&gt;&lt;br&gt;Auto-instrumentation&lt;br&gt;In each Docker image&lt;br&gt;Activated via JAVA_TOOL_OPTIONS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5E1A5;strokeColor=#AED581;fontSize=10;" vertex="1" parent="34">
+          <mxGeometry x="630" y="35" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;Blog Features (New)&lt;/b&gt;&lt;br&gt;SLO Recommendations (30d)&lt;br&gt;Service-Level SLOs&lt;br&gt;Performance Reports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#AED581;strokeColor=#8BC34A;fontSize=10;" vertex="1" parent="34">
+          <mxGeometry x="240" y="125" width="190" height="65" as="geometry" />
+        </mxCell>
+        <!-- Internal signals arrows -->
+        <mxCell id="51" value="feeds SLO engine" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="12" target="35" parent="34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="70" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="35" target="7" parent="34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="44" value="OTLP :4317" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="3" target="2" parent="34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- 9. AI & ML (#F3E5F5) -->
+        <!-- ============================================================ -->
+        <mxCell id="4" value="AI &amp; ML (configured, not active)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#CE93D8;verticalAlign=top;fontStyle=1;fontSize=14;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="900" width="280" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Amazon Bedrock&lt;/b&gt;&lt;br&gt;Claim document extraction&lt;br&gt;Data automation&lt;br&gt;(feature-toggled, mock today)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#CE93D8;fontSize=10;" vertex="1" parent="4">
+          <mxGeometry x="15" y="30" width="250" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- CONNECTIONS (cross-group edges) -->
+        <!-- ============================================================ -->
+
+        <!-- Users -> ALB -->
+        <mxCell id="72" value="HTTPS" style="rounded=1;fontSize=9;fontColor=#666666;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="38" target="5" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="73" value="HTTPS" style="rounded=1;fontSize=9;fontColor=#666666;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" source="39" target="5" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SRE -> CloudWatch, App Signals -->
+        <mxCell id="74" value="Console" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="40" target="11" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="75" value="Console" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="40" target="12" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- GitHub Actions -> ECR, IAM -->
+        <mxCell id="64" value="push images" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="17" target="14" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="65" value="assume role" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="17" target="18" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fargate -> Data stores -->
+        <mxCell id="58" value="JDBC" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="28" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="59" value="cache" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="29" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="60" value="documents" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="31" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="56" value="events" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="23" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="57" value="search" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="27" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fargate -> Secrets -->
+        <mxCell id="61" value="read credentials" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="36" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fargate -> Observability -->
+        <mxCell id="53" value="awslogs driver" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="11" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="63" value="traces (via ADOT)" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="42" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fargate -> Networking -->
+        <mxCell id="62" value="awsvpc" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="41" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fargate -> ECR -->
+        <mxCell id="54" value="pull images" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="16" target="14" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ADOT -> Observability -->
+        <mxCell id="47" value="traces" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="2" target="42" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="45" value="metrics" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="2" target="11" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="46" value="service telemetry" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="2" target="12" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Alarms -->
+        <mxCell id="52" value="alarm actions" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="11" target="37" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="71" value="SLO breach" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="35" target="37" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- CloudTrail -->
+        <mxCell id="50" value="audit logs" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="10" target="31" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="49" value="log integration" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="10" target="11" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Lambda -> RDS -->
+        <mxCell id="66" value="seed data" style="rounded=1;fontSize=9;fontColor=#666666;" edge="1" source="20" target="28" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- NOTES -->
+        <!-- ============================================================ -->
+        <mxCell id="96" value="&lt;b&gt;Feature-toggled&lt;/b&gt; via EnableApplicationSignals parameter&lt;br&gt;Enable: run AWS_100 with action=enable&lt;br&gt;Disable: run AWS_100 with action=disable&lt;br&gt;AWS_98 auto-detects and cleans up" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFFFCC;strokeColor=#AED581;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1120" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="69" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#999999;" edge="1" source="96" target="34" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="95" value="&lt;b&gt;Optional&lt;/b&gt; &amp;mdash; skipped by default&lt;br&gt;Enable via skip_messaging=false&lt;br&gt;in AWS_99 workflow dispatch" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFFFCC;strokeColor=#FDD835;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="620" y="580" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="68" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#999999;" edge="1" source="95" target="22" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="94" value="&lt;b&gt;Disabled&lt;/b&gt; &amp;mdash; commented out&lt;br&gt;in AWS_99 and AWS_98&lt;br&gt;Ready for future activation" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFFFCC;strokeColor=#EF9A9A;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="660" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="67" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#999999;" edge="1" source="94" target="8" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- LEGEND -->
+        <!-- ============================================================ -->
+        <mxCell id="21" value="Legend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;verticalAlign=top;fontStyle=1;fontSize=13;container=1;collapsible=0;arcSize=6;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="1020" width="340" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="78" style="rounded=1;fillColor=#E8EAF6;strokeColor=#7986CB;" vertex="1" parent="21">
+          <mxGeometry x="15" y="30" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="79" value="Networking &amp; Security" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="28" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="80" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FFB74D;" vertex="1" parent="21">
+          <mxGeometry x="15" y="55" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="81" value="Compute" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="53" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="82" style="rounded=1;fillColor=#F3E5F5;strokeColor=#CE93D8;" vertex="1" parent="21">
+          <mxGeometry x="15" y="80" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="83" value="Containers &amp; AI" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="78" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="84" style="rounded=1;fillColor=#E3F2FD;strokeColor=#64B5F6;" vertex="1" parent="21">
+          <mxGeometry x="15" y="105" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="85" value="Data Stores" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="103" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="86" style="rounded=1;fillColor=#FFF9C4;strokeColor=#FDD835;" vertex="1" parent="21">
+          <mxGeometry x="15" y="130" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="87" value="Messaging &amp; Search (optional)" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="128" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="88" style="rounded=1;fillColor=#FCE4EC;strokeColor=#EF9A9A;" vertex="1" parent="21">
+          <mxGeometry x="15" y="155" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="89" value="Security &amp; Secrets" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="153" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="90" style="rounded=1;fillColor=#E8F5E9;strokeColor=#81C784;" vertex="1" parent="21">
+          <mxGeometry x="15" y="180" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="91" value="Observability (always-on)" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="178" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="92" style="rounded=1;fillColor=#DCEDC8;strokeColor=#AED581;" vertex="1" parent="21">
+          <mxGeometry x="15" y="205" width="20" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="93" value="Application Signals (AWS_100 toggle)" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="21">
+          <mxGeometry x="45" y="203" width="250" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
