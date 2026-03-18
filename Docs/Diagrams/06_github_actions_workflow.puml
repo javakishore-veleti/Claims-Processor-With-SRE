@@ -1,0 +1,79 @@
+@startuml 06_GitHub_Actions_Workflow
+!theme aws-orange
+title GitHub Actions — Deployment & Blog Extension Workflows\n<size:12>AWS_99 (core) → AWS_100 (blog toggle) → AWS_98 (destroy)</size>
+
+skinparam rectangle {
+    roundCorner 10
+}
+
+|AWS_99 — Full Deploy|
+start
+:Developer triggers\nworkflow_dispatch;
+:Select environment\n(dev / staging / prod);
+
+:Job 0: Check stack statuses\n(skip if CREATE_COMPLETE,\nauto-delete if ROLLBACK_COMPLETE);
+
+partition "Infrastructure Stacks" {
+    :Step 1: VPC + Security Groups;
+    :Step 2a: RDS PostgreSQL;
+    :Step 2b: S3 Buckets;
+    :Step 2c: ECR Repositories;
+    :Step 2d: ElastiCache Redis;
+    :Step 3: Observability\n(logs, alarms, dashboard)\n**preserves EnableApplicationSignals**;
+    :Step 6: Secrets Manager;
+}
+
+partition "Application Deployment" {
+    :Step 8: Build + Push Docker\nimages to ECR (10 services);
+    :Step 9: API Gateway + Fargate\n(ALB + 10 ECS services)\n**EnableApplicationSignals=false default**;
+    :Step 10: Seed Data\n(Lambda function);
+}
+
+:All 10 services running\non Fargate behind ALB;
+stop
+
+|AWS_100 — Blog Extension|
+start
+:Developer triggers\n(independent of AWS_99);
+:Select: **enable** or **disable**;
+
+:Pre-flight: verify\nobservability + fargate\nstacks exist;
+
+#LightGreen:Human-in-the-loop\n**APPROVAL GATE**\n(GitHub Environment);
+
+if (action?) then (enable)
+    :Update observability stack\nEnableApplicationSignals=**true**\n→ 8 SLO resources created;
+
+    :Update Fargate stack\nEnableApplicationSignals=**true**\n→ ADOT sidecar added\n→ JAVA_TOOL_OPTIONS set\n→ aws-signals profile added\n→ Rolling deploy (10 services);
+
+    :Verify: check Application\nSignals metrics flowing;
+else (disable)
+    :Update both stacks\nEnableApplicationSignals=**false**\n→ SLOs removed\n→ sidecar removed\n→ agent deactivated;
+endif
+
+stop
+
+|AWS_98 — Destroy All|
+start
+:Developer triggers;
+:Type environment name\nto confirm (safety check);
+
+#LightCoral:Auto-detect blog toggles\n**FEATURE_TOGGLES** array:\n"observability:EnableApplicationSignals"\n"fargate:EnableApplicationSignals"\n(extensible for future blogs);
+
+:Disable all active toggles\n(update stacks to false first);
+
+partition "Destroy in Reverse Order" {
+    :1. Data Seed (Lambda);
+    :2. Fargate (ALB + ECS);
+    :3. EKS (if exists);
+    :4. Secrets Manager;
+    :5. Messaging/Search;
+    :6. Observability;
+    :7. Redis / RDS / S3 / ECR;
+    :8. VPC + Security Groups;
+}
+
+:Verify: all stacks deleted\n$0.00 residual;
+stop
+
+@enduml

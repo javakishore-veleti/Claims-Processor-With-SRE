@@ -1,0 +1,87 @@
+@startuml 01_Enterprise_BDAT_Architecture
+!theme aws-orange
+title Claims Processor With SRE — Enterprise Architecture (BDAT)\n<size:12>Business / Data / Application / Technology layers</size>
+
+skinparam rectangle {
+    roundCorner 15
+}
+
+' ── Business Architecture ──
+package "Business Architecture" as BIZ #FFF3E0 {
+    rectangle "Claims Intake\n& Processing" as B1 #FFE0B2
+    rectangle "Member\nManagement" as B2 #FFE0B2
+    rectangle "Multi-Tenant\nEntitlements" as B3 #FFE0B2
+    rectangle "SRE & SLO\nCompliance" as B4 #FFE0B2
+    rectangle "Batch\nOperations" as B5 #FFE0B2
+}
+
+' ── Data Architecture ──
+package "Data Architecture" as DATA #E3F2FD {
+    database "PostgreSQL\n(RDS in AWS)" as DB #BBDEFB
+    database "H2 In-Memory\n(Local dev)" as H2 #BBDEFB
+    database "Redis\n(ElastiCache)" as REDIS #BBDEFB
+    database "Elasticsearch\n(OpenSearch)" as ES #BBDEFB
+    queue "Kafka\n(MSK)" as KAFKA #BBDEFB
+    storage "S3\n(Documents)" as S3 #BBDEFB
+}
+
+' ── Application Architecture ──
+package "Application Architecture" as APP #E8F5E9 {
+    package "Portal Layer (Orchestrators)" as PORTALS {
+        component "Portal-Claims-Advisor\n:8081" as PCA #C8E6C9
+        component "Portal-Claims-Member\n:8082" as PCM #C8E6C9
+        component "Portal-Batch-Assignment\n:8085" as PBA #C8E6C9
+        component "Portal-Tenants\n:8088" as PT #C8E6C9
+        component "Portal-Entitlements\n:8089" as PE #C8E6C9
+        component "Portal-SRE\n:8090" as PSRE #C8E6C9
+    }
+
+    package "API Layer (Core Services)" as APIS {
+        component "API-Claims\n:8083" as AC #A5D6A7
+        component "API-Members\n:8084" as AM #A5D6A7
+        component "API-Tenants\n:8086" as AT #A5D6A7
+        component "API-Entitlements\n:8087" as AE #A5D6A7
+    }
+
+    package "Common Libraries" as LIBS {
+        component "Common-Utils\n(Encryption, JWT, DTOs\nTenantContextSpanProcessor)" as CU #81C784
+        component "Common-Claims\nCommon-Members\nCommon-Tenants\nCommon-Entitlements\nCommon-Apps" as CD #81C784
+    }
+}
+
+' ── Technology Architecture ──
+package "Technology Architecture" as TECH #F3E5F5 {
+    component "Spring Boot 3.5.6\nSpring Cloud 2025.0.0\nJava 17" as SB #E1BEE7
+    component "Angular 18\nStandalone Components" as ANG #E1BEE7
+    component "OpenTelemetry SDK\nMicrometer Bridge\nResilient4j" as OTEL #E1BEE7
+    component "Flyway Migrations\nHikariCP Pool\nFeign Clients" as FW #E1BEE7
+    component "Docker\nFargate\nGitHub Actions" as DEPLOY #E1BEE7
+}
+
+' ── Relationships ──
+B1 --> PCA
+B1 --> PCM
+B2 --> AM
+B3 --> AE
+B4 --> PSRE
+B5 --> PBA
+
+PCA --> AC : Feign
+PCA --> AM : Feign
+PCM --> AC : Feign
+PT --> AT : Feign
+PE --> AE : Feign
+
+AC --> DB
+AM --> DB
+AT --> DB
+AE --> DB
+AC --> KAFKA : Events
+AC --> ES : Search Index
+AC --> S3 : Documents
+
+APIS --> CU : uses
+PORTALS --> CD : uses
+LIBS --> OTEL
+
+@enduml

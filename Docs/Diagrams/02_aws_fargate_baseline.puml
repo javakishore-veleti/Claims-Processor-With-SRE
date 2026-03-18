@@ -1,0 +1,105 @@
+@startuml 02_AWS_Fargate_Baseline
+!theme aws-orange
+title AWS Fargate Architecture — Baseline (Without AWS_100)\n<size:12>AWS_99 deployment: 10 Fargate services behind ALB</size>
+
+skinparam cloud {
+    BackgroundColor #232F3E
+    FontColor white
+}
+
+' ── External ──
+actor "Claims Staff" as USER1
+actor "Member / Customer" as USER2
+actor "SRE Engineer" as USER3
+
+' ── AWS Cloud ──
+cloud "AWS Cloud" as AWS {
+
+    ' ── VPC ──
+    rectangle "VPC (10.0.0.0/16)" as VPC #E8EAF6 {
+
+        ' ── Public Subnets ──
+        rectangle "Public Subnets" as PUB #C5CAE9 {
+            component "Application\nLoad Balancer" as ALB #7986CB
+            note right of ALB
+                Path-based routing:
+                /advisor/* → :8081
+                /member/*  → :8082
+                /claims/*  → :8083
+                /members/* → :8084
+                /batch/*   → :8085
+                /tenants/* → :8086
+                /entl/*    → :8087
+                /ptenant/* → :8088
+                /pentl/*   → :8089
+                /sre/*     → :8090
+            end note
+        }
+
+        ' ── Private Subnets ──
+        rectangle "Private Subnets" as PRIV #E8EAF6 {
+
+            rectangle "ECS Cluster (Fargate)" as ECS #FFF3E0 {
+                rectangle "Portal Services" as PS {
+                    component ":8081\nAdvisor" as F1 #FFE0B2
+                    component ":8082\nMember" as F2 #FFE0B2
+                    component ":8085\nBatch" as F3 #FFE0B2
+                    component ":8088\nTenants" as F4 #FFE0B2
+                    component ":8089\nEntitlements" as F5 #FFE0B2
+                    component ":8090\nSRE" as F6 #FFE0B2
+                }
+                rectangle "API Services" as AS {
+                    component ":8083\nClaims" as F7 #C8E6C9
+                    component ":8084\nMembers" as F8 #C8E6C9
+                    component ":8086\nTenants" as F9 #C8E6C9
+                    component ":8087\nEntitlements" as F10 #C8E6C9
+                }
+            }
+
+            ' ── Data Layer ──
+            database "RDS PostgreSQL" as RDS #BBDEFB
+            database "ElastiCache\nRedis" as ELASTICACHE #BBDEFB
+        }
+    }
+
+    ' ── AWS Services (outside VPC) ──
+    component "ECR\n(10 repos)" as ECR #F3E5F5
+    component "Secrets Manager" as SM #F3E5F5
+    component "S3\n(Documents)" as S3 #F3E5F5
+    component "CloudWatch\nLogs + Alarms\nDashboard" as CW #F3E5F5
+    component "CloudTrail" as CT #F3E5F5
+    component "SNS Alerts" as SNS #F3E5F5
+}
+
+' ── Connections ──
+USER1 --> ALB : HTTPS
+USER2 --> ALB : HTTPS
+USER3 --> ALB : HTTPS
+
+ALB --> F1
+ALB --> F2
+ALB --> F7
+
+F1 --> F7 : Feign
+F1 --> F8 : Feign
+F2 --> F7 : Feign
+
+F7 --> RDS
+F8 --> RDS
+F9 --> RDS
+F10 --> RDS
+
+ECS --> ECR : pull images
+ECS --> SM : read secrets
+ECS --> CW : logs + metrics
+F7 --> S3 : claim documents
+CW --> SNS : alarm triggers
+
+note bottom of ECS
+    Each task: 1 container (app only)
+    Profiles: ${Environment},aws
+    Secrets from Secrets Manager
+    Logs to CloudWatch
+end note
+
+@enduml

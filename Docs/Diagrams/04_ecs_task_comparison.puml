@@ -1,0 +1,59 @@
+@startuml 04_ECS_Task_Comparison
+!theme aws-orange
+title ECS Fargate Task Definition — Before vs After AWS_100\n<size:12>Side-by-side: what EnableApplicationSignals changes in each task</size>
+
+skinparam rectangle {
+    roundCorner 10
+}
+
+' ── LEFT: Without Signals ──
+rectangle "Without AWS_100 (default)" as LEFT #E3F2FD {
+
+    rectangle "Fargate Task Definition" as TD1 #BBDEFB {
+        rectangle "Container 1: Application" as C1 #90CAF9 {
+            component "api-claims:latest\nPort: 8083" as IMG1
+            component "SPRING_PROFILES_ACTIVE\n= dev,aws" as ENV1
+            component "SERVER_PORT = 8083" as PORT1
+            component "Secrets: RDS + Redis\nfrom Secrets Manager" as SEC1
+        }
+        note bottom of TD1
+            CPU: 512 | Memory: 1024
+            Network: awsvpc
+            Logs: CloudWatch (awslogs)
+            **1 container per task**
+            ADOT agent present but **inert**
+        end note
+    }
+}
+
+' ── RIGHT: With Signals ──
+rectangle "With AWS_100 (EnableApplicationSignals=true)" as RIGHT #E8F5E9 {
+
+    rectangle "Fargate Task Definition" as TD2 #C8E6C9 {
+        rectangle "Container 1: Application" as C2 #A5D6A7 {
+            component "api-claims:latest\nPort: 8083" as IMG2
+            component "SPRING_PROFILES_ACTIVE\n= dev,aws,**aws-signals**" as ENV2 #81C784
+            component "SERVER_PORT = 8083" as PORT2
+            component "**JAVA_TOOL_OPTIONS**\n= -javaagent:adot.jar" as JTO #81C784
+            component "**OTEL_RESOURCE_ATTRIBUTES**\nservice.name=api-claims\nservice.namespace=claims-proc\ndeployment.environment=dev" as ORA #81C784
+            component "**ENVIRONMENT** = dev\n**PROJECT_NAME** = claims-proc" as EXTRA #81C784
+            component "Secrets: RDS + Redis" as SEC2
+        }
+        rectangle "Container 2: ADOT Collector" as C3 #E1BEE7 {
+            component "aws-otel-collector:latest\nPorts: 4317 (gRPC), 4318 (HTTP)" as ADOT
+            component "Essential: **false**\n(app runs without it)" as ESS
+            component "Config: ecs-default-config.yaml\nExports → X-Ray + CloudWatch" as ADOTCFG
+        }
+        note bottom of TD2
+            CPU: 512 | Memory: 1024
+            Network: awsvpc
+            Logs: CloudWatch (awslogs)
+            **2 containers per task**
+            ADOT agent **active**
+        end note
+    }
+}
+
+LEFT -[hidden]right- RIGHT
+
+@enduml

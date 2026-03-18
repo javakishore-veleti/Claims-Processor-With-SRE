@@ -1,0 +1,87 @@
+@startuml 03_AWS_Fargate_With_Application_Signals
+!theme aws-orange
+title AWS Fargate Architecture — With AWS_100 (Application Signals Enabled)\n<size:12>ADOT sidecar + agent + 8 SLOs added via EnableApplicationSignals=true</size>
+
+skinparam rectangle {
+    roundCorner 10
+}
+
+' ── Fargate Task Detail (zoomed in) ──
+rectangle "Fargate Task (e.g., API-Claims)" as TASK #FFF3E0 {
+    rectangle "App Container" as APP #FFE0B2 {
+        component "Spring Boot App\napi-claims:8083" as SB
+        component "ADOT Java Agent\n-javaagent:/opt/aws-otel.jar" as AGENT #FFCC80
+        component "TenantContextSpanProcessor\n(tenant.id from X-Tenant-Id)" as TCP #FFCC80
+    }
+    rectangle "ADOT Collector Sidecar" as SIDECAR #E1BEE7 {
+        component "aws-otel-collector\n:4317 (gRPC) :4318 (HTTP)" as ADOT
+        component "ecs-default-config.yaml\nExporters: X-Ray + CW" as CFG
+    }
+}
+
+note right of TASK
+    **awsvpc networking**
+    App reaches sidecar at
+    localhost:4317 (same task)
+
+    **Profiles:** dev,aws,aws-signals
+    **Essential:** sidecar=false
+      (app runs even if collector fails)
+end note
+
+' ── AWS Observability Services ──
+rectangle "CloudWatch Application Signals" as CWAS #E8F5E9 {
+    component "Service Discovery\n(10 services auto-detected)" as SD #C8E6C9
+    component "Service Map\nPortal → API → DB" as SM #C8E6C9
+    component "Operations\nGET/POST/PUT per endpoint" as OPS #C8E6C9
+
+    rectangle "SLO Engine (8 SLOs)" as SLOENG #A5D6A7 {
+        component "Availability SLOs\n99.9% × 4 APIs" as AVAIL
+        component "Latency P99 SLOs\n<500ms × 4 APIs" as LAT
+    }
+
+    rectangle "Blog Features (New)" as BLOG #81C784 {
+        component "SLO Recommendations\n(after 30 days)" as REC
+        component "Service-Level SLOs\n(holistic per service)" as SLSLO
+        component "Performance Reports\n(daily/weekly/monthly)" as RPT
+    }
+}
+
+rectangle "AWS X-Ray" as XRAY #E3F2FD {
+    component "Distributed Traces\nPortal → Feign → API → DB" as TRACES
+}
+
+rectangle "CloudWatch" as CW #E3F2FD {
+    component "Metrics\nLatency, Fault, Error" as METRICS
+    component "Logs\n(awslogs driver)" as LOGS
+    component "Alarms\n5xx, P99, Availability" as ALARMS
+}
+
+component "SNS Alert Topic" as SNS #F3E5F5
+
+' ── Data Flow ──
+SB --> AGENT : auto-instrumented
+AGENT --> TCP : adds tenant.id
+TCP --> ADOT : OTLP gRPC\nlocalhost:4317
+
+ADOT --> XRAY : traces
+ADOT --> METRICS : metrics
+ADOT --> SD : service telemetry
+
+SD --> SM
+SD --> OPS
+SD --> SLOENG
+
+SLOENG --> BLOG
+SLOENG --> ALARMS : breach alerts
+ALARMS --> SNS
+
+' ── Per-Tenant ──
+note bottom of TCP
+    **Per-Tenant SLO Tracking**
+    X-Tenant-Id header → tenant.id
+    OTel low-cardinality attribute
+    Filterable in Application Signals
+end note
+
+@enduml

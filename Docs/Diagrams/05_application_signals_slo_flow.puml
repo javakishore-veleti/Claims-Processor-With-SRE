@@ -1,0 +1,62 @@
+@startuml 05_Application_Signals_SLO_Flow
+!theme aws-orange
+title CloudWatch Application Signals — SLO Data Flow\n<size:12>Blog: Amazon CloudWatch Application Signals adds new SLO capabilities (2026-03-13)</size>
+
+skinparam activity {
+    BackgroundColor #FFF3E0
+    BorderColor #E65100
+}
+
+|Fargate Services|
+start
+:Spring Boot app handles\nHTTP request;
+:ADOT Java agent auto-instruments\nrequest (latency, status, trace);
+:TenantContextSpanProcessor\nadds **tenant.id** from X-Tenant-Id;
+:OTLP gRPC → localhost:4317\n(ADOT Collector sidecar);
+
+|ADOT Collector|
+:Receives OTLP telemetry;
+fork
+    :Export **traces** → X-Ray;
+fork again
+    :Export **metrics** → CloudWatch;
+fork again
+    :Export **service telemetry**\n→ Application Signals;
+end fork
+
+|Application Signals|
+:Auto-discover service\n(service.name + namespace);
+:Aggregate per-operation metrics\n(GET /claims, POST /claims, etc.);
+:Feed into **SLO Engine**;
+
+if (SLO breached?) then (yes)
+    :Calculate error budget\nburn rate;
+    if (Fast burn > 14.4x/1h?) then (yes)
+        :Fire CloudWatch Alarm\n→ SNS → email/Slack;
+        :Mark SLO as **Breached**;
+    else (no)
+        if (Slow burn > 6x/6h?) then (yes)
+            :Fire warning alarm;
+            :Mark SLO as **At Risk**;
+        else (no)
+            :SLO **Healthy**;
+        endif
+    endif
+else (no)
+    :SLO **Healthy**\nError budget intact;
+endif
+
+|Blog Feature: Performance Reports|
+:Aggregate daily/weekly/monthly\nSLO compliance data;
+:Generate calendar-aligned\nPerformance Report;
+:Available in Console\n(Week 1+);
+
+|Blog Feature: SLO Recommendations|
+:After 30 days of metrics;
+:Analyze P99 latency + error rates;
+:Suggest data-driven SLO targets;
+:One-click accept → create SLO;
+
+stop
+
+@enduml

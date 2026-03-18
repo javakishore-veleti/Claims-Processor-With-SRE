@@ -288,3 +288,18 @@ Assumes GitHub Actions has deployed the Fargate services via CloudFormation (`AW
 - [SLO Recommendations Documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-ServiceLevelObjectives.html#CloudWatch-ServiceLevelObjectives-Recommendations)
 - [CloudWatch Pricing](https://aws.amazon.com/cloudwatch/pricing/)
 - [README_PENDING_TASKS.md](README_PENDING_TASKS.md) — Platform pending tasks (tracked separately)
+
+## PlantUML Diagrams
+
+Renderable architecture diagrams in [`Docs/Diagrams/`](../Diagrams/):
+
+| Diagram | File | What It Shows |
+|---|---|---|
+| Enterprise BDAT | [`01_enterprise_bdat_architecture.puml`](../Diagrams/01_enterprise_bdat_architecture.puml) | Business, Data, Application, Technology layers |
+| Fargate Baseline | [`02_aws_fargate_baseline.puml`](../Diagrams/02_aws_fargate_baseline.puml) | AWS_99 deployment — 10 Fargate services, ALB, RDS, no signals |
+| Fargate + Signals | [`03_aws_fargate_with_signals.puml`](../Diagrams/03_aws_fargate_with_signals.puml) | AWS_100 enabled — ADOT sidecar, Application Signals, 8 SLOs |
+| ECS Task Comparison | [`04_ecs_task_comparison.puml`](../Diagrams/04_ecs_task_comparison.puml) | Before vs after: env vars, sidecar, agent activation |
+| SLO Data Flow | [`05_application_signals_slo_flow.puml`](../Diagrams/05_application_signals_slo_flow.puml) | App → ADOT → Signals → SLO engine → breach alerts |
+| GitHub Actions | [`06_github_actions_workflow.puml`](../Diagrams/06_github_actions_workflow.puml) | AWS_99 → AWS_100 → AWS_98 workflow sequence |
+
+Render with IntelliJ PlantUML plugin, VS Code extension, or [plantuml.com](https://www.plantuml.com/plantuml/uml).
