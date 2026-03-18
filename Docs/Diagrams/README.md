@@ -16,3 +16,4 @@ Render these `.puml` files using any PlantUML-compatible tool:
 | 04 | `04_ecs_task_comparison.puml` | Side-by-side: ECS task definition before vs after AWS_100 | Blog: SLO 2026-03-13 |
 | 05 | `05_application_signals_slo_flow.puml` | SLO data flow: app → ADOT → Application Signals → SLO engine | Blog: SLO 2026-03-13 |
 | 06 | `06_github_actions_workflow.puml` | AWS_99 (deploy) → AWS_100 (blog toggle) → AWS_98 (destroy) | CI/CD |
+| 07 | `07_aws_services_inventory.puml` | Complete AWS services map — all services grouped by function with connections | Platform-wide |

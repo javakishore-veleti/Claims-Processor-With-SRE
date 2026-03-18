@@ -1,0 +1,190 @@
+@startuml 07_AWS_Services_Inventory
+!theme aws-orange
+title Claims Processor With SRE — Complete AWS Services Map\n<size:12>All AWS services used across CloudFormation stacks, grouped by function</size>
+
+skinparam rectangle {
+    roundCorner 12
+}
+skinparam component {
+    BackgroundColor #FFFFFF
+}
+
+' ── Users ──
+actor "Claims Staff\n(Browser)" as U1
+actor "Member / Customer\n(Browser)" as U2
+actor "SRE / DevOps\n(Console + CLI)" as U3
+actor "GitHub Actions\n(CI/CD)" as GHCI
+
+' ══════════════════════════════════════════════════════════════
+' NETWORKING & SECURITY
+' ══════════════════════════════════════════════════════════════
+rectangle "Networking & Security" as NET #E8EAF6 {
+    component "**Amazon VPC**\n10.0.0.0/16\n2 public + 2 private subnets" as VPC #C5CAE9
+    component "**Internet Gateway**\nPublic internet access" as IGW #C5CAE9
+    component "**NAT Gateway**\n+ Elastic IP\nPrivate subnet outbound" as NAT #C5CAE9
+    component "**Security Groups** (6)\nALB, App, RDS, Redis\nKafka, OpenSearch" as SG #C5CAE9
+}
+
+' ══════════════════════════════════════════════════════════════
+' COMPUTE
+' ══════════════════════════════════════════════════════════════
+rectangle "Compute" as COMPUTE #FFF3E0 {
+    component "**Amazon ECS**\nCluster: claims-proc-{env}\nFargate + Fargate Spot" as ECS #FFE0B2
+    component "**AWS Fargate**\n10 tasks (1 per service)\n512 CPU / 1024 MiB each" as FARGATE #FFE0B2
+    component "**Elastic Load Balancer**\nApplication LB\nPath-based routing\n10 target groups" as ALB #FFE0B2
+    component "**AWS Lambda**\nData seed function\nRDS initial data population" as LAMBDA #FFE0B2
+}
+
+' ══════════════════════════════════════════════════════════════
+' CONTAINERS & ARTIFACTS
+' ══════════════════════════════════════════════════════════════
+rectangle "Container Registry" as REG #F3E5F5 {
+    component "**Amazon ECR**\n10 repositories\n(1 per microservice)\nImage scanning on push\nLifecycle: retain last 10" as ECR #E1BEE7
+}
+
+' ══════════════════════════════════════════════════════════════
+' DATA STORES
+' ══════════════════════════════════════════════════════════════
+rectangle "Data Stores" as DATASTORES #E3F2FD {
+    component "**Amazon RDS**\nPostgreSQL 16\ndb.t3.micro (dev)\nGP3, AES256 encryption\nMulti-AZ (prod)" as RDS #BBDEFB
+    component "**Amazon ElastiCache**\nRedis 7.x\ncache.t3.micro\nTransit encryption\nAuth token" as REDIS #BBDEFB
+    component "**Amazon S3**\nClaim documents bucket\nStatic assets bucket\nCFN templates bucket\nCloudTrail logs bucket\nVersioning + encryption" as S3 #BBDEFB
+}
+
+' ══════════════════════════════════════════════════════════════
+' MESSAGING & SEARCH (optional)
+' ══════════════════════════════════════════════════════════════
+rectangle "Messaging & Search (optional)" as MSG #FFF9C4 {
+    component "**Amazon MSK**\n(Managed Kafka)\nClaim events\n7 topics + DLQ\n(skip_messaging=true default)" as MSK #FFF176
+    component "**Amazon OpenSearch**\nClaim + member indexes\nKibana dashboards\nLog analytics\n(skip_messaging=true default)" as OS #FFF176
+}
+
+' ══════════════════════════════════════════════════════════════
+' SECURITY & SECRETS
+' ══════════════════════════════════════════════════════════════
+rectangle "Security & Secrets" as SEC #FCE4EC {
+    component "**AWS Secrets Manager**\nRDS credentials\nRedis connection URL\nRotation capable" as SM #F8BBD0
+    component "**AWS IAM**\nECS Task Execution Role\nECS Task Role\nCloudTrail Role\nGitHub Actions OIDC" as IAM #F8BBD0
+    component "**Amazon Cognito**\nUser Pool + App Client\n(disabled — feature-toggled)\nOAuth2 / OIDC ready" as COGNITO #F8BBD0
+}
+
+' ══════════════════════════════════════════════════════════════
+' OBSERVABILITY & MONITORING
+' ══════════════════════════════════════════════════════════════
+rectangle "Observability & Monitoring" as OBS #E8F5E9 {
+    component "**Amazon CloudWatch**\n11 Log Groups\n5 Alarms (5xx, P99, avail, RDS)\nApp Health Dashboard\nMetrics (PutMetricData)" as CW #C8E6C9
+    component "**Amazon SNS**\nAlert notification topic\nAlarm → email / webhook" as SNS #C8E6C9
+    component "**AWS CloudTrail**\nAPI audit logging\nS3 + CloudWatch Logs\n(staging + prod only)" as CT #C8E6C9
+    component "**AWS X-Ray**\nDistributed tracing\nService map\nTrace segments" as XRAY #C8E6C9
+}
+
+' ══════════════════════════════════════════════════════════════
+' APPLICATION SIGNALS (Blog Extension — AWS_100)
+' ══════════════════════════════════════════════════════════════
+rectangle "Application Signals (AWS_100 — feature-toggled)" as SIGNALS #DCEDC8 {
+    component "**CloudWatch Application Signals**\nService discovery (10 services)\nService map (Portal→API→DB)\nPer-operation metrics\nPer-tenant filtering (tenant.id)" as CWAS #C5E1A5
+    component "**8 SLOs** (CloudFormation)\nAvailability 99.9% × 4 APIs\nLatency P99 <500ms × 4 APIs\n30-day rolling window" as SLOS #C5E1A5
+    component "**ADOT Collector**\n(Fargate sidecar)\naws-otel-collector:latest\nOTLP → X-Ray + CloudWatch" as ADOT #C5E1A5
+    component "**ADOT Java Agent**\nAuto-instrumentation\nIn each Docker image\nActivated via JAVA_TOOL_OPTIONS" as ADOTJ #C5E1A5
+    component "**Blog Features (New)**\nSLO Recommendations (30d)\nService-Level SLOs\nPerformance Reports" as BLOGF #AED581
+}
+
+' ══════════════════════════════════════════════════════════════
+' AI (future)
+' ══════════════════════════════════════════════════════════════
+rectangle "AI & ML (configured, not active)" as AI #F3E5F5 {
+    component "**Amazon Bedrock**\nClaim document extraction\nData automation\n(feature-toggled, mock today)" as BEDROCK #E1BEE7
+}
+
+' ══════════════════════════════════════════════════════════════
+' CONNECTIONS
+' ══════════════════════════════════════════════════════════════
+
+' Users → ALB
+U1 --> ALB : HTTPS
+U2 --> ALB : HTTPS
+U3 --> CW : Console
+U3 --> CWAS : Console
+GHCI --> ECR : push images
+GHCI --> IAM : assume role
+
+' ALB → Fargate
+ALB --> FARGATE : path routing
+FARGATE --> ECS
+
+' Fargate → Data
+FARGATE --> RDS : JDBC
+FARGATE --> REDIS : cache
+FARGATE --> S3 : documents
+FARGATE --> MSK : events
+FARGATE --> OS : search
+
+' Fargate → Secrets
+FARGATE --> SM : read credentials
+
+' Fargate → Observability
+FARGATE --> CW : awslogs driver
+FARGATE --> XRAY : traces (via ADOT)
+
+' ADOT flow
+ADOTJ --> ADOT : OTLP localhost:4317
+ADOT --> XRAY : traces
+ADOT --> CW : metrics
+ADOT --> CWAS : service telemetry
+CWAS --> SLOS : feeds SLO engine
+SLOS --> BLOGF
+
+' Alarms
+CW --> SNS : alarm actions
+SLOS --> SNS : SLO breach
+
+' CloudTrail
+CT --> S3 : audit logs
+CT --> CW : log integration
+
+' Lambda
+LAMBDA --> RDS : seed data
+
+' Networking
+VPC --> IGW
+VPC --> NAT
+FARGATE --> VPC : awsvpc
+
+' Container pull
+FARGATE --> ECR : pull images
+
+note bottom of SIGNALS
+    **Feature-toggled** via EnableApplicationSignals parameter
+    Enable: run AWS_100 with action=enable
+    Disable: run AWS_100 with action=disable
+    AWS_98 auto-detects and cleans up
+end note
+
+note bottom of MSG
+    **Optional** — skipped by default
+    Enable via skip_messaging=false
+    in AWS_99 workflow dispatch
+end note
+
+note bottom of COGNITO
+    **Disabled** — commented out
+    in AWS_99 and AWS_98
+    Ready for future activation
+end note
+
+' ══════════════════════════════════════════════════════════════
+' LEGEND
+' ══════════════════════════════════════════════════════════════
+legend right
+    |= Color |= Category |
+    | <#E8EAF6> | Networking & Security |
+    | <#FFF3E0> | Compute |
+    | <#F3E5F5> | Containers & AI |
+    | <#E3F2FD> | Data Stores |
+    | <#FFF9C4> | Messaging & Search (optional) |
+    | <#FCE4EC> | Security & Secrets |
+    | <#E8F5E9> | Observability (always-on) |
+    | <#DCEDC8> | Application Signals (AWS_100 toggle) |
+endlegend
+
+@enduml
