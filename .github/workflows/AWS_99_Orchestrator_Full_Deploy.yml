@@ -1273,9 +1273,69 @@ jobs:
               RDSSecretArn="${RDS_ARN}" \
               RedisSecretArn="${REDIS_ARN}" \
             --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            --disable-rollback
 
           echo "### Stack: \`${STACK}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Diagnostic step: capture ECS task failure reasons and container logs
+      - name: Diagnose Fargate failures
+        if: failure()
+        env:
+          ENV: ${{ inputs.environment }}
+          PRJ: ${{ env.PROJECT_NAME }}
+        run: |
+          CLUSTER="${PRJ}-${ENV}"
+          LOG_GROUP="/${PRJ}/${ENV}/ecs"
+
+          echo "## Fargate Deployment Diagnostics" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # 1. CloudFormation stack events (failures only)
+          echo "### CloudFormation Failed Events" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          aws cloudformation describe-stack-events \
+            --stack-name "${PRJ}-${ENV}-fargate" \
+            --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].[LogicalResourceId,ResourceStatusReason]" \
+            --output table 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || echo "No events found" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          # 2. Stopped task reasons
+          echo "### ECS Stopped Task Reasons" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          TASK_ARNS=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status STOPPED \
+            --query 'taskArns[0:5]' --output text 2>/dev/null || echo "")
+          if [[ -n "$TASK_ARNS" && "$TASK_ARNS" != "None" ]]; then
+            aws ecs describe-tasks --cluster "$CLUSTER" --tasks $TASK_ARNS \
+              --query "tasks[].{service:group,reason:stoppedReason,status:lastStatus,container_exit:containers[0].exitCode,container_reason:containers[0].reason}" \
+              --output table 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || echo "Could not describe tasks" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No stopped tasks found in cluster" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          # 3. Recent CloudWatch logs (last 50 events)
+          echo "### Recent Container Logs" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          STREAMS=$(aws logs describe-log-streams --log-group-name "$LOG_GROUP" \
+            --order-by LastEventTime --descending --limit 3 \
+            --query 'logStreams[*].logStreamName' --output text 2>/dev/null || echo "")
+          if [[ -n "$STREAMS" && "$STREAMS" != "None" ]]; then
+            for STREAM in $STREAMS; do
+              echo "--- Stream: $STREAM ---"
+              aws logs get-log-events --log-group-name "$LOG_GROUP" \
+                --log-stream-name "$STREAM" --limit 30 \
+                --query 'events[*].message' --output text 2>/dev/null || echo "No events"
+              echo ""
+            done >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No log streams found in $LOG_GROUP" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> **Note:** Stack left in CREATE_FAILED state with --disable-rollback for inspection." >> "$GITHUB_STEP_SUMMARY"
+          echo "> Delete manually before next deploy: \`aws cloudformation delete-stack --stack-name ${PRJ}-${ENV}-fargate\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # 10  DATA SEED LAMBDA
