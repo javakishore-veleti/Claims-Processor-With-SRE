@@ -44,11 +44,18 @@
         </root>
     </springProfile>
 
-    <!-- Dev profile: JSON console + JSON file for ES shipping -->
-    <springProfile name="dev">
+    <!-- Dev profile: JSON console + JSON file for local ES shipping via Filebeat -->
+    <springProfile name="dev & !aws & !azure & !gcp">
         <root level="INFO">
             <appender-ref ref="JSON_CONSOLE"/>
             <appender-ref ref="JSON_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- AWS/Azure/GCP cloud profiles: JSON console only (CloudWatch/Monitor captures stdout) -->
+    <springProfile name="aws | azure | gcp">
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
         </root>
     </springProfile>
 
