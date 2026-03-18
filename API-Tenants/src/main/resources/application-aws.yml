@@ -1,19 +1,40 @@
 # AWS-specific configuration
-# Values injected from AWS Secrets Manager / SSM Parameter Store / K8s ConfigMap
+# Datasource, Redis injected via SPRING_DATASOURCE_* and SPRING_DATA_REDIS_* env vars
+# set by ECS task definition from Secrets Manager — no explicit overrides needed.
 # Compose with environment profile: --spring.profiles.active=dev,aws
 spring:
   datasource:
-    url: ${AWS_RDS_URL}
-    username: ${AWS_RDS_USERNAME}
-    password: ${AWS_RDS_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
+# Override dev feature toggles for AWS (disable services not deployed)
+tenants:
+  features:
+    search:
+      enabled: false
+    event-stream:
+      enabled: false
+    log-shipping:
+      enabled: false
+    cache:
+      enabled: false
+    metrics:
+      enabled: true
 
 # AWS-specific properties
 aws:
   region: ${AWS_REGION:us-east-1}
   s3:
-    bucket: ${AWS_S3_BUCKET}
+    bucket: ${AWS_S3_BUCKET:}
   secrets-manager:
     enabled: true
   cloudwatch:
     enabled: true
+
+management:
+  health:
+    redis:
+      enabled: false
+    kafka:
+      enabled: false
+    elasticsearch:
+      enabled: false
