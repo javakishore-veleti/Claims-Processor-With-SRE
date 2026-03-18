@@ -933,13 +933,22 @@ jobs:
           # COG_ARN=$(get_out "$SEC" "CognitoConfigSecretArn")  # COGNITO COMMENTED OUT
           REDIS_ARN=$(get_out "$SEC" "RedisCredentialsSecretArn")
 
+          # Construct JDBC URL for Fargate task (expects 'jdbc_url' key)
+          JDBC_URL="jdbc:postgresql://${RDS_HOST}:${RDS_PORT}/claims_db"
+
           [[ -n "$RDS_ARN" && -n "$DB_PASS" ]] && \
             aws secretsmanager put-secret-value --secret-id "$RDS_ARN" \
-              --secret-string "{\"username\":\"claims_user\",\"password\":\"${DB_PASS}\",\"host\":\"${RDS_HOST}\",\"port\":\"${RDS_PORT}\",\"dbname\":\"claims_db\"}"
+              --secret-string "{\"username\":\"claims_user\",\"password\":\"${DB_PASS}\",\"host\":\"${RDS_HOST}\",\"port\":\"${RDS_PORT}\",\"dbname\":\"claims_db\",\"jdbc_url\":\"${JDBC_URL}\"}"
+
+          # Construct Redis URL for Fargate task (expects 'url' key)
+          REDIS_STACK="${PRJ}-${ENV}-redis"
+          REDIS_HOST=$(get_out "$REDIS_STACK" "RedisEndpoint" 2>/dev/null || echo "placeholder-redis")
+          REDIS_PORT=$(get_out "$REDIS_STACK" "RedisPort" 2>/dev/null || echo "6379")
+          REDIS_URL="redis://:${REDIS_TOKEN}@${REDIS_HOST}:${REDIS_PORT}"
 
           [[ -n "$REDIS_ARN" && -n "$REDIS_TOKEN" ]] && \
             aws secretsmanager put-secret-value --secret-id "$REDIS_ARN" \
-              --secret-string "{\"auth-token\":\"${REDIS_TOKEN}\"}"
+              --secret-string "{\"auth-token\":\"${REDIS_TOKEN}\",\"host\":\"${REDIS_HOST}\",\"port\":\"${REDIS_PORT}\",\"url\":\"${REDIS_URL}\"}"
 
           [[ -n "$JWT_ARN" && -n "$JWT_KEY" ]] && \
             aws secretsmanager put-secret-value --secret-id "$JWT_ARN" \
