@@ -310,7 +310,10 @@ jobs:
   deploy-01-vpc:
     name: "1 — VPC & Security Groups"
     needs: check
-    if: needs.check.outputs.s01 == 'deploy'
+    # Always run — VPC stack is fast, idempotent, and may need updates
+    # (e.g., adding VPC Endpoints, changing NAT Gateway).
+    # --no-fail-on-empty-changeset ensures no error when nothing changed.
+    if: always() && !failure()
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
