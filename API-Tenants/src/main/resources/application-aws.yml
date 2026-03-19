@@ -10,13 +10,13 @@ spring:
 tenants:
   features:
     search:
-      enabled: false
+      enabled: ${FEATURE_SEARCH_ENABLED:false}
     event-stream:
-      enabled: false
+      enabled: ${FEATURE_EVENT_STREAM_ENABLED:false}
     log-shipping:
-      enabled: false
+      enabled: ${FEATURE_LOG_SHIPPING_ENABLED:false}
     cache:
-      enabled: false
+      enabled: ${FEATURE_CACHE_ENABLED:false}
     metrics:
       enabled: true
 
@@ -33,8 +33,8 @@ aws:
 management:
   health:
     redis:
-      enabled: false
+      enabled: ${FEATURE_CACHE_ENABLED:false}
     kafka:
-      enabled: false
+      enabled: ${FEATURE_EVENT_STREAM_ENABLED:false}
     elasticsearch:
-      enabled: false
+      enabled: ${FEATURE_SEARCH_ENABLED:false}

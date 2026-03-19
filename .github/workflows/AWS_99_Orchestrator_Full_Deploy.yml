@@ -1217,6 +1217,10 @@ jobs:
           ENV: ${{ inputs.environment }}
           PRJ: ${{ env.PROJECT_NAME }}
           IMAGE_TAG: ${{ inputs.image_tag }}
+          # Feature toggles: invert skip flags (skip_redis=false → EnableCache=true)
+          ENABLE_CACHE: ${{ inputs.skip_redis == false && 'true' || 'false' }}
+          ENABLE_SEARCH: ${{ inputs.skip_messaging == false && 'true' || 'false' }}
+          ENABLE_EVENT_STREAM: ${{ inputs.skip_messaging == false && 'true' || 'false' }}
         run: |
           get_out() {
             aws cloudformation describe-stacks --stack-name "$1" \
@@ -1287,6 +1291,9 @@ jobs:
               ParameterKey=ECRRepoPrefix,ParameterValue="${PRJ}" \
               ParameterKey=RDSSecretArn,ParameterValue="${RDS_ARN}" \
               ParameterKey=RedisSecretArn,ParameterValue="${REDIS_ARN}" \
+              ParameterKey=EnableCache,ParameterValue="${ENABLE_CACHE}" \
+              ParameterKey=EnableSearch,ParameterValue="${ENABLE_SEARCH}" \
+              ParameterKey=EnableEventStream,ParameterValue="${ENABLE_EVENT_STREAM}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --disable-rollback
 

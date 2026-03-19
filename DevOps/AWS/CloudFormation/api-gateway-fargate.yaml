@@ -112,6 +112,24 @@ Parameters:
     Default: ''
     Description: Cognito User Pool ID for authentication (optional)
 
+  EnableCache:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable Redis cache feature toggle in application containers
+
+  EnableSearch:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable OpenSearch/Elasticsearch search feature toggle in application containers
+
+  EnableEventStream:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable Kafka/MSK event stream feature toggle in application containers
+
   EnableApplicationSignals:
     Type: String
     Default: 'false'
@@ -824,6 +842,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8081'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -927,6 +951,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8082'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1030,6 +1060,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8083'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1133,6 +1169,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8084'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1236,6 +1278,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8085'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1339,6 +1387,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8086'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1442,6 +1496,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8087'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1545,6 +1605,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8088'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1648,6 +1714,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8089'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
@@ -1751,6 +1823,12 @@ Resources:
                 - !Sub '${Environment},aws'
             - Name: SERVER_PORT
               Value: '8090'
+            - Name: FEATURE_CACHE_ENABLED
+              Value: !Ref EnableCache
+            - Name: FEATURE_SEARCH_ENABLED
+              Value: !Ref EnableSearch
+            - Name: FEATURE_EVENT_STREAM_ENABLED
+              Value: !Ref EnableEventStream
             - Name: SPRING_FLYWAY_ENABLED
               Value: 'true'
             - !If
