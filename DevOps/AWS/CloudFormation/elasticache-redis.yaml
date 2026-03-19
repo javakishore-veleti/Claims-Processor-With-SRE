@@ -139,3 +139,9 @@ Outputs:
     Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
     Export:
       Name: !Sub '${ProjectName}-${Environment}-redis-endpoint'
+
+  RedisPort:
+    Description: Primary endpoint port for the Redis replication group
+    Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Port
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-redis-port'

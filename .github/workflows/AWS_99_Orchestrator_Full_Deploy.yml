@@ -942,8 +942,10 @@ jobs:
 
           # Construct Redis URL for Fargate task (expects 'url' key)
           REDIS_STACK="${PRJ}-${ENV}-redis"
-          REDIS_HOST=$(get_out "$REDIS_STACK" "RedisEndpoint" 2>/dev/null || echo "placeholder-redis")
-          REDIS_PORT=$(get_out "$REDIS_STACK" "RedisPort" 2>/dev/null || echo "6379")
+          REDIS_HOST=$(get_out "$REDIS_STACK" "RedisEndpoint" 2>/dev/null || echo "")
+          [[ -z "$REDIS_HOST" || "$REDIS_HOST" == "None" ]] && REDIS_HOST="placeholder-redis"
+          # ElastiCache default port is 6379; no RedisPort output in the template
+          REDIS_PORT="6379"
           REDIS_URL="redis://:${REDIS_TOKEN}@${REDIS_HOST}:${REDIS_PORT}"
 
           [[ -n "$REDIS_ARN" && -n "$REDIS_TOKEN" ]] && \
